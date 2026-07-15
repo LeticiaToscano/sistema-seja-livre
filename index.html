@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistema Seja Livre</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0A0D0C;--bg-2:#0E1311;--surface:#131A17;--surface-2:#182119;
+    --border:rgba(255,255,255,.07);--border-strong:rgba(255,255,255,.13);
+    --text:#EAF0EC;--text-dim:#93A29A;--text-faint:#5E6E66;
+    --green:#2EE59D;--green-deep:#0F3D2E;--amber:#F5B841;--amber-deep:#3A2E10;
+    --red:#F65C6E;--red-deep:#3A1620;--blue:#4C86C6;--teal:#2FB5A8;--purple:#9B8CFF;
+    --radius:14px;--radius-sm:10px;--font:'Sora',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:var(--font);background:
+      radial-gradient(1200px 600px at 100% -10%,rgba(46,229,157,.06),transparent 60%),var(--bg);
+    color:var(--text);font-size:14px;-webkit-font-smoothing:antialiased}
+  button{font-family:inherit;cursor:pointer}
+  .hidden{display:none!important}
+
+  /* ---------- LOGIN ---------- */
+  #login{min-height:100vh;display:grid;place-items:center;padding:24px}
+  .login-card{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--border);
+    border-radius:18px;padding:34px 30px}
+  .brand-lg{display:flex;align-items:center;gap:12px;margin-bottom:26px}
+  .mark{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#2EE59D,#12b877);
+    display:grid;place-items:center}
+  .brand-lg .n{font-size:17px;font-weight:800;letter-spacing:-.4px}
+  .brand-lg .s{font-size:10px;color:var(--green);letter-spacing:2px;font-weight:700}
+  .login-card h1{font-size:16px;font-weight:700;margin-bottom:4px}
+  .login-card p{font-size:12.5px;color:var(--text-dim);margin-bottom:22px}
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:11px;color:var(--text-dim);font-weight:600;margin-bottom:6px}
+  .field input{width:100%;background:var(--bg);border:1px solid var(--border-strong);border-radius:10px;
+    padding:11px 13px;color:var(--text);font-size:14px;font-family:inherit}
+  .field input:focus{outline:none;border-color:var(--green)}
+  .btn-primary{width:100%;background:var(--green);color:#04140d;border:none;border-radius:10px;
+    padding:12px;font-size:14px;font-weight:700;margin-top:8px}
+  .btn-primary:disabled{opacity:.6}
+  .login-err{color:var(--red);font-size:12.5px;margin-top:12px;min-height:16px}
+
+  /* ---------- APP SHELL ---------- */
+  #app{display:grid;grid-template-columns:210px 1fr;min-height:100vh}
+  .sidebar{background:var(--bg-2);border-right:1px solid var(--border);padding:20px 14px;display:flex;flex-direction:column}
+  .brand{display:flex;align-items:center;gap:10px;padding:4px 8px 20px}
+  .brand .n{font-size:14px;font-weight:800}
+  .brand .s{font-size:9px;color:var(--green);letter-spacing:1.5px;font-weight:700}
+  .nav{display:flex;flex-direction:column;gap:3px;flex:1}
+  .nav-item{display:flex;align-items:center;gap:11px;padding:10px 11px;border-radius:10px;background:none;
+    border:none;color:var(--text-dim);font-size:13.5px;font-weight:600;text-align:left;width:100%}
+  .nav-item svg{width:18px;height:18px}
+  .nav-item:hover{background:var(--surface);color:var(--text)}
+  .nav-item.active{background:var(--green-deep);color:var(--green)}
+  .foot{border-top:1px solid var(--border);padding-top:12px;margin-top:12px}
+  .user-chip{display:flex;align-items:center;gap:10px;padding:6px 8px}
+  .avatar{width:32px;height:32px;border-radius:9px;background:var(--surface-2);display:grid;place-items:center;
+    font-size:12px;font-weight:700;color:var(--green)}
+  .user-chip .u-name{font-size:12.5px;font-weight:600;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .user-chip .u-role{font-size:10px;color:var(--text-faint)}
+  .btn-logout{margin-top:8px;width:100%;background:none;border:1px solid var(--border-strong);color:var(--text-dim);
+    border-radius:9px;padding:8px;font-size:12px;font-weight:600}
+  .btn-logout:hover{color:var(--text);border-color:var(--red)}
+
+  .main{overflow-y:auto;height:100vh}
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:20px 28px;border-bottom:1px solid var(--border);
+    position:sticky;top:0;background:rgba(10,13,12,.86);backdrop-filter:blur(10px);z-index:10}
+  .topbar .crumb{font-size:11px;color:var(--text-faint);letter-spacing:.4px;font-weight:600}
+  .topbar h1{font-size:19px;font-weight:700;letter-spacing:-.3px;margin-top:2px}
+  .live{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--text-dim);font-weight:600}
+  .live .dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 3px rgba(46,229,157,.18)}
+  .content{padding:26px 28px 60px}
+
+  /* KPIs */
+  .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:17px 18px}
+  .kpi .k-label{font-size:11px;color:var(--text-dim);font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+  .kpi .k-val{font-size:27px;font-weight:800;letter-spacing:-1px;margin-top:7px}
+  .kpi .k-sub{font-size:11.5px;color:var(--text-faint);margin-top:3px}
+
+  .sec-title{font-size:12px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.8px;
+    margin:6px 0 14px;display:flex;align-items:center;gap:12px}
+  .sec-title .rule{flex:1;height:1px;background:var(--border)}
+
+  /* radar bars */
+  .radar-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px}
+  .rcard{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;position:relative;overflow:hidden}
+  .rcard .rc-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .rcard .rc-name{font-size:13px;font-weight:700}
+  .rcard .rc-val{font-size:32px;font-weight:800;letter-spacing:-1.5px}
+  .rcard .rc-pct{font-size:12px;color:var(--text-faint);font-weight:600;margin-top:2px}
+  .rcard .rc-bar{height:6px;border-radius:4px;background:var(--bg);margin-top:14px;overflow:hidden}
+  .rcard .rc-fill{height:100%;border-radius:4px}
+  .tag{font-size:10px;font-weight:700;padding:4px 10px;border-radius:20px}
+  .t-green{background:var(--green-deep);color:var(--green)}
+  .t-amber{background:var(--amber-deep);color:#ffcf7a}
+  .t-red{background:var(--red-deep);color:#ff9aa6}
+
+  .health-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+  .hpill{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:12px 16px;flex:1;min-width:140px}
+  .hpill .hp-n{font-size:20px;font-weight:800}
+  .hpill .hp-l{font-size:11px;color:var(--text-dim);font-weight:600;margin-top:2px}
+
+  /* tables */
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+  .toolbar{display:flex;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border);align-items:center}
+  .search{flex:1;background:var(--bg);border:1px solid var(--border-strong);border-radius:9px;padding:9px 13px;
+    color:var(--text);font-size:13px;font-family:inherit}
+  .search:focus{outline:none;border-color:var(--green)}
+  table{width:100%;border-collapse:collapse}
+  th{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-faint);font-weight:700;
+    text-align:left;padding:11px 16px;border-bottom:1px solid var(--border);background:var(--bg-2)}
+  td{padding:12px 16px;border-bottom:1px solid var(--border);font-size:13px}
+  tbody tr{cursor:pointer}
+  tbody tr:hover{background:var(--surface-2)}
+  tbody tr:last-child td{border-bottom:none}
+  .cell-name{display:flex;align-items:center;gap:10px;font-weight:600}
+  .mini-av{width:26px;height:26px;border-radius:7px;background:var(--surface-2);display:grid;place-items:center;
+    font-size:10px;font-weight:700;color:var(--text-dim);flex-shrink:0}
+  .status{font-size:10.5px;font-weight:700;padding:4px 10px;border-radius:20px;display:inline-block}
+  .s-saudavel{background:var(--green-deep);color:#5fe6b3}
+  .s-negligenciado{background:var(--amber-deep);color:#ffcf7a}
+  .s-em_recuperacao{background:rgba(76,134,198,.16);color:#8fbef0}
+  .s-critico{background:var(--red-deep);color:#ff9aa6}
+  .s-nunca_operou{background:var(--surface-2);color:var(--text-faint)}
+  .num{font-variant-numeric:tabular-nums;color:var(--text-dim)}
+  .score-badge{font-weight:800;font-variant-numeric:tabular-nums}
+
+  .loading,.empty{padding:44px;text-align:center;color:var(--text-faint);font-size:13px}
+  .spinner{width:22px;height:22px;border:2.5px solid var(--border-strong);border-top-color:var(--green);
+    border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 12px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* drawer */
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(2px);opacity:0;pointer-events:none;
+    transition:.25s;z-index:40}
+  .overlay.open{opacity:1;pointer-events:auto}
+  .drawer{position:fixed;top:0;right:0;height:100vh;width:440px;max-width:94vw;background:var(--bg-2);
+    border-left:1px solid var(--border-strong);transform:translateX(100%);transition:.3s cubic-bezier(.2,.7,.2,1);
+    z-index:41;display:flex;flex-direction:column;box-shadow:-30px 0 60px -20px rgba(0,0,0,.7)}
+  .drawer.open{transform:none}
+  .dr-head{padding:22px 24px 18px;border-bottom:1px solid var(--border);position:relative}
+  .dr-close{position:absolute;top:20px;right:20px;background:var(--surface);border:1px solid var(--border-strong);
+    color:var(--text-dim);width:32px;height:32px;border-radius:8px;font-size:15px}
+  .dr-name{font-size:19px;font-weight:700;letter-spacing:-.3px;margin:10px 0 4px}
+  .dr-sub{font-size:12px;color:var(--text-dim);font-weight:600}
+  .dr-body{padding:18px 24px;overflow-y:auto;flex:1}
+  .dr-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
+  .dr-stat{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:12px 13px}
+  .dr-stat .l{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-faint);font-weight:700}
+  .dr-stat .v{font-size:16px;font-weight:700;margin-top:5px}
+  .dr-sec{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text-faint);font-weight:700;margin:18px 0 10px}
+
+  @media(max-width:860px){
+    #app{grid-template-columns:1fr}
+    .sidebar{position:fixed;left:0;top:0;bottom:0;width:210px;transform:translateX(-100%);transition:.25s;z-index:50}
+    .sidebar.open{transform:none}
+    .kpi-grid{grid-template-columns:1fr 1fr}.radar-grid{grid-template-columns:1fr}
+    .menu-btn{display:grid!important}
+  }
+  .menu-btn{display:none;place-items:center;width:36px;height:36px;border-radius:9px;background:var(--surface);
+    border:1px solid var(--border-strong);color:var(--text)}
+</style>
+</head>
+<body>
+
+<!-- ==================== LOGIN ==================== -->
+<div id="login">
+  <div class="login-card">
+    <div class="brand-lg">
+      <div class="mark"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 15c3-1 5-8 8-8s3 5 8 3" stroke="#04140d" stroke-width="2.4" stroke-linecap="round"/><circle cx="12" cy="7" r="1.6" fill="#04140d"/></svg></div>
+      <div><div class="n">Seja Livre</div><div class="s">INVESTIMENTOS</div></div>
+    </div>
+    <h1>Entrar no sistema</h1>
+    <p>Acesso restrito à equipe Seja Livre.</p>
+    <form id="loginForm">
+      <div class="field"><label>E-mail</label><input type="email" id="email" autocomplete="username" required></div>
+      <div class="field"><label>Senha</label><input type="password" id="password" autocomplete="current-password" required></div>
+      <button class="btn-primary" id="loginBtn" type="submit">Entrar</button>
+      <div class="login-err" id="loginErr"></div>
+    </form>
+  </div>
+</div>
+
+<!-- ==================== APP ==================== -->
+<div id="app" class="hidden">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="mark" style="width:32px;height:32px;border-radius:9px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 15c3-1 5-8 8-8s3 5 8 3" stroke="#04140d" stroke-width="2.4" stroke-linecap="round"/><circle cx="12" cy="7" r="1.6" fill="#04140d"/></svg></div>
+      <div><div class="n">Seja Livre</div><div class="s">SISTEMA</div></div>
+    </div>
+    <nav class="nav">
+      <button class="nav-item active" data-view="radar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/></svg>Radar</button>
+      <button class="nav-item" data-view="clientes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3.2 3-5 5.5-5s4.9 1.8 5.5 5" stroke-linecap="round"/></svg>Clientes</button>
+      <button class="nav-item" data-view="destaques"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l2.5 5 5.5.8-4 3.9 1 5.5L12 16l-5 2.7 1-5.5-4-3.9 5.5-.8z" stroke-linejoin="round"/></svg>Destaques</button>
+    </nav>
+    <div class="foot">
+      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div></div></div>
+      <button class="btn-logout" id="logoutBtn">Sair</button>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:14px">
+        <button class="menu-btn" id="menuBtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16" stroke-linecap="round"/></svg></button>
+        <div><div class="crumb" id="crumb">CARTEIRA</div><h1 id="pageTitle">Radar de retenção</h1></div>
+      </div>
+      <div class="live"><span class="dot"></span>Dados ao vivo</div>
+    </div>
+    <div class="content" id="content"><div class="loading"><div class="spinner"></div>Carregando…</div></div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay"></div>
+<aside class="drawer" id="drawer">
+  <div class="dr-head"><button class="dr-close" id="drClose">✕</button><div id="drStatus"></div><div class="dr-name" id="drName"></div><div class="dr-sub" id="drSub"></div></div>
+  <div class="dr-body" id="drBody"></div>
+</aside>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// ============ CONFIG (a chave publishable é pública por natureza — o RLS protege) ============
+const SUPABASE_URL = "https://hdgacffmwigdscrtctia.supabase.co";
+const SUPABASE_KEY = "sb_publishable_8-g_Xdbxmb52CnPVhOpkBw_BmJk2M1a";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const SAUDE_LABEL = {saudavel:"Saudável",negligenciado:"Negligenciado",em_recuperacao:"Em recuperação",critico:"Crítico",nunca_operou:"Nunca operou"};
+const el = id => document.getElementById(id);
+const ini = n => (n||"?").trim().split(/\s+/).slice(0,2).map(w=>w[0]).join("").toUpperCase();
+const nf = n => (n==null?"—":Number(n).toLocaleString("pt-BR"));
+const fmtData = d => d ? new Date(d+"T00:00:00").toLocaleDateString("pt-BR") : "nunca";
+
+// ---------- AUTH ----------
+async function boot(){
+  const {data:{session}} = await sb.auth.getSession();
+  if(session){ mostrarApp(session); } else { el("login").classList.remove("hidden"); el("app").classList.add("hidden"); }
+}
+el("loginForm").addEventListener("submit", async e=>{
+  e.preventDefault();
+  const btn=el("loginBtn"); btn.disabled=true; btn.textContent="Entrando…"; el("loginErr").textContent="";
+  const {data,error}=await sb.auth.signInWithPassword({email:el("email").value.trim(),password:el("password").value});
+  btn.disabled=false; btn.textContent="Entrar";
+  if(error){ el("loginErr").textContent = error.message.includes("Invalid")?"E-mail ou senha incorretos.":error.message; return; }
+  mostrarApp(data.session);
+});
+el("logoutBtn").addEventListener("click", async ()=>{ await sb.auth.signOut(); location.reload(); });
+
+async function mostrarApp(session){
+  el("login").classList.add("hidden"); el("app").classList.remove("hidden");
+  const email = session.user.email;
+  // busca o papel/nome do assessor logado
+  let nome=email, papel="—";
+  const {data:a} = await sb.from("assessores").select("nome,papel").eq("auth_user_id",session.user.id).maybeSingle();
+  if(a){ nome=a.nome||email; papel=a.papel; }
+  el("userName").textContent=nome; el("avatar").textContent=ini(nome);
+  el("userRole").textContent = papel==="admin"?"Administrador":papel==="gerencia"?"Gerência":"Assessor";
+  render("radar");
+}
+
+// ---------- ROTEADOR ----------
+const TITLES={radar:["CARTEIRA","Radar de retenção"],clientes:["CARTEIRA","Clientes"],destaques:["CARTEIRA","Destaques"]};
+document.querySelectorAll(".nav-item").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll(".nav-item").forEach(x=>x.classList.remove("active"));
+  b.classList.add("active"); el("sidebar").classList.remove("open"); render(b.dataset.view);
+}));
+function render(view){
+  el("crumb").textContent=TITLES[view][0]; el("pageTitle").textContent=TITLES[view][1];
+  el("content").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
+  ({radar:vRadar,clientes:vClientes,destaques:vDestaques}[view])();
+}
+
+// ---------- RADAR ----------
+async function vRadar(){
+  const {data,error} = await sb.rpc("fn_dashboard_resumo");
+  if(error){ return erro(error); }
+  const r = data.radar||{}; const tot=data.total_clientes||0;
+  const oper=data.operando||0, parou=data.parou||0, nunca=data.nunca||0;
+  const pct = n => tot? Math.round(100*n/tot):0;
+  const bloco=(nome,val,cor,tag)=>`<div class="rcard"><div class="rc-top"><span class="rc-name">${nome}</span>${tag}</div>
+    <div class="rc-val" style="color:${cor}">${nf(val)}</div><div class="rc-pct">${pct(val)}% da base</div>
+    <div class="rc-bar"><div class="rc-fill" style="width:${pct(val)}%;background:${cor}"></div></div></div>`;
+  const health = ["saudavel","negligenciado","em_recuperacao","critico","nunca_operou"]
+    .map(k=>`<div class="hpill"><div class="hp-n">${nf(r[k]||0)}</div><div class="hp-l">${SAUDE_LABEL[k]}</div></div>`).join("");
+  el("content").innerHTML=`
+    <div class="kpi-grid">
+      <div class="kpi"><div class="k-label">Base ativa</div><div class="k-val">${nf(tot)}</div><div class="k-sub">clientes Seja Livre</div></div>
+      <div class="kpi"><div class="k-label">Operando</div><div class="k-val" style="color:var(--green)">${nf(oper)}</div><div class="k-sub">${pct(oper)}% · últimos 60 dias</div></div>
+      <div class="kpi"><div class="k-label">Parou de operar</div><div class="k-val" style="color:var(--amber)">${nf(parou)}</div><div class="k-sub">${pct(parou)}% · reativação</div></div>
+      <div class="kpi"><div class="k-label">Nunca operou</div><div class="k-val" style="color:var(--text-dim)">${nf(nunca)}</div><div class="k-sub">${pct(nunca)}% · ativação</div></div>
+    </div>
+    <div class="sec-title">Situação de operação<span class="rule"></span></div>
+    <div class="radar-grid">
+      ${bloco("Operando",oper,"var(--green)",'<span class="tag t-green">ativo</span>')}
+      ${bloco("Parou de operar",parou,"var(--amber)",'<span class="tag t-amber">recuperar</span>')}
+      ${bloco("Nunca operou",nunca,"var(--text-dim)",'<span class="tag t-red">ativar</span>')}
+    </div>
+    <div class="sec-title">Saúde da carteira<span class="rule"></span></div>
+    <div class="health-row">${health}</div>`;
+}
+
+// ---------- CLIENTES ----------
+let buscaTimer=null;
+async function vClientes(){
+  el("content").innerHTML=`
+    <div class="panel">
+      <div class="toolbar"><input class="search" id="busca" placeholder="Buscar por nome ou Sinacor…"></div>
+      <div id="tabelaClientes"><div class="loading"><div class="spinner"></div>Carregando…</div></div>
+    </div>`;
+  el("busca").addEventListener("input",e=>{ clearTimeout(buscaTimer); buscaTimer=setTimeout(()=>carregarClientes(e.target.value.trim()),300); });
+  carregarClientes("");
+}
+async function carregarClientes(termo){
+  let q = sb.from("vw_saude_carteira").select("id,nome,sinacor,barra,saude,data_ultima_operacao").limit(100);
+  if(termo){ q = q.or(`nome.ilike.%${termo}%,sinacor.ilike.%${termo}%`); }
+  const {data,error} = await q;
+  if(error){ return erro(error,"tabelaClientes"); }
+  if(!data.length){ el("tabelaClientes").innerHTML='<div class="empty">Nenhum cliente encontrado.</div>'; return; }
+  el("tabelaClientes").innerHTML=`<table><thead><tr><th>Cliente</th><th>Sinacor</th><th>Barra</th><th>Situação</th><th>Última operação</th></tr></thead>
+    <tbody>${data.map(c=>`<tr onclick="abrirFicha('${c.id}')">
+      <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}</div></td>
+      <td class="num">${c.sinacor}</td><td class="num">${c.barra||"—"}</td>
+      <td><span class="status s-${c.saude}">${SAUDE_LABEL[c.saude]||c.saude}</span></td>
+      <td class="num">${fmtData(c.data_ultima_operacao)}</td></tr>`).join("")}</tbody></table>
+    <div style="padding:12px 16px;font-size:11px;color:var(--text-faint)">Mostrando até 100 resultados. Refine a busca para ver outros.</div>`;
+}
+
+// ---------- DESTAQUES ----------
+async function vDestaques(){
+  const {data,error}=await sb.from("vw_score_cliente").select("id,nome,sinacor,barra,contratos_bmf,qtd_operacoes,score").order("score",{ascending:false}).limit(50);
+  if(error){ return erro(error); }
+  el("content").innerHTML=`
+    <div class="sec-title">Top 50 da carteira por score<span class="rule"></span></div>
+    <div class="panel"><table><thead><tr><th>#</th><th>Cliente</th><th>Barra</th><th>Contratos (BM&F)</th><th>Operações</th><th>Score</th></tr></thead>
+    <tbody>${data.map((c,i)=>`<tr onclick="abrirFicha('${c.id}')">
+      <td class="num">${i+1}</td>
+      <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}</div></td>
+      <td class="num">${c.barra||"—"}</td><td class="num">${nf(c.contratos_bmf)}</td><td class="num">${nf(c.qtd_operacoes)}</td>
+      <td><span class="score-badge" style="color:${c.score>=85?'var(--green)':c.score>=60?'var(--amber)':'var(--text-dim)'}">${c.score??"—"}</span></td></tr>`).join("")}</tbody></table></div>`;
+}
+
+// ---------- FICHA (drawer) ----------
+async function abrirFicha(id){
+  el("overlay").classList.add("open"); el("drawer").classList.add("open");
+  el("drBody").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
+  el("drName").textContent=""; el("drSub").textContent=""; el("drStatus").innerHTML="";
+  const {data:c} = await sb.from("clientes").select("*").eq("id",id).single();
+  const {data:s} = await sb.from("vw_saude_carteira").select("saude,status_operacao,data_ativacao,data_ultima_operacao,contratos_bmf,volume_bovespa,qtd_operacoes").eq("id",id).maybeSingle();
+  if(!c){ el("drBody").innerHTML='<div class="empty">Cliente não encontrado.</div>'; return; }
+  el("drName").textContent=c.nome;
+  el("drSub").textContent=`Sinacor ${c.sinacor} · ${c.barra||"sem barra"}`;
+  if(s){ el("drStatus").innerHTML=`<span class="status s-${s.saude}">${SAUDE_LABEL[s.saude]||s.saude}</span>`; }
+  const aniv = (c.nasc_dia&&c.nasc_mes)? String(c.nasc_dia).padStart(2,"0")+"/"+String(c.nasc_mes).padStart(2,"0") : "—";
+  el("drBody").innerHTML=`
+    <div class="dr-stats">
+      <div class="dr-stat"><div class="l">Última operação</div><div class="v" style="font-size:14px">${s?fmtData(s.data_ultima_operacao):"—"}</div></div>
+      <div class="dr-stat"><div class="l">1ª operação</div><div class="v" style="font-size:14px">${s?fmtData(s.data_ativacao):"—"}</div></div>
+      <div class="dr-stat"><div class="l">Contratos (BM&F)</div><div class="v" style="font-size:14px">${s?nf(s.contratos_bmf):"—"}</div></div>
+      <div class="dr-stat"><div class="l">Nº de operações</div><div class="v" style="font-size:14px">${s?nf(s.qtd_operacoes):"—"}</div></div>
+      <div class="dr-stat"><div class="l">Aniversário</div><div class="v" style="font-size:14px">${aniv}</div></div>
+      <div class="dr-stat"><div class="l">Cadastro</div><div class="v" style="font-size:14px">${fmtData(c.data_cadastro)}</div></div>
+    </div>
+    <div class="dr-sec">Contato</div>
+    <div class="dr-stats">
+      <div class="dr-stat"><div class="l">Telefone</div><div class="v" style="font-size:13px">${c.telefone||"—"}</div></div>
+      <div class="dr-stat"><div class="l">E-mail</div><div class="v" style="font-size:12px;word-break:break-all">${c.email||"—"}</div></div>
+    </div>`;
+}
+function fecharFicha(){ el("overlay").classList.remove("open"); el("drawer").classList.remove("open"); }
+el("drClose").addEventListener("click",fecharFicha);
+el("overlay").addEventListener("click",fecharFicha);
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") fecharFicha(); });
+el("menuBtn").addEventListener("click",()=>el("sidebar").classList.toggle("open"));
+
+// ---------- erro ----------
+function erro(e,alvo){
+  const html=`<div class="empty">Não foi possível carregar os dados.<br><span style="font-size:11px;color:var(--text-faint)">${(e.message||e).toString()}</span><br><br>Se você acabou de criar seu acesso, confira se rodou o passo que vincula seu login como administrador.</div>`;
+  el(alvo||"content").innerHTML=html;
+}
+
+boot();
+</script>
+</body>
+</html>
