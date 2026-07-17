@@ -151,10 +151,14 @@
   .s-critico{background:var(--red-deep);color:#ff9aa6}
   .s-nunca_operou{background:var(--surface-2);color:var(--text-faint)}
   .num{font-variant-numeric:tabular-nums;color:var(--text-dim)}
-  .faixa{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;padding:4px 9px;
-    border-radius:20px;white-space:nowrap;letter-spacing:.2px}
-  .faixa .bi{width:12px;height:12px}
-  .faixa.preta{box-shadow:0 0 0 1px rgba(245,184,65,.45),0 0 14px rgba(245,184,65,.22)}
+  .faixa{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;padding:3px 11px 3px 5px;
+    border-radius:20px;white-space:nowrap;background:var(--surface-2);border:1px solid var(--border)}
+  .faixa .belt{flex-shrink:0}
+  .faixa.f-branca .fn{color:#EAEFEC}.faixa.f-azul .fn{color:#5B9BE0}.faixa.f-roxa .fn{color:#A78BFF}
+  .faixa.f-marrom .fn{color:#C8843C}.faixa.f-preta .fn{color:#F5B841}
+  .faixa.f-preta{border-color:rgba(245,184,65,.4);box-shadow:0 0 11px rgba(245,184,65,.16)}
+  .faixa.sem{opacity:.6}.faixa.sem .fn{color:var(--text-faint)}
+  .graus{color:#F5B841;font-size:10px;letter-spacing:1px}
   tr.linha-preta td{background:linear-gradient(90deg,rgba(245,184,65,.07),transparent 60%)}
   .btn-rd{display:inline-flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--border-strong);
     color:var(--text-dim);border-radius:8px;padding:6px 11px;font-size:11.5px;font-weight:600}
@@ -306,15 +310,23 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const SAUDE_LABEL = {saudavel:"Saudável",negligenciado:"Negligenciado",em_recuperacao:"Em recuperação",critico:"Crítico",nunca_operou:"Nunca operou"};
 const OP_LABEL = {operando:"Operando",parou:"Parou de operar",nunca_operou:"Nunca operou"};
 const nfR = v => (v==null||v==0)?"—":"R$ "+Number(v).toLocaleString("pt-BR",{maximumFractionDigits:0});
-const FAIXAS={
-  branca:{n:"Branca",c:"#DBDFDC",t:"#0A0D0C"}, azul:{n:"Azul",c:"#3C7BD4",t:"#fff"},
-  roxa:{n:"Roxa",c:"#9B7BFF",t:"#fff"}, marrom:{n:"Marrom",c:"#B5732E",t:"#fff"},
-  preta:{n:"Preta",c:"#15181A",t:"#F5B841"}
-};
-function faixaBadge(f){
-  const x=FAIXAS[f]||FAIXAS.branca;
-  return `<span class="faixa${f==='preta'?' preta':''}" style="background:${x.c};color:${x.t}">`+
-    `<svg class="bi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="9" width="18" height="6" rx="1"/><path d="M8 9v6M16 9v6"/></svg>${x.n}</span>`;
+const FAIXA_NOME={sem:"Sem faixa",branca:"Branca",azul:"Azul",roxa:"Roxa",marrom:"Marrom",preta:"Preta"};
+function beltSVG(faixa){
+  const map={sem:"#4A574F",branca:"#E8ECEA",azul:"#5B9BE0",roxa:"#A78BFF",marrom:"#C8843C",preta:"#181B1D"};
+  const cor=map[faixa]||"#E8ECEA", st="rgba(0,0,0,.32)";
+  const tip = faixa==='preta' ? `<rect x="20.4" y="6" width="3.6" height="9.5" fill="#F5B841"/>` : "";
+  return `<svg class="belt" viewBox="0 0 30 21" width="26" height="18" aria-hidden="true">
+    <rect x="1" y="7.2" width="28" height="6.6" rx="1.6" fill="${cor}" stroke="${st}" stroke-width=".7"/>
+    <path d="M9.6 8.6l4 1.9-4 1.9z M20.4 8.6l-4 1.9 4 1.9z" fill="${cor}" stroke="${st}" stroke-width=".7"/>
+    <rect x="11.2" y="5.2" width="7.6" height="10.6" rx="1.6" fill="${cor}" stroke="${st}" stroke-width=".7"/>
+    ${tip}
+  </svg>`;
+}
+function faixaBadge(faixa, grau){
+  faixa = faixa || "sem";
+  if(faixa==="sem") return `<span class="faixa sem">${beltSVG("sem")}<span class="fn">Sem faixa</span></span>`;
+  const estrelas = (faixa==="preta" && grau>0) ? `<span class="graus">${"★".repeat(grau)}</span>` : "";
+  return `<span class="faixa f-${faixa}">${beltSVG(faixa)}<span class="fn">${FAIXA_NOME[faixa]}</span>${estrelas}</span>`;
 }
 function volDisplay(bmf,bov){
   const b=Number(bmf)||0, v=Number(bov)||0, p=[];
@@ -420,7 +432,7 @@ async function vFila(){
 async function carregarFilaFull(){
   const {page,size}=filaState, from=page*size, to=from+size-1;
   const {data,error,count} = await sb.from("vw_fila_acao")
-    .select("id,nome,barra,contratos_bmf,volume_bovespa,qtd_operacoes,data_ultima_operacao,faixa,score",{count:"exact"})
+    .select("id,nome,barra,contratos_bmf,volume_bovespa,qtd_operacoes,data_ultima_operacao,faixa,grau,score",{count:"exact"})
     .range(from,to);
   if(error){ return erro(error,"filaFull"); }
   if(!data||!data.length){ el("filaFull").innerHTML='<div class="empty">Nenhum cliente parado no momento.</div>'; return; }
@@ -428,7 +440,7 @@ async function carregarFilaFull(){
   el("filaFull").innerHTML=`<table><thead><tr><th>Cliente</th><th>Faixa</th><th>Barra</th><th>Atividade</th><th>Parou desde</th><th>Score</th><th></th></tr></thead>
     <tbody>${data.map(c=>`<tr class="${c.faixa==='preta'?'linha-preta':''}" onclick="abrirFicha('${c.id}')">
       <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}</div></td>
-      <td>${faixaBadge(c.faixa)}</td>
+      <td>${faixaBadge(c.faixa,c.grau)}</td>
       <td class="num">${c.barra||"—"}</td>
       <td class="num">${volDisplay(c.contratos_bmf,c.volume_bovespa)}</td>
       <td class="num">${fmtDesde(c.data_ultima_operacao)}</td>
@@ -520,13 +532,13 @@ async function vRadar(){
 
 async function carregarFila(){
   const {data,error} = await sb.from("vw_fila_acao")
-    .select("id,nome,barra,contratos_bmf,volume_bovespa,data_ultima_operacao,faixa,score").limit(12);
+    .select("id,nome,barra,contratos_bmf,volume_bovespa,data_ultima_operacao,faixa,grau,score").limit(12);
   if(error){ return erro(error,"filaAcao"); }
   if(!data||!data.length){ el("filaAcao").innerHTML='<div class="empty">Nenhum cliente parado no momento.</div>'; return; }
   el("filaAcao").innerHTML=`<table><thead><tr><th>Cliente</th><th>Faixa</th><th>Atividade</th><th>Parou desde</th></tr></thead>
     <tbody>${data.map(c=>`<tr class="${c.faixa==='preta'?'linha-preta':''}" onclick="abrirFicha('${c.id}')">
       <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}</div></td>
-      <td>${faixaBadge(c.faixa)}</td>
+      <td>${faixaBadge(c.faixa,c.grau)}</td>
       <td class="num">${volDisplay(c.contratos_bmf,c.volume_bovespa)}</td>
       <td class="num">${fmtDesde(c.data_ultima_operacao)}</td></tr>`).join("")}</tbody></table>`;
 }
@@ -565,7 +577,7 @@ function vClientes(){
 async function carregarClientes(){
   const {termo,filtro,page,size}=cliState;
   const from=page*size, to=from+size-1;
-  let q = sb.from("vw_saude_carteira").select("id,nome,sinacor,barra,saude,status_operacao,data_ultima_operacao,contratos_bmf,volume_bovespa,faixa",{count:"exact"}).order("nome").range(from,to);
+  let q = sb.from("vw_saude_carteira").select("id,nome,sinacor,barra,saude,status_operacao,data_ultima_operacao,contratos_bmf,volume_bovespa,faixa,grau",{count:"exact"}).order("nome").range(from,to);
   if(termo){ q = q.or(`nome.ilike.%${termo}%,sinacor.ilike.%${termo}%`); }
   if(filtro!=="todos"){ q = q.eq("status_operacao",filtro); }
   const {data,error,count} = await q;
@@ -576,7 +588,7 @@ async function carregarClientes(){
   el("tabelaClientes").innerHTML=`<table><thead><tr><th>Cliente</th><th>Faixa</th><th>Barra</th><th>Atividade</th><th>Situação</th><th>Última op.</th></tr></thead>
     <tbody>${data.map(c=>`<tr class="${c.faixa==='preta'?'linha-preta':''}" onclick="abrirFicha('${c.id}')">
       <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}</div></td>
-      <td>${faixaBadge(c.faixa)}</td>
+      <td>${faixaBadge(c.faixa,c.grau)}</td>
       <td class="num">${c.barra||"—"}</td>
       <td class="num">${volDisplay(c.contratos_bmf,c.volume_bovespa)}</td>
       <td><span class="status s-${c.saude}">${SAUDE_LABEL[c.saude]||c.saude}</span></td>
@@ -617,7 +629,7 @@ async function vDestaques(){
 }
 async function carregarDestaques(){
   el("tabelaDest").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
-  let q=sb.from("vw_score_cliente").select("id,nome,barra,contratos_bmf,volume_bovespa,qtd_operacoes,score,faixa,data_ultima_operacao");
+  let q=sb.from("vw_score_cliente").select("id,nome,barra,contratos_bmf,volume_bovespa,qtd_operacoes,score,faixa,grau,data_ultima_operacao");
   if(destState.barra!=="todas") q=q.eq("barra",destState.barra);
   if(destState.ordem==="score") q=q.order("score",{ascending:false});
   else if(destState.ordem==="recente") q=q.order("data_ultima_operacao",{ascending:false,nullsFirst:false});
@@ -629,7 +641,7 @@ async function carregarDestaques(){
     <tbody>${data.map((c,i)=>`<tr class="${c.faixa==='preta'?'linha-preta':''}" onclick="abrirFicha('${c.id}')">
       <td class="num">${i+1}</td>
       <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}</div></td>
-      <td>${faixaBadge(c.faixa)}</td>
+      <td>${faixaBadge(c.faixa,c.grau)}</td>
       <td class="num">${c.barra||"—"}</td>
       <td class="num">${volDisplay(c.contratos_bmf,c.volume_bovespa)}</td>
       <td class="num">${fmtData(c.data_ultima_operacao)}</td>
@@ -643,24 +655,24 @@ async function abrirFicha(id){
   el("drBody").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
   el("drName").textContent=""; el("drSub").textContent=""; el("drStatus").innerHTML=""; el("drActions").innerHTML="";
   const {data:c} = await sb.from("clientes").select("*").eq("id",id).single();
-  const {data:s} = await sb.from("vw_saude_carteira").select("saude,status_operacao,data_ativacao,data_ultima_operacao,contratos_bmf,volume_bovespa,qtd_operacoes,faixa").eq("id",id).maybeSingle();
+  const {data:s} = await sb.from("vw_saude_carteira").select("saude,status_operacao,data_ativacao,data_ultima_operacao,contratos_bmf,volume_bovespa,qtd_operacoes,faixa,grau").eq("id",id).maybeSingle();
   if(!c){ el("drBody").innerHTML='<div class="empty">Cliente não encontrado.</div>'; return; }
   el("drName").textContent=c.nome;
   el("drSub").textContent=`Sinacor ${c.sinacor} · ${c.barra||"sem barra"}`;
   el("drStatus").innerHTML = (s?`<span class="status s-${s.saude}">${SAUDE_LABEL[s.saude]||s.saude}</span>`:"")
-    + faixaBadge(s?s.faixa:"branca");
+    + faixaBadge(s?s.faixa:"sem", s?s.grau:0);
   el("drActions").innerHTML = btnRD();
   const aniv = (c.nasc_dia&&c.nasc_mes)? String(c.nasc_dia).padStart(2,"0")+"/"+String(c.nasc_mes).padStart(2,"0") : "—";
 
   // linha do tempo de faixas (últimos 3 meses)
-  const {data:tl} = await sb.from("vw_faixa_timeline").select("mes,contratos,faixa").eq("sinacor",c.sinacor);
+  const {data:tl} = await sb.from("vw_faixa_timeline").select("mes,contratos,faixa,grau").eq("sinacor",c.sinacor);
   const mapa={}; (tl||[]).forEach(r=>{ mapa[String(r.mes).slice(0,7)]=r; });
   const hoje=new Date(); const meses=[];
   for(let i=2;i>=0;i--){ const d=new Date(hoje.getFullYear(),hoje.getMonth()-i,1);
     const chave=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
     const nome=d.toLocaleDateString("pt-BR",{month:"short"}).replace(".","");
     const r=mapa[chave]; meses.push({nome,faixa:r?r.faixa:"branca",ct:r?Number(r.contratos):0}); }
-  const timeline = meses.map(m=>`<div class="tl-mes"><div class="m">${m.nome}</div>${faixaBadge(m.faixa)}<div class="ct">${m.ct>0?nf(m.ct)+" ct":"—"}</div></div>`).join("");
+  const timeline = meses.map(m=>`<div class="tl-mes"><div class="m">${m.nome}</div>${faixaBadge(m.faixa,m.grau)}<div class="ct">${m.ct>0?nf(m.ct)+" ct":"—"}</div></div>`).join("");
 
   el("drBody").innerHTML=`
     <div class="dr-stats">
