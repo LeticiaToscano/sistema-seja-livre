@@ -50,7 +50,10 @@
   .brand{display:flex;align-items:center;gap:10px;padding:4px 8px 20px}
   .brand .n{font-size:14px;font-weight:800}
   .brand .s{font-size:9px;color:var(--green);letter-spacing:1.5px;font-weight:700}
-  .nav{display:flex;flex-direction:column;gap:3px;flex:1}
+  .nav{display:flex;flex-direction:column;gap:2px;flex:1;overflow-y:auto}
+  .nav-label{font-size:9.5px;text-transform:uppercase;letter-spacing:1.2px;color:var(--text-faint);
+    font-weight:700;padding:14px 11px 5px}
+  .nav-label:first-child{padding-top:2px}
   .nav-item{display:flex;align-items:center;gap:11px;padding:10px 11px;border-radius:10px;background:none;
     border:none;color:var(--text-dim);font-size:13.5px;font-weight:600;text-align:left;width:100%}
   .nav-item svg{width:18px;height:18px}
@@ -101,6 +104,26 @@
   .t-red{background:var(--red-deep);color:#ff9aa6}
 
   .health-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+  /* distribuição empilhada */
+  .stack{display:flex;height:20px;border-radius:7px;overflow:hidden;margin-bottom:12px;background:var(--bg)}
+  .stack>div{height:100%;transition:width .5s}
+  .stack-legend{display:flex;gap:20px;flex-wrap:wrap;font-size:12px;color:var(--text-dim);font-weight:600}
+  .stack-legend .lg{display:flex;align-items:center;gap:7px}
+  .stack-legend .sw{width:10px;height:10px;border-radius:3px}
+  .stack-cap{font-size:12px;color:var(--text-faint);margin-top:12px}
+  .stack-cap b{color:var(--green);font-weight:700}
+  /* grid inferior: fila + aniversariantes */
+  .radar-lower{display:grid;grid-template-columns:1.7fr 1fr;gap:16px;margin-top:8px}
+  .aniv-list{display:flex;flex-direction:column}
+  .aniv-item{display:flex;align-items:center;gap:11px;padding:11px 16px;border-bottom:1px solid var(--border);cursor:pointer}
+  .aniv-item:last-child{border-bottom:none}
+  .aniv-item:hover{background:var(--surface-2)}
+  .aniv-item .cake{width:30px;height:30px;border-radius:8px;background:var(--purple);display:grid;place-items:center;flex-shrink:0}
+  .aniv-item .an{font-size:13px;font-weight:600}
+  .aniv-item .ab{font-size:11px;color:var(--text-faint)}
+  .note{font-size:12px;color:var(--text-dim);background:var(--surface);border:1px solid var(--border);
+    border-left:3px solid var(--amber);border-radius:8px;padding:11px 14px;margin-top:6px;line-height:1.5}
+  @media(max-width:860px){.radar-lower{grid-template-columns:1fr}}
   .hpill{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:12px 16px;flex:1;min-width:140px}
   .hpill .hp-n{font-size:20px;font-weight:800}
   .hpill .hp-l{font-size:11px;color:var(--text-dim);font-weight:600;margin-top:2px}
@@ -128,32 +151,68 @@
   .s-critico{background:var(--red-deep);color:#ff9aa6}
   .s-nunca_operou{background:var(--surface-2);color:var(--text-faint)}
   .num{font-variant-numeric:tabular-nums;color:var(--text-dim)}
+  .faixa{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;padding:4px 9px;
+    border-radius:20px;white-space:nowrap;letter-spacing:.2px}
+  .faixa .bi{width:12px;height:12px}
+  .faixa.preta{box-shadow:0 0 0 1px rgba(245,184,65,.45),0 0 14px rgba(245,184,65,.22)}
+  tr.linha-preta td{background:linear-gradient(90deg,rgba(245,184,65,.07),transparent 60%)}
+  .btn-rd{display:inline-flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--border-strong);
+    color:var(--text-dim);border-radius:8px;padding:6px 11px;font-size:11.5px;font-weight:600}
+  .btn-rd:hover{border-color:#25D366;color:#25D366}
   .score-badge{font-weight:800;font-variant-numeric:tabular-nums}
 
   .loading,.empty{padding:44px;text-align:center;color:var(--text-faint);font-size:13px}
+  .reservada{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
+    padding:70px 30px;max-width:520px;margin:40px auto}
+  .rv-icon{width:64px;height:64px;border-radius:18px;background:var(--surface);border:1px solid var(--border);
+    display:grid;place-items:center;color:var(--text-dim);margin-bottom:22px}
+  .rv-icon svg{width:30px;height:30px}
+  .rv-title{font-size:20px;font-weight:700;letter-spacing:-.3px;margin-bottom:12px}
+  .rv-desc{font-size:14px;color:var(--text-dim);line-height:1.65}
+  .select{flex:0 0 200px;-webkit-appearance:none;appearance:none;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2393A29A' stroke-width='2'><path d='M6 9l6 6 6-6'/></svg>");
+    background-repeat:no-repeat;background-position:right 12px center}
+  .pager{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-top:1px solid var(--border);flex-wrap:wrap;gap:12px}
+  .pg-count{font-size:12px;color:var(--text-dim)}.pg-count b{color:var(--text)}
+  .pg-btns{display:flex;align-items:center;gap:12px}
+  .pg-num{font-size:12px;color:var(--text-faint);font-weight:600}
+  .pg-btn{background:var(--surface-2);border:1px solid var(--border-strong);color:var(--text);border-radius:8px;
+    padding:8px 14px;font-size:12.5px;font-weight:600}
+  .pg-btn:hover:not(:disabled){border-color:var(--green);color:var(--green)}
+  .pg-btn:disabled{opacity:.4;cursor:not-allowed}
   .spinner{width:22px;height:22px;border:2.5px solid var(--border-strong);border-top-color:var(--green);
     border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 12px}
   @keyframes spin{to{transform:rotate(360deg)}}
 
   /* drawer */
-  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(2px);opacity:0;pointer-events:none;
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.66);backdrop-filter:blur(3px);opacity:0;pointer-events:none;
     transition:.25s;z-index:40}
   .overlay.open{opacity:1;pointer-events:auto}
-  .drawer{position:fixed;top:0;right:0;height:100vh;width:440px;max-width:94vw;background:var(--bg-2);
-    border-left:1px solid var(--border-strong);transform:translateX(100%);transition:.3s cubic-bezier(.2,.7,.2,1);
-    z-index:41;display:flex;flex-direction:column;box-shadow:-30px 0 60px -20px rgba(0,0,0,.7)}
-  .drawer.open{transform:none}
-  .dr-head{padding:22px 24px 18px;border-bottom:1px solid var(--border);position:relative}
-  .dr-close{position:absolute;top:20px;right:20px;background:var(--surface);border:1px solid var(--border-strong);
-    color:var(--text-dim);width:32px;height:32px;border-radius:8px;font-size:15px}
-  .dr-name{font-size:19px;font-weight:700;letter-spacing:-.3px;margin:10px 0 4px}
-  .dr-sub{font-size:12px;color:var(--text-dim);font-weight:600}
-  .dr-body{padding:18px 24px;overflow-y:auto;flex:1}
-  .dr-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
-  .dr-stat{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:12px 13px}
+  .drawer{position:fixed;top:50%;left:50%;transform:translate(-50%,-48%) scale(.97);opacity:0;pointer-events:none;
+    width:780px;max-width:94vw;max-height:88vh;background:var(--bg-2);border:1px solid var(--border-strong);
+    border-radius:20px;transition:.24s cubic-bezier(.2,.7,.2,1);z-index:41;display:flex;flex-direction:column;
+    box-shadow:0 40px 100px -25px rgba(0,0,0,.85)}
+  .drawer.open{transform:translate(-50%,-50%) scale(1);opacity:1;pointer-events:auto}
+  .dr-head{padding:26px 30px 20px;border-bottom:1px solid var(--border);position:relative}
+  .dr-close{position:absolute;top:22px;right:22px;background:var(--surface);border:1px solid var(--border-strong);
+    color:var(--text-dim);width:34px;height:34px;border-radius:9px;font-size:15px}
+  .dr-close:hover{color:var(--text);border-color:var(--red)}
+  .dr-badges{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .dr-name{font-size:23px;font-weight:800;letter-spacing:-.4px;margin:12px 0 4px}
+  .dr-sub{font-size:12.5px;color:var(--text-dim);font-weight:600}
+  .dr-actions{margin-top:16px;display:flex;gap:10px}
+  .dr-body{padding:22px 30px 28px;overflow-y:auto;flex:1}
+  .dr-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:11px;margin-bottom:8px}
+  .dr-stat{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:13px 15px}
   .dr-stat .l{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-faint);font-weight:700}
-  .dr-stat .v{font-size:16px;font-weight:700;margin-top:5px}
-  .dr-sec{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text-faint);font-weight:700;margin:18px 0 10px}
+  .dr-stat .v{font-size:16px;font-weight:700;margin-top:6px}
+  .dr-sec{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text-faint);font-weight:700;margin:22px 0 12px}
+  /* linha do tempo de faixas */
+  .timeline{display:flex;gap:10px}
+  .tl-mes{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center}
+  .tl-mes .m{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-faint);font-weight:700;margin-bottom:9px}
+  .tl-mes .ct{font-size:12px;color:var(--text-dim);margin-top:9px}
+  @media(max-width:680px){.dr-stats{grid-template-columns:1fr 1fr}.timeline{flex-direction:column}}
 
   @media(max-width:860px){
     #app{grid-template-columns:1fr}
@@ -194,9 +253,24 @@
       <div><div class="n">Seja Livre</div><div class="s">SISTEMA</div></div>
     </div>
     <nav class="nav">
+      <div class="nav-label">Carteira</div>
       <button class="nav-item active" data-view="radar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/></svg>Radar</button>
       <button class="nav-item" data-view="clientes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3.2 3-5 5.5-5s4.9 1.8 5.5 5" stroke-linecap="round"/></svg>Clientes</button>
       <button class="nav-item" data-view="destaques"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l2.5 5 5.5.8-4 3.9 1 5.5L12 16l-5 2.7 1-5.5-4-3.9 5.5-.8z" stroke-linejoin="round"/></svg>Destaques</button>
+      <button class="nav-item" data-view="fila"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h10M4 12h10M4 18h7" stroke-linecap="round"/><path d="M17 15l2.2 2.2L23 13" stroke-linecap="round" stroke-linejoin="round"/></svg>Fila de ação</button>
+      <button class="nav-item" data-view="aniversariantes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20h16v-8H4z"/><path d="M4 14c2 0 2-1.3 4-1.3s2 1.3 4 1.3 2-1.3 4-1.3 2 1.3 4 1.3" stroke-linecap="round"/><path d="M12 8V5" stroke-linecap="round"/></svg>Aniversariantes</button>
+
+      <div class="nav-label">Atendimento</div>
+      <button class="nav-item" data-view="fluxos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="6" cy="6" r="2.2"/><circle cx="6" cy="18" r="2.2"/><circle cx="18" cy="12" r="2.2"/><path d="M8 6h4a4 4 0 0 1 4 4v0M8 18h4a4 4 0 0 0 4-4v0" stroke-linecap="round"/></svg>Fluxos</button>
+      <button class="nav-item" data-view="assessores"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="9" r="2.6"/><circle cx="16" cy="9" r="2.6"/><path d="M3 18c.5-2.6 2.4-4 5-4s4.5 1.4 5 4M13.5 14.2c2.2-.2 3.9 1.1 4.5 3.8" stroke-linecap="round"/></svg>Assessores</button>
+
+      <div class="nav-label">Gestão</div>
+      <button class="nav-item" data-view="config"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 8h14M5 16h14" stroke-linecap="round"/><circle cx="9" cy="8" r="2.2" fill="var(--bg-2)"/><circle cx="15" cy="16" r="2.2" fill="var(--bg-2)"/></svg>Configurações</button>
+      <button class="nav-item" data-view="auditoria"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l7 3v5c0 4-3 7-7 8-4-1-7-4-7-8V6z" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg>Auditoria</button>
+      <button class="nav-item" data-view="ia"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="5" width="14" height="14" rx="3"/><path d="M9 9h6v6H9z" fill="var(--bg-2)"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke-linecap="round"/></svg>CEO de IA</button>
+
+      <div class="nav-label">Sistema</div>
+      <button class="nav-item" data-view="integracoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 7V4M15 7V4M8 7h8v4a4 4 0 0 1-8 0z" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15v5" stroke-linecap="round"/></svg>Integrações</button>
     </nav>
     <div class="foot">
       <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div></div></div>
@@ -218,7 +292,7 @@
 
 <div class="overlay" id="overlay"></div>
 <aside class="drawer" id="drawer">
-  <div class="dr-head"><button class="dr-close" id="drClose">✕</button><div id="drStatus"></div><div class="dr-name" id="drName"></div><div class="dr-sub" id="drSub"></div></div>
+  <div class="dr-head"><button class="dr-close" id="drClose">✕</button><div class="dr-badges" id="drStatus"></div><div class="dr-name" id="drName"></div><div class="dr-sub" id="drSub"></div><div class="dr-actions" id="drActions"></div></div>
   <div class="dr-body" id="drBody"></div>
 </aside>
 
@@ -230,10 +304,39 @@ const SUPABASE_KEY = "sb_publishable_8-g_Xdbxmb52CnPVhOpkBw_BmJk2M1a";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const SAUDE_LABEL = {saudavel:"Saudável",negligenciado:"Negligenciado",em_recuperacao:"Em recuperação",critico:"Crítico",nunca_operou:"Nunca operou"};
+const OP_LABEL = {operando:"Operando",parou:"Parou de operar",nunca_operou:"Nunca operou"};
+const nfR = v => (v==null||v==0)?"—":"R$ "+Number(v).toLocaleString("pt-BR",{maximumFractionDigits:0});
+const FAIXAS={
+  branca:{n:"Branca",c:"#DBDFDC",t:"#0A0D0C"}, azul:{n:"Azul",c:"#3C7BD4",t:"#fff"},
+  roxa:{n:"Roxa",c:"#9B7BFF",t:"#fff"}, marrom:{n:"Marrom",c:"#B5732E",t:"#fff"},
+  preta:{n:"Preta",c:"#15181A",t:"#F5B841"}
+};
+function faixaBadge(f){
+  const x=FAIXAS[f]||FAIXAS.branca;
+  return `<span class="faixa${f==='preta'?' preta':''}" style="background:${x.c};color:${x.t}">`+
+    `<svg class="bi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="9" width="18" height="6" rx="1"/><path d="M8 9v6M16 9v6"/></svg>${x.n}</span>`;
+}
+function volDisplay(bmf,bov){
+  const b=Number(bmf)||0, v=Number(bov)||0, p=[];
+  if(b>0) p.push(nf(b)+" ct");
+  if(v>0) p.push(nfR(v));
+  return p.length? p.join(" · ") : "—";
+}
+function btnRD(){ return `<button class="btn-rd" onclick="event.stopPropagation();abrirRD()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16v11H8l-4 3z" stroke-linejoin="round"/></svg>Contato no RD</button>`; }
+function abrirRD(){ window.open("https://app.tallos.com.br/app/chat","_blank"); }
 const el = id => document.getElementById(id);
 const ini = n => (n||"?").trim().split(/\s+/).slice(0,2).map(w=>w[0]).join("").toUpperCase();
 const nf = n => (n==null?"—":Number(n).toLocaleString("pt-BR"));
 const fmtData = d => d ? new Date(d+"T00:00:00").toLocaleDateString("pt-BR") : "nunca";
+const fmtDesde = d => {
+  if(!d) return "—";
+  const dias = Math.floor((Date.now()-new Date(d+"T00:00:00"))/86400000);
+  if(dias<0) return "hoje";
+  if(dias<60) return `há ${dias} dias`;
+  const meses = Math.floor(dias/30);
+  if(meses<12) return `há ${meses} meses`;
+  return `há ${Math.floor(meses/12)} ano(s)`;
+};
 
 // ---------- AUTH ----------
 async function boot(){
@@ -263,7 +366,22 @@ async function mostrarApp(session){
 }
 
 // ---------- ROTEADOR ----------
-const TITLES={radar:["CARTEIRA","Radar de retenção"],clientes:["CARTEIRA","Clientes"],destaques:["CARTEIRA","Destaques"]};
+const TITLES={
+  radar:["CARTEIRA","Radar de retenção"], clientes:["CARTEIRA","Clientes"], destaques:["CARTEIRA","Destaques"],
+  fila:["CARTEIRA","Fila de ação"], aniversariantes:["CARTEIRA","Aniversariantes"],
+  fluxos:["ATENDIMENTO","Fluxos"], assessores:["ATENDIMENTO","Assessores"],
+  config:["GESTÃO","Configurações"], auditoria:["GESTÃO","Trilha de auditoria"], ia:["GESTÃO","CEO de IA"],
+  integracoes:["SISTEMA","Integrações"]
+};
+const RESERVADAS={
+  fluxos:{icon:"fluxos",desc:"As réguas de atendimento automatizadas — boas-vindas, ativação, manutenção, reengajamento e aniversário. Toda automação roda primeiro em modo sombra (simula sem enviar) antes de ir ao ar, em lotes controlados."},
+  assessores:{icon:"assessores",desc:"Desempenho e carteira por assessor — ativações, retenção, aderência e tamanho de carteira. Depende de definir o vínculo cliente–assessor (a explorar)."},
+  config:{icon:"config",desc:"Ajuste das réguas do sistema — dias para considerar que um cliente 'parou de operar', janela de contato frio, e os pesos do score (volume, frequência, recência), com simulador."},
+  auditoria:{icon:"auditoria",desc:"O registro de tudo que o sistema faz — importações, disparos, mudanças de regra, acessos. A base de confiança e rastreabilidade da operação."},
+  ia:{icon:"ia",desc:"O diagnóstico estratégico da operação em linguagem natural, e o copiloto de IA por assessor — cada um enxergando apenas a própria carteira."},
+  integracoes:{icon:"integracoes",desc:"As conexões do sistema — Volume Operado (operação), RD Conversas (atendimento), Gmail/Genial (entrada de clientes) e IA. Ligadas e a ligar."}
+};
+const VIEWS={radar:vRadar,clientes:vClientes,destaques:vDestaques,fila:vFila,aniversariantes:vAniversariantes};
 document.querySelectorAll(".nav-item").forEach(b=>b.addEventListener("click",()=>{
   document.querySelectorAll(".nav-item").forEach(x=>x.classList.remove("active"));
   b.classList.add("active"); el("sidebar").classList.remove("open"); render(b.dataset.view);
@@ -271,21 +389,89 @@ document.querySelectorAll(".nav-item").forEach(b=>b.addEventListener("click",()=
 function render(view){
   el("crumb").textContent=TITLES[view][0]; el("pageTitle").textContent=TITLES[view][1];
   el("content").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
-  ({radar:vRadar,clientes:vClientes,destaques:vDestaques}[view])();
+  if(VIEWS[view]) VIEWS[view](); else vReservada(view);
 }
+const ICONS={
+  fluxos:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="6" cy="6" r="2.2"/><circle cx="6" cy="18" r="2.2"/><circle cx="18" cy="12" r="2.2"/><path d="M8 6h4a4 4 0 0 1 4 4M8 18h4a4 4 0 0 0 4-4" stroke-linecap="round"/></svg>',
+  assessores:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="9" r="2.6"/><circle cx="16" cy="9" r="2.6"/><path d="M3 18c.5-2.6 2.4-4 5-4s4.5 1.4 5 4M13.5 14.2c2.2-.2 3.9 1.1 4.5 3.8" stroke-linecap="round"/></svg>',
+  config:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 8h14M5 16h14" stroke-linecap="round"/><circle cx="9" cy="8" r="2.4"/><circle cx="15" cy="16" r="2.4"/></svg>',
+  auditoria:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l7 3v5c0 4-3 7-7 8-4-1-7-4-7-8V6z" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  ia:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="5" y="5" width="14" height="14" rx="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke-linecap="round"/></svg>',
+  integracoes:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 7V4M15 7V4M8 7h8v4a4 4 0 0 1-8 0z" stroke-linejoin="round"/><path d="M12 15v5" stroke-linecap="round"/></svg>'
+};
+function vReservada(view){
+  const r=RESERVADAS[view]||{icon:"config",desc:""};
+  el("content").innerHTML=`<div class="reservada">
+    <div class="rv-icon">${ICONS[r.icon]||""}</div>
+    <div class="rv-title">${TITLES[view][1]}</div>
+    <div class="rv-desc">${r.desc}</div>
+  </div>`;
+}
+
+// ---------- FILA DE AÇÃO (tela cheia) ----------
+let filaState={page:0,size:50,total:0};
+async function vFila(){
+  el("content").innerHTML=`
+    <div class="sec-title">Maior valor parado · prioridade de reativação (por score)<span class="rule"></span></div>
+    <div class="panel" id="filaFull"><div class="loading"><div class="spinner"></div>Carregando…</div></div>`;
+  filaState={page:0,size:50,total:0};
+  carregarFilaFull();
+}
+async function carregarFilaFull(){
+  const {page,size}=filaState, from=page*size, to=from+size-1;
+  const {data,error,count} = await sb.from("vw_fila_acao")
+    .select("id,nome,barra,contratos_bmf,volume_bovespa,qtd_operacoes,data_ultima_operacao,faixa,score",{count:"exact"})
+    .range(from,to);
+  if(error){ return erro(error,"filaFull"); }
+  if(!data||!data.length){ el("filaFull").innerHTML='<div class="empty">Nenhum cliente parado no momento.</div>'; return; }
+  const de=from+1, ate=from+data.length, totalPags=Math.max(1,Math.ceil((count||0)/size));
+  el("filaFull").innerHTML=`<table><thead><tr><th>Cliente</th><th>Faixa</th><th>Barra</th><th>Atividade</th><th>Parou desde</th><th>Score</th><th></th></tr></thead>
+    <tbody>${data.map(c=>`<tr class="${c.faixa==='preta'?'linha-preta':''}" onclick="abrirFicha('${c.id}')">
+      <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}</div></td>
+      <td>${faixaBadge(c.faixa)}</td>
+      <td class="num">${c.barra||"—"}</td>
+      <td class="num">${volDisplay(c.contratos_bmf,c.volume_bovespa)}</td>
+      <td class="num">${fmtDesde(c.data_ultima_operacao)}</td>
+      <td><span class="score-badge" style="color:${c.score>=85?'var(--green)':c.score>=60?'var(--amber)':'var(--text-dim)'}">${c.score??"—"}</span></td>
+      <td>${btnRD()}</td></tr>`).join("")}</tbody></table>
+    <div class="pager">
+      <span class="pg-count">Mostrando <b>${nf(de)}–${nf(ate)}</b> de <b>${nf(count)}</b> parados</span>
+      <div class="pg-btns">
+        <button class="pg-btn" ${page<=0?"disabled":""} onclick="mudarFila(-1)">← Anterior</button>
+        <span class="pg-num">Página ${page+1} de ${nf(totalPags)}</span>
+        <button class="pg-btn" ${page>=totalPags-1?"disabled":""} onclick="mudarFila(1)">Próxima →</button>
+      </div>
+    </div>`;
+}
+function mudarFila(d){ filaState.page=Math.max(0,filaState.page+d); carregarFilaFull(); document.querySelector(".main").scrollTop=0; }
+
+// ---------- ANIVERSARIANTES (tela cheia) ----------
+async function vAniversariantes(){
+  el("content").innerHTML=`
+    <div class="sec-title">Aniversariantes de hoje<span class="rule"></span></div>
+    <div class="panel" id="anivFull"><div class="loading"><div class="spinner"></div>Carregando…</div></div>`;
+  const {data,error} = await sb.from("vw_aniversariantes_hoje").select("id,nome,barra,sinacor").limit(200);
+  if(error){ return erro(error,"anivFull"); }
+  if(!data||!data.length){ el("anivFull").innerHTML='<div class="empty">Nenhum aniversariante hoje.</div>'; return; }
+  el("anivFull").innerHTML=`<div class="aniv-list">${data.map(c=>`<div class="aniv-item" onclick="abrirFicha('${c.id}')">
+    <span class="cake"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0A0D0C" stroke-width="2"><path d="M4 20h16v-9H4z"/><path d="M4 14c2 0 2-1.5 4-1.5s2 1.5 4 1.5 2-1.5 4-1.5 2 1.5 4 1.5" stroke-linecap="round"/><path d="M12 8V5m-4 3V6m8 2V6" stroke-linecap="round"/></svg></span>
+    <div style="flex:1"><div class="an">${c.nome}</div><div class="ab">Sinacor ${c.sinacor} · ${c.barra||"—"}</div></div>
+    <button class="btn-rd" onclick="event.stopPropagation();abrirRD()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 11c0 5.5-7 10-7 10z" stroke-linejoin="round"/></svg>Desejar felicidades</button></div>`).join("")}</div>`;
+}
+
 
 // ---------- RADAR ----------
 async function vRadar(){
   const {data,error} = await sb.rpc("fn_dashboard_resumo");
   if(error){ return erro(error); }
-  const r = data.radar||{}; const tot=data.total_clientes||0;
+  const tot=data.total_clientes||0;
   const oper=data.operando||0, parou=data.parou||0, nunca=data.nunca||0;
+  const jaOperaram = oper+parou;
   const pct = n => tot? Math.round(100*n/tot):0;
   const bloco=(nome,val,cor,tag)=>`<div class="rcard"><div class="rc-top"><span class="rc-name">${nome}</span>${tag}</div>
     <div class="rc-val" style="color:${cor}">${nf(val)}</div><div class="rc-pct">${pct(val)}% da base</div>
     <div class="rc-bar"><div class="rc-fill" style="width:${pct(val)}%;background:${cor}"></div></div></div>`;
-  const health = ["saudavel","negligenciado","em_recuperacao","critico","nunca_operou"]
-    .map(k=>`<div class="hpill"><div class="hp-n">${nf(r[k]||0)}</div><div class="hp-l">${SAUDE_LABEL[k]}</div></div>`).join("");
+
   el("content").innerHTML=`
     <div class="kpi-grid">
       <div class="kpi"><div class="k-label">Base ativa</div><div class="k-val">${nf(tot)}</div><div class="k-sub">clientes Seja Livre</div></div>
@@ -293,81 +479,205 @@ async function vRadar(){
       <div class="kpi"><div class="k-label">Parou de operar</div><div class="k-val" style="color:var(--amber)">${nf(parou)}</div><div class="k-sub">${pct(parou)}% · reativação</div></div>
       <div class="kpi"><div class="k-label">Nunca operou</div><div class="k-val" style="color:var(--text-dim)">${nf(nunca)}</div><div class="k-sub">${pct(nunca)}% · ativação</div></div>
     </div>
+
+    <div class="sec-title">Distribuição da base<span class="rule"></span></div>
+    <div class="panel" style="padding:18px 20px;margin-bottom:22px">
+      <div class="stack">
+        <div style="width:${pct(oper)}%;background:var(--green)"></div>
+        <div style="width:${pct(parou)}%;background:var(--amber)"></div>
+        <div style="width:${pct(nunca)}%;background:#2a332e"></div>
+      </div>
+      <div class="stack-legend">
+        <span class="lg"><span class="sw" style="background:var(--green)"></span>Operando · ${nf(oper)}</span>
+        <span class="lg"><span class="sw" style="background:var(--amber)"></span>Parou · ${nf(parou)}</span>
+        <span class="lg"><span class="sw" style="background:#2a332e"></span>Nunca operou · ${nf(nunca)}</span>
+      </div>
+      <div class="stack-cap"><b>${nf(jaOperaram)}</b> clientes já operaram (${pct(jaOperaram)}% da base) — dos quais ${nf(parou)} estão parados hoje, prontos para reativação.</div>
+    </div>
+
     <div class="sec-title">Situação de operação<span class="rule"></span></div>
     <div class="radar-grid">
       ${bloco("Operando",oper,"var(--green)",'<span class="tag t-green">ativo</span>')}
       ${bloco("Parou de operar",parou,"var(--amber)",'<span class="tag t-amber">recuperar</span>')}
       ${bloco("Nunca operou",nunca,"var(--text-dim)",'<span class="tag t-red">ativar</span>')}
     </div>
-    <div class="sec-title">Saúde da carteira<span class="rule"></span></div>
-    <div class="health-row">${health}</div>`;
+
+    <div class="radar-lower">
+      <div>
+        <div class="sec-title">Fila de ação · maior volume parado<span class="rule"></span></div>
+        <div class="panel" id="filaAcao"><div class="loading"><div class="spinner"></div>Carregando…</div></div>
+      </div>
+      <div>
+        <div class="sec-title">Aniversariantes de hoje<span class="rule"></span></div>
+        <div class="panel" id="aniversariantes"><div class="loading"><div class="spinner"></div>Carregando…</div></div>
+      </div>
+    </div>
+    <div class="note">A <b>saúde completa da carteira</b> (saudável · negligenciado · em recuperação · crítico) cruza operação com o último contato. O eixo de contato acende quando o RD Conversas for conectado — por ora, o radar mostra a situação de operação, que é a informação disponível.</div>`;
+
+  carregarFila();
+  carregarAniversariantes();
+}
+
+async function carregarFila(){
+  const {data,error} = await sb.from("vw_fila_acao")
+    .select("id,nome,barra,contratos_bmf,volume_bovespa,data_ultima_operacao,faixa,score").limit(12);
+  if(error){ return erro(error,"filaAcao"); }
+  if(!data||!data.length){ el("filaAcao").innerHTML='<div class="empty">Nenhum cliente parado no momento.</div>'; return; }
+  el("filaAcao").innerHTML=`<table><thead><tr><th>Cliente</th><th>Faixa</th><th>Atividade</th><th>Parou desde</th></tr></thead>
+    <tbody>${data.map(c=>`<tr class="${c.faixa==='preta'?'linha-preta':''}" onclick="abrirFicha('${c.id}')">
+      <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}</div></td>
+      <td>${faixaBadge(c.faixa)}</td>
+      <td class="num">${volDisplay(c.contratos_bmf,c.volume_bovespa)}</td>
+      <td class="num">${fmtDesde(c.data_ultima_operacao)}</td></tr>`).join("")}</tbody></table>`;
+}
+
+async function carregarAniversariantes(){
+  const {data,error} = await sb.from("vw_aniversariantes_hoje").select("id,nome,barra").limit(30);
+  if(error){ return erro(error,"aniversariantes"); }
+  if(!data||!data.length){ el("aniversariantes").innerHTML='<div class="empty">Nenhum aniversariante hoje.</div>'; return; }
+  el("aniversariantes").innerHTML=`<div class="aniv-list">${data.map(c=>`<div class="aniv-item" onclick="abrirFicha('${c.id}')">
+    <span class="cake"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0A0D0C" stroke-width="2"><path d="M4 20h16v-9H4z"/><path d="M4 14c2 0 2-1.5 4-1.5s2 1.5 4 1.5 2-1.5 4-1.5 2 1.5 4 1.5" stroke-linecap="round"/><path d="M12 8V5m-4 3V6m8 2V6" stroke-linecap="round"/></svg></span>
+    <div><div class="an">${c.nome}</div><div class="ab">${c.barra||"—"}</div></div></div>`).join("")}</div>`;
 }
 
 // ---------- CLIENTES ----------
 let buscaTimer=null;
-async function vClientes(){
+let cliState={termo:"",filtro:"todos",page:0,size:50,total:0};
+function vClientes(){
   el("content").innerHTML=`
     <div class="panel">
-      <div class="toolbar"><input class="search" id="busca" placeholder="Buscar por nome ou Sinacor…"></div>
+      <div class="toolbar">
+        <input class="search" id="busca" placeholder="Buscar por nome ou Sinacor…">
+        <select class="search select" id="filtro">
+          <option value="todos">Todas as situações</option>
+          <option value="operando">Operando</option>
+          <option value="parou">Parou de operar</option>
+          <option value="nunca_operou">Nunca operou</option>
+        </select>
+      </div>
       <div id="tabelaClientes"><div class="loading"><div class="spinner"></div>Carregando…</div></div>
     </div>`;
-  el("busca").addEventListener("input",e=>{ clearTimeout(buscaTimer); buscaTimer=setTimeout(()=>carregarClientes(e.target.value.trim()),300); });
-  carregarClientes("");
+  cliState={termo:"",filtro:"todos",page:0,size:50,total:0};
+  el("busca").addEventListener("input",e=>{ clearTimeout(buscaTimer); buscaTimer=setTimeout(()=>{cliState.termo=e.target.value.trim();cliState.page=0;carregarClientes();},300); });
+  el("filtro").addEventListener("change",e=>{ cliState.filtro=e.target.value; cliState.page=0; carregarClientes(); });
+  carregarClientes();
 }
-async function carregarClientes(termo){
-  let q = sb.from("vw_saude_carteira").select("id,nome,sinacor,barra,saude,data_ultima_operacao").limit(100);
+async function carregarClientes(){
+  const {termo,filtro,page,size}=cliState;
+  const from=page*size, to=from+size-1;
+  let q = sb.from("vw_saude_carteira").select("id,nome,sinacor,barra,saude,status_operacao,data_ultima_operacao,contratos_bmf,volume_bovespa,faixa",{count:"exact"}).order("nome").range(from,to);
   if(termo){ q = q.or(`nome.ilike.%${termo}%,sinacor.ilike.%${termo}%`); }
-  const {data,error} = await q;
+  if(filtro!=="todos"){ q = q.eq("status_operacao",filtro); }
+  const {data,error,count} = await q;
   if(error){ return erro(error,"tabelaClientes"); }
+  cliState.total=count||0;
   if(!data.length){ el("tabelaClientes").innerHTML='<div class="empty">Nenhum cliente encontrado.</div>'; return; }
-  el("tabelaClientes").innerHTML=`<table><thead><tr><th>Cliente</th><th>Sinacor</th><th>Barra</th><th>Situação</th><th>Última operação</th></tr></thead>
-    <tbody>${data.map(c=>`<tr onclick="abrirFicha('${c.id}')">
+  const de=from+1, ate=from+data.length, totalPags=Math.max(1,Math.ceil((count||0)/size));
+  el("tabelaClientes").innerHTML=`<table><thead><tr><th>Cliente</th><th>Faixa</th><th>Barra</th><th>Atividade</th><th>Situação</th><th>Última op.</th></tr></thead>
+    <tbody>${data.map(c=>`<tr class="${c.faixa==='preta'?'linha-preta':''}" onclick="abrirFicha('${c.id}')">
       <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}</div></td>
-      <td class="num">${c.sinacor}</td><td class="num">${c.barra||"—"}</td>
+      <td>${faixaBadge(c.faixa)}</td>
+      <td class="num">${c.barra||"—"}</td>
+      <td class="num">${volDisplay(c.contratos_bmf,c.volume_bovespa)}</td>
       <td><span class="status s-${c.saude}">${SAUDE_LABEL[c.saude]||c.saude}</span></td>
       <td class="num">${fmtData(c.data_ultima_operacao)}</td></tr>`).join("")}</tbody></table>
-    <div style="padding:12px 16px;font-size:11px;color:var(--text-faint)">Mostrando até 100 resultados. Refine a busca para ver outros.</div>`;
+    <div class="pager">
+      <span class="pg-count">Mostrando <b>${nf(de)}–${nf(ate)}</b> de <b>${nf(count)}</b> clientes</span>
+      <div class="pg-btns">
+        <button class="pg-btn" ${page<=0?"disabled":""} onclick="mudarPagina(-1)">← Anterior</button>
+        <span class="pg-num">Página ${page+1} de ${nf(totalPags)}</span>
+        <button class="pg-btn" ${page>=totalPags-1?"disabled":""} onclick="mudarPagina(1)">Próxima →</button>
+      </div>
+    </div>`;
 }
+function mudarPagina(d){ cliState.page=Math.max(0,cliState.page+d); carregarClientes();
+  el("content").scrollTop=0; document.querySelector(".main").scrollTop=0; }
 
 // ---------- DESTAQUES ----------
+let destState={barra:"todas",ordem:"score"};
 async function vDestaques(){
-  const {data,error}=await sb.from("vw_score_cliente").select("id,nome,sinacor,barra,contratos_bmf,qtd_operacoes,score").order("score",{ascending:false}).limit(50);
-  if(error){ return erro(error); }
+  const {data:barras}=await sb.from("vw_barras").select("barra");
+  const opcoesBarra=`<option value="todas">Todas as barras</option>`+(barras||[]).map(b=>`<option>${b.barra}</option>`).join("");
   el("content").innerHTML=`
-    <div class="sec-title">Top 50 da carteira por score<span class="rule"></span></div>
-    <div class="panel"><table><thead><tr><th>#</th><th>Cliente</th><th>Barra</th><th>Contratos (BM&F)</th><th>Operações</th><th>Score</th></tr></thead>
-    <tbody>${data.map((c,i)=>`<tr onclick="abrirFicha('${c.id}')">
+    <div class="panel">
+      <div class="toolbar">
+        <select class="search select" id="dBarra" style="flex:1">${opcoesBarra}</select>
+        <select class="search select" id="dOrdem" style="flex:0 0 230px">
+          <option value="score">Score (maior → menor)</option>
+          <option value="recente">Operou mais recente</option>
+          <option value="antigo">Há mais tempo sem operar</option>
+        </select>
+      </div>
+      <div id="tabelaDest"><div class="loading"><div class="spinner"></div>Carregando…</div></div>
+    </div>`;
+  el("dBarra").value=destState.barra; el("dOrdem").value=destState.ordem;
+  el("dBarra").addEventListener("change",e=>{ destState.barra=e.target.value; carregarDestaques(); });
+  el("dOrdem").addEventListener("change",e=>{ destState.ordem=e.target.value; carregarDestaques(); });
+  carregarDestaques();
+}
+async function carregarDestaques(){
+  el("tabelaDest").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
+  let q=sb.from("vw_score_cliente").select("id,nome,barra,contratos_bmf,volume_bovespa,qtd_operacoes,score,faixa,data_ultima_operacao");
+  if(destState.barra!=="todas") q=q.eq("barra",destState.barra);
+  if(destState.ordem==="score") q=q.order("score",{ascending:false});
+  else if(destState.ordem==="recente") q=q.order("data_ultima_operacao",{ascending:false,nullsFirst:false});
+  else q=q.order("data_ultima_operacao",{ascending:true,nullsFirst:false});
+  const {data,error}=await q.limit(100);
+  if(error){ return erro(error,"tabelaDest"); }
+  if(!data||!data.length){ el("tabelaDest").innerHTML='<div class="empty">Nenhum cliente encontrado.</div>'; return; }
+  el("tabelaDest").innerHTML=`<table><thead><tr><th>#</th><th>Cliente</th><th>Faixa</th><th>Barra</th><th>Atividade</th><th>Última op.</th><th>Score</th></tr></thead>
+    <tbody>${data.map((c,i)=>`<tr class="${c.faixa==='preta'?'linha-preta':''}" onclick="abrirFicha('${c.id}')">
       <td class="num">${i+1}</td>
       <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}</div></td>
-      <td class="num">${c.barra||"—"}</td><td class="num">${nf(c.contratos_bmf)}</td><td class="num">${nf(c.qtd_operacoes)}</td>
-      <td><span class="score-badge" style="color:${c.score>=85?'var(--green)':c.score>=60?'var(--amber)':'var(--text-dim)'}">${c.score??"—"}</span></td></tr>`).join("")}</tbody></table></div>`;
+      <td>${faixaBadge(c.faixa)}</td>
+      <td class="num">${c.barra||"—"}</td>
+      <td class="num">${volDisplay(c.contratos_bmf,c.volume_bovespa)}</td>
+      <td class="num">${fmtData(c.data_ultima_operacao)}</td>
+      <td><span class="score-badge" style="color:${c.score>=85?'var(--green)':c.score>=60?'var(--amber)':'var(--text-dim)'}">${c.score??"—"}</span></td></tr>`).join("")}</tbody></table>
+    <div style="padding:11px 16px;font-size:11px;color:var(--text-faint)">Até 100 resultados.</div></div>`;
 }
 
 // ---------- FICHA (drawer) ----------
 async function abrirFicha(id){
   el("overlay").classList.add("open"); el("drawer").classList.add("open");
   el("drBody").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
-  el("drName").textContent=""; el("drSub").textContent=""; el("drStatus").innerHTML="";
+  el("drName").textContent=""; el("drSub").textContent=""; el("drStatus").innerHTML=""; el("drActions").innerHTML="";
   const {data:c} = await sb.from("clientes").select("*").eq("id",id).single();
-  const {data:s} = await sb.from("vw_saude_carteira").select("saude,status_operacao,data_ativacao,data_ultima_operacao,contratos_bmf,volume_bovespa,qtd_operacoes").eq("id",id).maybeSingle();
+  const {data:s} = await sb.from("vw_saude_carteira").select("saude,status_operacao,data_ativacao,data_ultima_operacao,contratos_bmf,volume_bovespa,qtd_operacoes,faixa").eq("id",id).maybeSingle();
   if(!c){ el("drBody").innerHTML='<div class="empty">Cliente não encontrado.</div>'; return; }
   el("drName").textContent=c.nome;
   el("drSub").textContent=`Sinacor ${c.sinacor} · ${c.barra||"sem barra"}`;
-  if(s){ el("drStatus").innerHTML=`<span class="status s-${s.saude}">${SAUDE_LABEL[s.saude]||s.saude}</span>`; }
+  el("drStatus").innerHTML = (s?`<span class="status s-${s.saude}">${SAUDE_LABEL[s.saude]||s.saude}</span>`:"")
+    + faixaBadge(s?s.faixa:"branca");
+  el("drActions").innerHTML = btnRD();
   const aniv = (c.nasc_dia&&c.nasc_mes)? String(c.nasc_dia).padStart(2,"0")+"/"+String(c.nasc_mes).padStart(2,"0") : "—";
+
+  // linha do tempo de faixas (últimos 3 meses)
+  const {data:tl} = await sb.from("vw_faixa_timeline").select("mes,contratos,faixa").eq("sinacor",c.sinacor);
+  const mapa={}; (tl||[]).forEach(r=>{ mapa[String(r.mes).slice(0,7)]=r; });
+  const hoje=new Date(); const meses=[];
+  for(let i=2;i>=0;i--){ const d=new Date(hoje.getFullYear(),hoje.getMonth()-i,1);
+    const chave=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
+    const nome=d.toLocaleDateString("pt-BR",{month:"short"}).replace(".","");
+    const r=mapa[chave]; meses.push({nome,faixa:r?r.faixa:"branca",ct:r?Number(r.contratos):0}); }
+  const timeline = meses.map(m=>`<div class="tl-mes"><div class="m">${m.nome}</div>${faixaBadge(m.faixa)}<div class="ct">${m.ct>0?nf(m.ct)+" ct":"—"}</div></div>`).join("");
+
   el("drBody").innerHTML=`
     <div class="dr-stats">
+      <div class="dr-stat"><div class="l">Atividade operada</div><div class="v" style="font-size:14px">${s?volDisplay(s.contratos_bmf,s.volume_bovespa):"—"}</div></div>
+      <div class="dr-stat"><div class="l">Nº de operações</div><div class="v" style="font-size:14px">${s?nf(s.qtd_operacoes):"—"}</div></div>
+      <div class="dr-stat"><div class="l">Situação</div><div class="v" style="font-size:14px">${s?(OP_LABEL[s.status_operacao]||"—"):"—"}</div></div>
       <div class="dr-stat"><div class="l">Última operação</div><div class="v" style="font-size:14px">${s?fmtData(s.data_ultima_operacao):"—"}</div></div>
       <div class="dr-stat"><div class="l">1ª operação</div><div class="v" style="font-size:14px">${s?fmtData(s.data_ativacao):"—"}</div></div>
-      <div class="dr-stat"><div class="l">Contratos (BM&F)</div><div class="v" style="font-size:14px">${s?nf(s.contratos_bmf):"—"}</div></div>
-      <div class="dr-stat"><div class="l">Nº de operações</div><div class="v" style="font-size:14px">${s?nf(s.qtd_operacoes):"—"}</div></div>
-      <div class="dr-stat"><div class="l">Aniversário</div><div class="v" style="font-size:14px">${aniv}</div></div>
       <div class="dr-stat"><div class="l">Cadastro</div><div class="v" style="font-size:14px">${fmtData(c.data_cadastro)}</div></div>
     </div>
+    <div class="dr-sec">Evolução de faixa · últimos 3 meses</div>
+    <div class="timeline">${timeline}</div>
     <div class="dr-sec">Contato</div>
     <div class="dr-stats">
       <div class="dr-stat"><div class="l">Telefone</div><div class="v" style="font-size:13px">${c.telefone||"—"}</div></div>
       <div class="dr-stat"><div class="l">E-mail</div><div class="v" style="font-size:12px;word-break:break-all">${c.email||"—"}</div></div>
+      <div class="dr-stat"><div class="l">Aniversário</div><div class="v" style="font-size:14px">${aniv}</div></div>
     </div>`;
 }
 function fecharFicha(){ el("overlay").classList.remove("open"); el("drawer").classList.remove("open"); }
