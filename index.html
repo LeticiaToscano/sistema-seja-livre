@@ -187,6 +187,11 @@
     padding:8px 14px;font-size:12.5px;font-weight:600}
   .pg-btn:hover:not(:disabled){border-color:var(--green);color:var(--green)}
   .pg-btn:disabled{opacity:.4;cursor:not-allowed}
+  .clube-chips{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+  .clube-chip{display:flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--border);
+    border-radius:12px;padding:9px 14px}
+  .clube-chip:hover{border-color:var(--border-strong)}
+  .clube-chip b{font-size:15px;font-weight:800;color:var(--text)}
   .spinner{width:22px;height:22px;border:2.5px solid var(--border-strong);border-top-color:var(--green);
     border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 12px}
   @keyframes spin{to{transform:rotate(360deg)}}
@@ -264,6 +269,7 @@
       <button class="nav-item active" data-view="radar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/></svg>Radar</button>
       <button class="nav-item" data-view="clientes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3.2 3-5 5.5-5s4.9 1.8 5.5 5" stroke-linecap="round"/></svg>Clientes</button>
       <button class="nav-item" data-view="destaques"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l2.5 5 5.5.8-4 3.9 1 5.5L12 16l-5 2.7 1-5.5-4-3.9 5.5-.8z" stroke-linejoin="round"/></svg>Destaques</button>
+      <button class="nav-item" data-view="clube"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="9" width="18" height="5" rx="1.4"/><path d="M9 9v5M15 9v5"/><path d="M6 17l2.5 3M18 17l-2.5 3" stroke-linecap="round"/></svg>Clube Trader</button>
       <button class="nav-item" data-view="fila"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h10M4 12h10M4 18h7" stroke-linecap="round"/><path d="M17 15l2.2 2.2L23 13" stroke-linecap="round" stroke-linejoin="round"/></svg>Fila de ação</button>
       <button class="nav-item" data-view="aniversariantes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20h16v-8H4z"/><path d="M4 14c2 0 2-1.3 4-1.3s2 1.3 4 1.3 2-1.3 4-1.3 2 1.3 4 1.3" stroke-linecap="round"/><path d="M12 8V5" stroke-linecap="round"/></svg>Aniversariantes</button>
 
@@ -373,6 +379,7 @@ async function mostrarApp(session){
 // ---------- ROTEADOR ----------
 const TITLES={
   radar:["CARTEIRA","Radar de retenção"], clientes:["CARTEIRA","Clientes"], destaques:["CARTEIRA","Destaques"],
+  clube:["CARTEIRA","Clube Trader"],
   fila:["CARTEIRA","Fila de ação"], aniversariantes:["CARTEIRA","Aniversariantes"],
   fluxos:["ATENDIMENTO","Fluxos"], assessores:["ATENDIMENTO","Assessores"],
   config:["GESTÃO","Configurações"], auditoria:["GESTÃO","Trilha de auditoria"], ia:["GESTÃO","CEO de IA"],
@@ -386,7 +393,7 @@ const RESERVADAS={
   ia:{icon:"ia",desc:"O diagnóstico estratégico da operação em linguagem natural, e o copiloto de IA por assessor — cada um enxergando apenas a própria carteira."},
   integracoes:{icon:"integracoes",desc:"As conexões do sistema — Volume Operado (operação), RD Conversas (atendimento), Gmail/Genial (entrada de clientes) e IA. Ligadas e a ligar."}
 };
-const VIEWS={radar:vRadar,clientes:vClientes,destaques:vDestaques,fila:vFila,aniversariantes:vAniversariantes};
+const VIEWS={radar:vRadar,clientes:vClientes,destaques:vDestaques,clube:vClube,fila:vFila,aniversariantes:vAniversariantes};
 document.querySelectorAll(".nav-item").forEach(b=>b.addEventListener("click",()=>{
   document.querySelectorAll(".nav-item").forEach(x=>x.classList.remove("active"));
   b.classList.add("active"); el("sidebar").classList.remove("open"); render(b.dataset.view);
@@ -455,12 +462,13 @@ async function vAniversariantes(){
   el("content").innerHTML=`
     <div class="sec-title">Aniversariantes de hoje<span class="rule"></span></div>
     <div class="panel" id="anivFull"><div class="loading"><div class="spinner"></div>Carregando…</div></div>`;
-  const {data,error} = await sb.from("vw_aniversariantes_hoje").select("id,nome,barra,sinacor").limit(200);
+  const {data,error} = await sb.from("vw_aniversariantes_hoje").select("id,nome,barra,sinacor,faixa,grau").limit(200);
   if(error){ return erro(error,"anivFull"); }
   if(!data||!data.length){ el("anivFull").innerHTML='<div class="empty">Nenhum aniversariante hoje.</div>'; return; }
   el("anivFull").innerHTML=`<div class="aniv-list">${data.map(c=>`<div class="aniv-item" onclick="abrirFicha('${c.id}')">
     <span class="cake"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0A0D0C" stroke-width="2"><path d="M4 20h16v-9H4z"/><path d="M4 14c2 0 2-1.5 4-1.5s2 1.5 4 1.5 2-1.5 4-1.5 2 1.5 4 1.5" stroke-linecap="round"/><path d="M12 8V5m-4 3V6m8 2V6" stroke-linecap="round"/></svg></span>
     <div style="flex:1"><div class="an">${c.nome}</div><div class="ab">Sinacor ${c.sinacor} · ${c.barra||"—"}</div></div>
+    ${faixaBadge(c.faixa,c.grau)}
     <button class="btn-rd" onclick="event.stopPropagation();abrirRD()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 11c0 5.5-7 10-7 10z" stroke-linejoin="round"/></svg>Desejar felicidades</button></div>`).join("")}</div>`;
 }
 
@@ -537,12 +545,12 @@ async function carregarFila(){
 }
 
 async function carregarAniversariantes(){
-  const {data,error} = await sb.from("vw_aniversariantes_hoje").select("id,nome,barra").limit(30);
+  const {data,error} = await sb.from("vw_aniversariantes_hoje").select("id,nome,barra,faixa,grau").limit(30);
   if(error){ return erro(error,"aniversariantes"); }
   if(!data||!data.length){ el("aniversariantes").innerHTML='<div class="empty">Nenhum aniversariante hoje.</div>'; return; }
   el("aniversariantes").innerHTML=`<div class="aniv-list">${data.map(c=>`<div class="aniv-item" onclick="abrirFicha('${c.id}')">
     <span class="cake"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0A0D0C" stroke-width="2"><path d="M4 20h16v-9H4z"/><path d="M4 14c2 0 2-1.5 4-1.5s2 1.5 4 1.5 2-1.5 4-1.5 2 1.5 4 1.5" stroke-linecap="round"/><path d="M12 8V5m-4 3V6m8 2V6" stroke-linecap="round"/></svg></span>
-    <div><div class="an">${c.nome}</div><div class="ab">${c.barra||"—"}</div></div></div>`).join("")}</div>`;
+    <div style="flex:1"><div class="an">${c.nome}</div><div class="ab">${c.barra||"—"}</div></div>${faixaBadge(c.faixa,c.grau)}</div>`).join("")}</div>`;
 }
 
 // ---------- CLIENTES ----------
@@ -640,6 +648,56 @@ async function carregarDestaques(){
       <td class="num">${fmtData(c.data_ultima_operacao)}</td>
       <td><span class="score-badge" style="color:${c.score>=85?'var(--green)':c.score>=60?'var(--amber)':'var(--text-dim)'}">${c.score??"—"}</span></td></tr>`).join("")}</tbody></table>
     <div style="padding:11px 16px;font-size:11px;color:var(--text-faint)">Até 100 resultados.</div></div>`;
+}
+
+// ---------- CLUBE TRADER (clientes com faixa) ----------
+let clubeState={faixa:"todas"};
+const FAIXA_ORDEM=["preta","marrom","roxa","azul","branca"];
+async function vClube(){
+  el("content").innerHTML=`
+    <div class="sec-title">Clientes classificados por faixa<span class="rule"></span></div>
+    <div id="clubeChips" class="clube-chips"></div>
+    <div class="panel">
+      <div class="toolbar">
+        <select class="search select" id="cFaixa" style="flex:0 0 220px">
+          <option value="todas">Todas as faixas</option>
+          <option value="preta">Faixa Preta</option>
+          <option value="marrom">Faixa Marrom</option>
+          <option value="roxa">Faixa Roxa</option>
+          <option value="azul">Faixa Azul</option>
+          <option value="branca">Faixa Branca</option>
+        </select>
+      </div>
+      <div id="tabelaClube"><div class="loading"><div class="spinner"></div>Carregando…</div></div>
+    </div>`;
+  el("cFaixa").value=clubeState.faixa;
+  el("cFaixa").addEventListener("change",e=>{ clubeState.faixa=e.target.value; carregarClube(); });
+  let chips="";
+  for(const f of FAIXA_ORDEM){
+    const {count}=await sb.from("vw_clube").select("id",{count:"exact",head:true}).eq("faixa",f);
+    chips+=`<button class="clube-chip" onclick="filtrarClube('${f}')">${faixaBadge(f,f==='preta'?1:0)}<b>${nf(count||0)}</b></button>`;
+  }
+  el("clubeChips").innerHTML=chips;
+  carregarClube();
+}
+function filtrarClube(f){ clubeState.faixa=f; el("cFaixa").value=f; carregarClube(); }
+async function carregarClube(){
+  el("tabelaClube").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
+  let q=sb.from("vw_clube").select("id,nome,barra,contratos_bmf,volume_bovespa,data_ultima_operacao,faixa,grau,score");
+  if(clubeState.faixa!=="todas") q=q.eq("faixa",clubeState.faixa);
+  const {data,error}=await q.limit(200);
+  if(error){ return erro(error,"tabelaClube"); }
+  if(!data||!data.length){ el("tabelaClube").innerHTML='<div class="empty">Nenhum cliente nesta faixa.</div>'; return; }
+  el("tabelaClube").innerHTML=`<table><thead><tr><th>#</th><th>Cliente</th><th>Faixa</th><th>Barra</th><th>Atividade</th><th>Última op.</th><th>Score</th></tr></thead>
+    <tbody>${data.map((c,i)=>`<tr class="${c.faixa==='preta'?'linha-preta':''}" onclick="abrirFicha('${c.id}')">
+      <td class="num">${i+1}</td>
+      <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}</div></td>
+      <td>${faixaBadge(c.faixa,c.grau)}</td>
+      <td class="num">${c.barra||"—"}</td>
+      <td class="num">${volDisplay(c.contratos_bmf,c.volume_bovespa)}</td>
+      <td class="num">${fmtData(c.data_ultima_operacao)}</td>
+      <td><span class="score-badge" style="color:${c.score>=85?'var(--green)':c.score>=60?'var(--amber)':'var(--text-dim)'}">${c.score??"—"}</span></td></tr>`).join("")}</tbody></table>
+    <div style="padding:11px 16px;font-size:11px;color:var(--text-faint)">Até 200 resultados.</div></div>`;
 }
 
 // ---------- FICHA (drawer) ----------
