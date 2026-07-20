@@ -218,6 +218,65 @@
   .ex-shortcuts button:hover{border-color:var(--green);color:var(--green)}
   .ex-filtros{display:flex;gap:8px;flex-wrap:wrap}
   .ex-filtros .select{flex:1;min-width:150px}
+  .integ-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
+  .integ-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;position:relative;overflow:hidden}
+  .integ-card::before{content:"";position:absolute;top:0;left:0;width:3px;height:100%}
+  .integ-card.st-on::before{background:var(--green)}
+  .integ-card.st-partial::before{background:var(--amber)}
+  .integ-card.st-off::before{background:var(--text-faint);opacity:.5}
+  .integ-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+  .integ-nome{font-size:16px;font-weight:800;letter-spacing:-.2px}
+  .integ-pill{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;white-space:nowrap}
+  .integ-pill .dot{width:7px;height:7px;border-radius:50%}
+  .integ-pill.st-on{background:rgba(46,229,157,.12);color:var(--green)}.integ-pill.st-on .dot{background:var(--green)}
+  .integ-pill.st-partial{background:rgba(245,184,65,.12);color:var(--amber)}.integ-pill.st-partial .dot{background:var(--amber)}
+  .integ-pill.st-off{background:var(--surface-2);color:var(--text-faint)}.integ-pill.st-off .dot{background:var(--text-faint)}
+  .integ-desc{font-size:12.5px;color:var(--text-dim);line-height:1.5;margin-bottom:14px}
+  .integ-recs{display:flex;flex-direction:column;gap:7px;border-top:1px solid var(--border);padding-top:13px}
+  .rec{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--text-dim)}
+  .rec-ok{color:var(--green);font-weight:800}.rec-bloq{font-size:11px}.rec-off{color:var(--text-faint);font-weight:800}
+  .integ-legenda{margin-top:20px;font-size:11.5px;color:var(--text-faint);text-align:center}
+  /* sininho de notificações */
+  .notif-wrap{position:relative}
+  .notif-btn{position:relative;width:40px;height:40px;border-radius:11px;background:var(--surface);border:1px solid var(--border);
+    color:var(--text-dim);display:grid;place-items:center}
+  .notif-btn:hover{color:var(--text);border-color:var(--border-strong)}
+  .notif-badge{position:absolute;top:-5px;right:-5px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;
+    background:var(--red);color:#fff;font-size:10.5px;font-weight:800;display:grid;place-items:center}
+  .notif-panel{position:absolute;top:50px;right:0;width:380px;max-width:92vw;background:var(--bg-2);border:1px solid var(--border-strong);
+    border-radius:14px;box-shadow:0 30px 70px -20px rgba(0,0,0,.8);opacity:0;pointer-events:none;transform:translateY(-8px);
+    transition:.18s;z-index:45;overflow:hidden}
+  .notif-panel.open{opacity:1;pointer-events:auto;transform:none}
+  .notif-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border)}
+  .notif-head b{font-size:14px}
+  .notif-mark{font-size:11px;color:var(--text-faint);font-weight:600}.notif-mark:hover{color:var(--green)}
+  .notif-list{max-height:60vh;overflow-y:auto}
+  .notif-empty{padding:40px 20px;text-align:center;color:var(--text-faint);font-size:12.5px}
+  .notif-item{display:flex;gap:12px;padding:13px 16px;border-bottom:1px solid var(--border);cursor:pointer}
+  .notif-item:hover{background:var(--surface)}
+  .notif-item.unread{background:rgba(46,229,157,.04)}
+  .notif-ico{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;flex-shrink:0;font-size:15px}
+  .ni-entrada{background:rgba(46,229,157,.14);color:var(--green)}
+  .ni-habilitacao{background:rgba(91,155,224,.14);color:#5B9BE0}
+  .ni-saida{background:rgba(240,90,90,.14);color:var(--red)}
+  .notif-body{flex:1;min-width:0}
+  .notif-t{font-size:13px;font-weight:600;line-height:1.35}
+  .notif-sub{font-size:11.5px;color:var(--text-dim);margin-top:2px}
+  .notif-time{font-size:10.5px;color:var(--text-faint);margin-top:3px}
+  /* toast / pop-up */
+  .toast-wrap{position:fixed;bottom:24px;right:24px;display:flex;flex-direction:column;gap:10px;z-index:60}
+  .toast{background:var(--bg-2);border:1px solid var(--border-strong);border-left:3px solid var(--green);border-radius:12px;
+    padding:14px 18px;min-width:280px;max-width:380px;box-shadow:0 20px 50px -15px rgba(0,0,0,.7);
+    animation:toastIn .25s ease;display:flex;gap:12px;align-items:flex-start}
+  .toast.crit{border-left-color:var(--red)}
+  .toast-x{margin-left:auto;color:var(--text-faint);font-size:15px;cursor:pointer}
+  @keyframes toastIn{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:none}}
+  .toast-t{font-size:13px;font-weight:700}.toast-d{font-size:12px;color:var(--text-dim);margin-top:3px;line-height:1.4}
+  /* solicitações */
+  .sol-tabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+  .sol-tab{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:8px 15px;font-size:12.5px;font-weight:600;color:var(--text-dim)}
+  .sol-tab.on{border-color:var(--green);color:var(--green)}
+  .sol-tab:hover{border-color:var(--border-strong)}
   .spinner{width:22px;height:22px;border:2.5px solid var(--border-strong);border-top-color:var(--green);
     border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 12px}
   @keyframes spin{to{transform:rotate(360deg)}}
@@ -299,6 +358,7 @@
       <button class="nav-item" data-view="clube"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="9" width="18" height="5" rx="1.4"/><path d="M9 9v5M15 9v5"/><path d="M6 17l2.5 3M18 17l-2.5 3" stroke-linecap="round"/></svg>Clube Trader</button>
       <button class="nav-item" data-view="fila"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h10M4 12h10M4 18h7" stroke-linecap="round"/><path d="M17 15l2.2 2.2L23 13" stroke-linecap="round" stroke-linejoin="round"/></svg>Fila de ação</button>
       <button class="nav-item" data-view="aniversariantes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20h16v-8H4z"/><path d="M4 14c2 0 2-1.3 4-1.3s2 1.3 4 1.3 2-1.3 4-1.3 2 1.3 4 1.3" stroke-linecap="round"/><path d="M12 8V5" stroke-linecap="round"/></svg>Aniversariantes</button>
+      <button class="nav-item" data-view="solicitacoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h16v14H4z"/><path d="M4 9h16M9 5v4" stroke-linecap="round"/><path d="M8 14l2.5 2.5L16 11" stroke-linecap="round" stroke-linejoin="round"/></svg>Solicitações</button>
 
       <div class="nav-label">Atendimento</div>
       <button class="nav-item" data-view="fluxos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="6" cy="6" r="2.2"/><circle cx="6" cy="18" r="2.2"/><circle cx="18" cy="12" r="2.2"/><path d="M8 6h4a4 4 0 0 1 4 4v0M8 18h4a4 4 0 0 0 4-4v0" stroke-linecap="round"/></svg>Fluxos</button>
@@ -324,9 +384,22 @@
         <button class="menu-btn" id="menuBtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16" stroke-linecap="round"/></svg></button>
         <div><div class="crumb" id="crumb">CARTEIRA</div><h1 id="pageTitle">Radar de retenção</h1></div>
       </div>
-      <div class="live"><span class="dot"></span>Dados ao vivo</div>
+      <div style="display:flex;align-items:center;gap:14px">
+        <div class="notif-wrap">
+          <button class="notif-btn" id="notifBtn" onclick="toggleNotif()">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" stroke-linecap="round" stroke-linejoin="round"/><path d="M13.7 21a2 2 0 0 1-3.4 0" stroke-linecap="round"/></svg>
+            <span class="notif-badge" id="notifBadge" style="display:none">0</span>
+          </button>
+          <div class="notif-panel" id="notifPanel">
+            <div class="notif-head"><b>Notificações</b><button class="notif-mark" id="notifMark" onclick="marcarTodasLidas()">Marcar todas como lidas</button></div>
+            <div class="notif-list" id="notifList"><div class="notif-empty">Nenhuma notificação ainda.</div></div>
+          </div>
+        </div>
+        <div class="live"><span class="dot"></span>Dados ao vivo</div>
+      </div>
     </div>
     <div class="content" id="content"><div class="loading"><div class="spinner"></div>Carregando…</div></div>
+    <div id="toastWrap" class="toast-wrap"></div>
   </div>
 </div>
 
@@ -366,6 +439,7 @@ const el = id => document.getElementById(id);
 const ini = n => (n||"?").trim().split(/\s+/).slice(0,2).map(w=>w[0]).join("").toUpperCase();
 const nf = n => (n==null?"—":Number(n).toLocaleString("pt-BR"));
 const fmtData = d => d ? new Date(d+"T00:00:00").toLocaleDateString("pt-BR") : "nunca";
+const fmtDataHora = d => { if(!d) return "—"; const x=new Date(d); return x.toLocaleDateString("pt-BR")+" "+x.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}); };
 const fmtDesde = d => {
   if(!d) return "—";
   const dias = Math.floor((Date.now()-new Date(d+"T00:00:00"))/86400000);
@@ -401,6 +475,8 @@ async function mostrarApp(session){
   el("userName").textContent=nome; el("avatar").textContent=ini(nome);
   el("userRole").textContent = papel==="admin"?"Administrador":papel==="gerencia"?"Gerência":"Assessor";
   render("radar");
+  carregarNotif();
+  document.addEventListener("click",e=>{ if(!e.target.closest(".notif-wrap")) el("notifPanel").classList.remove("open"); });
 }
 
 // ---------- ROTEADOR ----------
@@ -408,6 +484,7 @@ const TITLES={
   radar:["CARTEIRA","Radar de retenção"], clientes:["CARTEIRA","Clientes"], explorar:["CARTEIRA","Explorar"], destaques:["CARTEIRA","Destaques"],
   clube:["CARTEIRA","Clube Trader"],
   fila:["CARTEIRA","Fila de ação"], aniversariantes:["CARTEIRA","Aniversariantes"],
+  solicitacoes:["CARTEIRA","Solicitações"],
   fluxos:["ATENDIMENTO","Fluxos"], assessores:["ATENDIMENTO","Assessores"],
   config:["GESTÃO","Configurações"], auditoria:["GESTÃO","Trilha de auditoria"], ia:["GESTÃO","CEO de IA"],
   integracoes:["SISTEMA","Integrações"]
@@ -420,7 +497,7 @@ const RESERVADAS={
   ia:{icon:"ia",desc:"O diagnóstico estratégico da operação em linguagem natural, e o copiloto de IA por assessor — cada um enxergando apenas a própria carteira."},
   integracoes:{icon:"integracoes",desc:"As conexões do sistema — Volume Operado (operação), RD Conversas (atendimento), Gmail/Genial (entrada de clientes) e IA. Ligadas e a ligar."}
 };
-const VIEWS={radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,fila:vFila,aniversariantes:vAniversariantes,config:vConfig};
+const VIEWS={radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes};
 document.querySelectorAll(".nav-item").forEach(b=>b.addEventListener("click",()=>{
   document.querySelectorAll(".nav-item").forEach(x=>x.classList.remove("active"));
   b.classList.add("active"); el("sidebar").classList.remove("open"); render(b.dataset.view);
@@ -675,6 +752,103 @@ async function carregarDestaques(){
       <td class="num">${fmtData(c.data_ultima_operacao)}</td>
       <td><span class="score-badge" style="color:${c.score>=85?'var(--green)':c.score>=60?'var(--amber)':'var(--text-dim)'}">${c.score??"—"}</span></td></tr>`).join("")}</tbody></table>
     <div style="padding:11px 16px;font-size:11px;color:var(--text-faint)">Até 100 resultados.</div></div>`;
+}
+
+// ---------- NOTIFICAÇÕES (sininho + toast + solicitações) ----------
+const TIPO_INFO={
+  entrada:{ico:"↓",cls:"ni-entrada",label:"Troca de entrada"},
+  habilitacao:{ico:"✦",cls:"ni-habilitacao",label:"Abertura de conta"},
+  saida:{ico:"↑",cls:"ni-saida",label:"Troca de saída"}
+};
+async function carregarNotif(){
+  const {data,error}=await sb.from("vw_notificacoes_mes").select("*").limit(50);
+  if(error){ return; }
+  const lista=data||[], naoLidas=lista.filter(n=>!n.lida).length, badge=el("notifBadge");
+  if(naoLidas>0){ badge.style.display="grid"; badge.textContent=naoLidas>99?"99+":naoLidas; } else badge.style.display="none";
+  if(!lista.length){ el("notifList").innerHTML='<div class="notif-empty">Nenhuma solicitação este mês.<br><span style="font-size:11px">As trocas e aberturas aparecerão aqui.</span></div>'; return; }
+  el("notifList").innerHTML=lista.map(n=>{const t=TIPO_INFO[n.tipo]||TIPO_INFO.entrada;
+    const nome=n.cliente_nome||n.nome_atual||("Sinacor "+(n.sinacor||"—"));
+    return `<div class="notif-item ${n.lida?'':'unread'}" ${n.cliente_id?`onclick="abrirFicha('${n.cliente_id}')"`:''}>
+      <div class="notif-ico ${t.cls}">${t.ico}</div>
+      <div class="notif-body"><div class="notif-t">${nome}</div>
+        <div class="notif-sub">${t.label}${n.barra?" · "+n.barra:""}${n.alerta?' · <span style="color:var(--amber)">⚠ sem e-mail</span>':""}</div>
+        <div class="notif-time">${fmtDataHora(n.criado_em)}</div></div></div>`;}).join("");
+}
+function toggleNotif(){ const p=el("notifPanel"); if(p.classList.toggle("open")) carregarNotif(); }
+async function marcarTodasLidas(){ await sb.from("notificacoes").update({lida:true}).eq("lida",false); carregarNotif(); }
+function toast(titulo,desc,crit){
+  const w=el("toastWrap"); if(!w) return;
+  const d=document.createElement("div"); d.className="toast"+(crit?" crit":"");
+  d.innerHTML=`<div><div class="toast-t">${titulo}</div>${desc?`<div class="toast-d">${desc}</div>`:""}</div><span class="toast-x">✕</span>`;
+  d.querySelector(".toast-x").onclick=()=>d.remove();
+  w.appendChild(d); setTimeout(()=>{ d.style.opacity="0"; setTimeout(()=>d.remove(),300); },8000);
+}
+
+// ---------- SOLICITAÇÕES (aba) ----------
+let solState={tipo:"todas"};
+function vSolicitacoes(){
+  el("content").innerHTML=`
+    <div class="sec-title">Solicitações do mês<span class="rule"></span></div>
+    <div class="sol-tabs">
+      <button class="sol-tab on" onclick="solFiltro('todas',this)">Todas</button>
+      <button class="sol-tab" onclick="solFiltro('saida',this)">Saídas</button>
+      <button class="sol-tab" onclick="solFiltro('entrada',this)">Entradas</button>
+      <button class="sol-tab" onclick="solFiltro('habilitacao',this)">Aberturas</button>
+    </div>
+    <div class="panel" id="solList"><div class="loading"><div class="spinner"></div>Carregando…</div></div>`;
+  solState={tipo:"todas"};
+  carregarSolic();
+}
+function solFiltro(t,btn){ solState.tipo=t; document.querySelectorAll(".sol-tab").forEach(b=>b.classList.remove("on")); btn.classList.add("on"); carregarSolic(); }
+async function carregarSolic(){
+  el("solList").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
+  let q=sb.from("vw_notificacoes_mes").select("*");
+  if(solState.tipo!=="todas") q=q.eq("tipo",solState.tipo);
+  const {data,error}=await q.limit(300);
+  if(error){ return erro(error,"solList"); }
+  if(!data||!data.length){ el("solList").innerHTML='<div class="empty">Nenhuma solicitação este mês.<br><span style="font-size:12px;color:var(--text-faint)">As trocas e aberturas aparecerão aqui quando o e-mail e o relatório forem ligados.</span></div>'; return; }
+  el("solList").innerHTML=`<table><thead><tr><th>Tipo</th><th>Cliente</th><th>Barra</th><th>Data</th><th>Origem</th><th></th></tr></thead>
+    <tbody>${data.map(n=>{const t=TIPO_INFO[n.tipo]||TIPO_INFO.entrada; const nome=n.cliente_nome||n.nome_atual||("Sinacor "+(n.sinacor||"—"));
+      return `<tr class="${n.tipo==='saida'?'linha-preta':''}" ${n.cliente_id?`onclick="abrirFicha('${n.cliente_id}')"`:''}>
+        <td><span class="notif-ico ${t.cls}" style="width:26px;height:26px;font-size:12px;display:inline-grid;vertical-align:middle">${t.ico}</span> ${t.label}</td>
+        <td>${nome}</td><td class="num">${n.barra||"—"}</td>
+        <td class="num">${n.data_movimento?fmtData(n.data_movimento):fmtDataHora(n.criado_em)}</td>
+        <td class="num">${n.origem}${n.alerta?' <span style="color:var(--amber)">⚠</span>':""}</td>
+        <td>${n.tipo==='saida'?btnRD():""}</td></tr>`;}).join("")}</tbody></table>`;
+}
+
+// ---------- INTEGRAÇÕES ----------
+function vIntegracoes(){
+  const INTEG=[
+    {nome:"Volume Operado",st:"on",desc:"Fonte do dado de operação de cada cliente.",
+     rec:[["Semente histórica (jan/2025→jul/2026)","ok"],["Feed vivo (planilha em tempo real)","ok"]]},
+    {nome:"Supabase",st:"on",desc:"O banco de dados e a autenticação do sistema.",
+     rec:[["Base de clientes e operações","ok"],["Login e permissões (RLS)","ok"]]},
+    {nome:"RD Conversas",st:"partial",desc:"Atendimento no WhatsApp (plataforma Tallos).",
+     rec:[["Lista de assessores","ok"],["Busca de contato (CPF/telefone)","ok"],["Envio de mensagens/templates","ok"],["Histórico / último contato","bloq"]]},
+    {nome:"Gmail / Genial",st:"off",desc:"Entrada automática de clientes novos (cadastro e troca).",
+     rec:[["Leitura dos e-mails de cadastro","off"]]},
+    {nome:"WhatsApp / Meta",st:"off",desc:"Templates aprovados para os disparos (copiloto de envio).",
+     rec:[["Templates aprovados pela Meta","off"],["Disparo assistido (Degrau 2)","off"]]},
+    {nome:"IA (Anthropic)",st:"off",desc:"O CEO de IA e os copilotos de atendimento.",
+     rec:[["Diagnóstico estratégico","off"],["Copiloto por assessor","off"]]},
+  ];
+  const STLABEL={on:["Ligado","st-on"],partial:["Parcial","st-partial"],off:["A ligar","st-off"]};
+  const RECICON={ok:'<span class="rec-ok">✓</span>',bloq:'<span class="rec-bloq">🔒</span>',off:'<span class="rec-off">○</span>'};
+  el("content").innerHTML=`
+    <div class="sec-title">Conexões do sistema<span class="rule"></span></div>
+    <div class="integ-grid">
+      ${INTEG.map(i=>{const s=STLABEL[i.st];return `
+        <div class="integ-card ${s[1]}">
+          <div class="integ-top">
+            <div class="integ-nome">${i.nome}</div>
+            <span class="integ-pill ${s[1]}"><span class="dot"></span>${s[0]}</span>
+          </div>
+          <div class="integ-desc">${i.desc}</div>
+          <div class="integ-recs">${i.rec.map(r=>`<div class="rec">${RECICON[r[1]]}<span>${r[0]}</span></div>`).join("")}</div>
+        </div>`;}).join("")}
+    </div>
+    <div class="integ-legenda">🟢 Ligado · funcionando agora &nbsp;·&nbsp; 🟡 Parcial · conectado, com limite &nbsp;·&nbsp; ⚪ A ligar · planejado</div>`;
 }
 
 // ---------- EXPLORAR (análise por período + filtros) ----------
