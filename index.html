@@ -651,7 +651,7 @@ async function carregarDestaques(){
 }
 
 // ---------- CLUBE TRADER (clientes com faixa) ----------
-let clubeState={faixa:"todas"};
+let clubeState={faixa:"todas",page:0,size:50,total:0};
 const FAIXA_ORDEM=["preta","marrom","roxa","azul","branca"];
 async function vClube(){
   el("content").innerHTML=`
@@ -670,8 +670,9 @@ async function vClube(){
       </div>
       <div id="tabelaClube"><div class="loading"><div class="spinner"></div>Carregando…</div></div>
     </div>`;
+  clubeState={faixa:clubeState.faixa,page:0,size:50,total:0};
   el("cFaixa").value=clubeState.faixa;
-  el("cFaixa").addEventListener("change",e=>{ clubeState.faixa=e.target.value; carregarClube(); });
+  el("cFaixa").addEventListener("change",e=>{ clubeState.faixa=e.target.value; clubeState.page=0; carregarClube(); });
   let chips="";
   for(const f of FAIXA_ORDEM){
     const {count}=await sb.from("vw_clube").select("id",{count:"exact",head:true}).eq("faixa",f);
@@ -680,24 +681,34 @@ async function vClube(){
   el("clubeChips").innerHTML=chips;
   carregarClube();
 }
-function filtrarClube(f){ clubeState.faixa=f; el("cFaixa").value=f; carregarClube(); }
+function filtrarClube(f){ clubeState.faixa=f; clubeState.page=0; el("cFaixa").value=f; carregarClube(); }
+function mudarClube(d){ clubeState.page=Math.max(0,clubeState.page+d); carregarClube(); document.querySelector(".main").scrollTop=0; }
 async function carregarClube(){
   el("tabelaClube").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
-  let q=sb.from("vw_clube").select("id,nome,barra,contratos_bmf,volume_bovespa,data_ultima_operacao,faixa,grau,score");
+  const {page,size}=clubeState, from=page*size, to=from+size-1;
+  let q=sb.from("vw_clube").select("id,nome,barra,contratos_bmf,volume_bovespa,data_ultima_operacao,faixa,grau,score",{count:"exact"});
   if(clubeState.faixa!=="todas") q=q.eq("faixa",clubeState.faixa);
-  const {data,error}=await q.limit(200);
+  const {data,error,count}=await q.range(from,to);
   if(error){ return erro(error,"tabelaClube"); }
   if(!data||!data.length){ el("tabelaClube").innerHTML='<div class="empty">Nenhum cliente nesta faixa.</div>'; return; }
+  const de=from+1, ate=from+data.length, totalPags=Math.max(1,Math.ceil((count||0)/size));
   el("tabelaClube").innerHTML=`<table><thead><tr><th>#</th><th>Cliente</th><th>Faixa</th><th>Barra</th><th>Atividade</th><th>Última op.</th><th>Score</th></tr></thead>
     <tbody>${data.map((c,i)=>`<tr class="${c.faixa==='preta'?'linha-preta':''}" onclick="abrirFicha('${c.id}')">
-      <td class="num">${i+1}</td>
+      <td class="num">${from+i+1}</td>
       <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}</div></td>
       <td>${faixaBadge(c.faixa,c.grau)}</td>
       <td class="num">${c.barra||"—"}</td>
       <td class="num">${volDisplay(c.contratos_bmf,c.volume_bovespa)}</td>
       <td class="num">${fmtData(c.data_ultima_operacao)}</td>
       <td><span class="score-badge" style="color:${c.score>=85?'var(--green)':c.score>=60?'var(--amber)':'var(--text-dim)'}">${c.score??"—"}</span></td></tr>`).join("")}</tbody></table>
-    <div style="padding:11px 16px;font-size:11px;color:var(--text-faint)">Até 200 resultados.</div></div>`;
+    <div class="pager">
+      <span class="pg-count">Mostrando <b>${nf(de)}–${nf(ate)}</b> de <b>${nf(count)}</b> no clube</span>
+      <div class="pg-btns">
+        <button class="pg-btn" ${page<=0?"disabled":""} onclick="mudarClube(-1)">← Anterior</button>
+        <span class="pg-num">Página ${page+1} de ${nf(totalPags)}</span>
+        <button class="pg-btn" ${page>=totalPags-1?"disabled":""} onclick="mudarClube(1)">Próxima →</button>
+      </div>
+    </div>`;
 }
 
 // ---------- FICHA (drawer) ----------
