@@ -298,6 +298,10 @@
   .sol-date input[type=date]{background:var(--surface-2);border:1px solid var(--border-strong);color:var(--text);border-radius:8px;padding:8px 11px;font-size:13px;color-scheme:dark}
   .sol-date button{background:var(--surface-2);border:1px solid var(--border);color:var(--text-dim);border-radius:7px;padding:8px 12px;font-size:12px;font-weight:600}
   .sol-date button:hover{border-color:var(--green);color:var(--green)}
+  .sol-modo{display:inline-flex;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:3px;gap:3px}
+  .sol-modo .sm{background:transparent;border:none;color:var(--text-dim);border-radius:7px;padding:7px 13px;font-size:12.5px;font-weight:600}
+  .sol-modo .sm.on{background:var(--surface-2);color:var(--green)}
+  .sol-inputs{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .spinner{width:22px;height:22px;border:2.5px solid var(--border-strong);border-top-color:var(--green);
     border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 12px}
   @keyframes spin{to{transform:rotate(360deg)}}
@@ -834,15 +838,21 @@ function toast(titulo,desc,crit){
 }
 
 // ---------- SOLICITAÇÕES (aba) ----------
-let solState={tipo:"todas",data:""};
+function mesInicioISO(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-01"; }
+let solState={tipo:"todas",modo:"dia",data:"",ini:"",fim:""};
 function vSolicitacoes(){
+  if(!solState.data) solState.data=hojeISO();
+  if(!solState.ini){ solState.ini=mesInicioISO(); solState.fim=hojeISO(); }
   el("content").innerHTML=`
     <div class="sec-title">Solicitações<span class="rule"></span></div>
     <div class="sol-resumo" id="solResumo"></div>
     <div class="sol-date">
-      <label>Dia: <input type="date" id="solData" value="${solState.data||hojeISO()}"></label>
-      <button onclick="solHoje()">Hoje</button>
-      <button onclick="solMes()">Mês inteiro</button>
+      <div class="sol-modo">
+        <button class="sm ${solState.modo==='dia'?'on':''}" onclick="solModo('dia',this)">Por dia</button>
+        <button class="sm ${solState.modo==='intervalo'?'on':''}" onclick="solModo('intervalo',this)">Por período</button>
+        <button class="sm ${solState.modo==='mes'?'on':''}" onclick="solModo('mes',this)">Mês inteiro</button>
+      </div>
+      <div class="sol-inputs" id="solInputs"></div>
     </div>
     <div class="sol-tabs">
       <button class="sol-tab on" onclick="solFiltro('todas',this)">Todas</button>
@@ -851,33 +861,55 @@ function vSolicitacoes(){
       <button class="sol-tab" onclick="solFiltro('habilitacao',this)">Aberturas</button>
     </div>
     <div class="panel" id="solList"><div class="loading"><div class="spinner"></div>Carregando…</div></div>`;
-  solState={tipo:"todas",data:solState.data||hojeISO()};
-  el("solData").value=solState.data;
-  el("solData").addEventListener("change",e=>{ solState.data=e.target.value; carregarSolic(); });
+  solState.tipo="todas";
+  renderSolInputs();
   carregarSolic();
 }
+function renderSolInputs(){
+  var h="";
+  if(solState.modo==="dia"){
+    h=`<label>Dia: <input type="date" id="solData" value="${solState.data}"></label>
+       <button onclick="solHoje()">Hoje</button>`;
+  }else if(solState.modo==="intervalo"){
+    h=`<label>De <input type="date" id="solIni" value="${solState.ini}"></label>
+       <label>até <input type="date" id="solFim" value="${solState.fim}"></label>`;
+  }else{
+    h=`<span style="font-size:12px;color:var(--text-faint)">Mostrando todas as solicitações do mês vigente.</span>`;
+  }
+  el("solInputs").innerHTML=h;
+  if(solState.modo==="dia") el("solData").addEventListener("change",e=>{ solState.data=e.target.value; carregarSolic(); });
+  if(solState.modo==="intervalo"){
+    el("solIni").addEventListener("change",e=>{ solState.ini=e.target.value; carregarSolic(); });
+    el("solFim").addEventListener("change",e=>{ solState.fim=e.target.value; carregarSolic(); });
+  }
+}
+function solModo(m,btn){ solState.modo=m; document.querySelectorAll(".sm").forEach(b=>b.classList.remove("on")); btn.classList.add("on"); renderSolInputs(); carregarSolic(); }
 function solFiltro(t,btn){ solState.tipo=t; document.querySelectorAll(".sol-tab").forEach(b=>b.classList.remove("on")); btn.classList.add("on"); carregarSolic(); }
 function solHoje(){ solState.data=hojeISO(); el("solData").value=solState.data; carregarSolic(); }
-function solMes(){ solState.data=""; el("solData").value=""; carregarSolic(); }
+function aplicarData(q){
+  if(solState.modo==="dia"){ return solState.data? q.eq("data_movimento",solState.data) : q; }
+  if(solState.modo==="intervalo"){ if(solState.ini) q=q.gte("data_movimento",solState.ini); if(solState.fim) q=q.lte("data_movimento",solState.fim); return q; }
+  return q.gte("data_movimento",mesInicioISO()); // mês
+}
+async function contarTipoSolic(t){
+  let q=sb.from("notificacoes").select("id",{count:"exact",head:true}).eq("tipo",t);
+  const {count}=await aplicarData(q); return count||0;
+}
 async function carregarSolic(){
   el("solList").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
-  // resumo numérico
-  if(solState.data){
-    const c=await contarSolic(solState.data);
-    el("solResumo").innerHTML=`
-      <div class="sol-chip"><span class="sc-n" style="color:var(--red)">${nf(c.saida)}</span><span class="sc-l">Saídas</span></div>
-      <div class="sol-chip"><span class="sc-n" style="color:var(--green)">${nf(c.entrada)}</span><span class="sc-l">Entradas</span></div>
-      <div class="sol-chip"><span class="sc-n" style="color:#5B9BE0">${nf(c.habilitacao)}</span><span class="sc-l">Aberturas</span></div>`;
-  } else el("solResumo").innerHTML="";
-  // lista
-  let q=sb.from("vw_notificacoes_mes").select("*");
+  const [saida,entrada,habilitacao]=await Promise.all([contarTipoSolic("saida"),contarTipoSolic("entrada"),contarTipoSolic("habilitacao")]);
+  el("solResumo").innerHTML=`
+    <div class="sol-chip"><span class="sc-n" style="color:var(--red)">${nf(saida)}</span><span class="sc-l">Saídas</span></div>
+    <div class="sol-chip"><span class="sc-n" style="color:var(--green)">${nf(entrada)}</span><span class="sc-l">Entradas</span></div>
+    <div class="sol-chip"><span class="sc-n" style="color:#5B9BE0">${nf(habilitacao)}</span><span class="sc-l">Aberturas</span></div>`;
+  let q=sb.from("notificacoes").select("*").order("criado_em",{ascending:false});
   if(solState.tipo!=="todas") q=q.eq("tipo",solState.tipo);
-  if(solState.data) q=q.eq("data_movimento",solState.data);
+  q=aplicarData(q);
   const {data,error}=await q.limit(400);
   if(error){ return erro(error,"solList"); }
-  if(!data||!data.length){ el("solList").innerHTML=`<div class="empty">Nenhuma solicitação ${solState.data?"neste dia":"este mês"}.</div>`; return; }
+  if(!data||!data.length){ el("solList").innerHTML=`<div class="empty">Nenhuma solicitação neste filtro.</div>`; return; }
   el("solList").innerHTML=`<table><thead><tr><th>Tipo</th><th>Cliente</th><th>Barra</th><th>Data</th><th>Origem</th><th></th></tr></thead>
-    <tbody>${data.map(n=>{const t=TIPO_INFO[n.tipo]||TIPO_INFO.entrada; const nome=n.cliente_nome||n.nome_atual||("Sinacor "+(n.sinacor||"—"));
+    <tbody>${data.map(n=>{const t=TIPO_INFO[n.tipo]||TIPO_INFO.entrada; const nome=n.cliente_nome||("Sinacor "+(n.sinacor||"—"));
       return `<tr class="${n.tipo==='saida'?'linha-preta':''}" ${n.cliente_id?`onclick="abrirFicha('${n.cliente_id}')"`:''}>
         <td><span class="notif-ico ${t.cls}" style="width:26px;height:26px;font-size:12px;display:inline-grid;vertical-align:middle">${t.ico}</span> ${t.label}</td>
         <td>${nome}</td><td class="num">${n.barra||"—"}</td>
