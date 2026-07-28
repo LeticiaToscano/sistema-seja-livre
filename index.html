@@ -1266,19 +1266,48 @@ function cfIrPara(aba){
   if(aba==="trilha") cfTelaTrilha(); else cfTelaConferencia();
 }
 
-function cfTelaTrilha(){
+async function cfTelaTrilha(){
   el("cfAbaConteudo").innerHTML=`
-    <div class="reservada">
-      <div class="rv-icon">${ICONS.auditoria}</div>
-      <div class="rv-title">Trilha</div>
-      <div class="rv-desc">
-        O registro do que o sistema faz — quem importou, quando, quantas linhas entraram,
-        que regra mudou, quem acessou. É o que responde "o que aconteceu aqui?" quando um
-        número parece errado.<br><br>
-        Enquanto não existe, a conferência ao lado responde a outra metade da pergunta:
-        <b>os dados batem com o relatório?</b>
-      </div>
+    <div class="note" style="border-left-color:var(--blue);margin-bottom:16px">
+      O registro do que o sistema fez — quem gravou, quando, e quanta coisa entrou.
+      Os 200 eventos mais recentes.
+    </div>
+    <div class="panel" id="trLista"><div class="loading"><div class="spinner"></div>Carregando…</div></div>`;
+
+  const {data,error} = await sb.from("eventos")
+    .select("quando,origem,acao,resumo").order("quando",{ascending:false}).limit(200);
+  if(error) return erro(error,"trLista");
+  if(!data||!data.length){
+    el("trLista").innerHTML='<div class="empty">A trilha ainda está vazia. Ela começa a encher na próxima importação.</div>';
+    return;
+  }
+
+  const ORIG={
+    receber_volume:{r:"CRM",   c:"var(--green)"},
+    historico:     {r:"antes", c:"var(--text-faint)"},
+    manutencao:    {r:"ajuste",c:"var(--purple)"},
+    leitor_genial: {r:"Gmail", c:"var(--blue)"},
+    painel:        {r:"painel",c:"var(--teal)"}
+  };
+  let ultimoDia="", h="";
+  data.forEach(e=>{
+    const d=new Date(e.quando);
+    const dia=d.toLocaleDateString("pt-BR",{day:"2-digit",month:"long"});
+    if(dia!==ultimoDia){
+      ultimoDia=dia;
+      h+=`<div style="padding:13px 16px;background:var(--bg-2);border-bottom:1px solid var(--border);
+        font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--text-faint)">${dia}</div>`;
+    }
+    const o=ORIG[e.origem]||{r:e.origem,c:"var(--text-faint)"};
+    const alerta = e.acao==="recusou_lote";
+    h+=`<div style="display:flex;gap:13px;align-items:baseline;padding:12px 16px;
+      border-bottom:1px solid rgba(255,255,255,.04)">
+      <span class="num" style="font-size:12px;flex:0 0 42px">${d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}</span>
+      <span class="tag" style="flex:0 0 auto;background:transparent;border:1px solid ${o.c};color:${o.c}">${o.r}</span>
+      <span style="font-size:13px;flex:1;${alerta?"color:var(--amber);font-weight:600":""}">${e.resumo||e.acao}</span>
     </div>`;
+  });
+  el("trLista").innerHTML=h;
 }
 
 function cfTelaConferencia(){
@@ -1450,4 +1479,4 @@ function erro(e,alvo){
 boot();
 </script>
 </body>
-</html>S
+</html>
