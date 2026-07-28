@@ -516,7 +516,7 @@ const TITLES={
   fila:["CARTEIRA","Fila de ação"], aniversariantes:["CARTEIRA","Aniversariantes"],
   solicitacoes:["CARTEIRA","Solicitações"],
   fluxos:["ATENDIMENTO","Fluxos"], assessores:["ATENDIMENTO","Assessores"],
-  config:["GESTÃO","Configurações"], auditoria:["GESTÃO","Trilha de auditoria"], ia:["GESTÃO","CEO de IA"],
+  config:["GESTÃO","Configurações"], auditoria:["GESTÃO","Conferência"], ia:["GESTÃO","CEO de IA"],
   integracoes:["SISTEMA","Integrações"]
 };
 const RESERVADAS={
@@ -527,7 +527,7 @@ const RESERVADAS={
   ia:{icon:"ia",desc:"O diagnóstico estratégico da operação em linguagem natural, e o copiloto de IA por assessor — cada um enxergando apenas a própria carteira."},
   integracoes:{icon:"integracoes",desc:"As conexões do sistema — Volume Operado (operação), RD Conversas (atendimento), Gmail/Genial (entrada de clientes) e IA. Ligadas e a ligar."}
 };
-const VIEWS={radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes};
+const VIEWS={radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes,auditoria:vAuditoria};
 document.querySelectorAll(".nav-item").forEach(b=>b.addEventListener("click",()=>{
   document.querySelectorAll(".nav-item").forEach(x=>x.classList.remove("active"));
   b.classList.add("active"); el("sidebar").classList.remove("open"); render(b.dataset.view);
@@ -1171,6 +1171,191 @@ async function carregarClube(){
         <button class="pg-btn" ${page>=totalPags-1?"disabled":""} onclick="mudarClube(1)">Próxima →</button>
       </div>
     </div>`;
+}
+
+// ---------- AUDITORIA · CONFERÊNCIA ----------
+// Compara os relatórios da Genial com o que está gravado no CRM.
+// SÓ LEITURA — chama conferir_volume(), que não escreve nada.
+
+const CF_COL={
+  conta:['CD_CONTA_COM_DIGITO','CONTA SINACOR','CONTA_SINACOR','CD_CONTA','CODIGO'],
+  data:['DATA_CONTRATO','DATA_OPERACAO','DATA'],
+  contratos:['QTD_CONTRATOS','CONTRATOS'],
+  volume:['TOTAL_VOLUME','VOLUME'],
+  ativo:['ATIVO','CD_ATIVO','INSTRUMENTO','PAPEL'],
+  assessor:['NOME_ASSESSOR_HISTORICO','ASSESSOR','ASSESSOR_CONTA'],
+  modo:['MODO','TIPO_OPERACAO'],
+  plataforma:['PLATAFORMA']
+};
+const CF_COM_DIGITO='CD_CONTA_COM_DIGITO';
+let cfLidos=[];
+
+const cfNorm = s => String(s==null?'':s).normalize('NFD')
+  .replace(/[\u0300-\u036f]/g,'').replace(/[^A-Za-z0-9 _]/g,'')
+  .replace(/\s+/g,' ').trim().toUpperCase();
+const cfDig = s => String(s==null?'':s).replace(/\D+/g,'');
+function cfData(v){
+  const t=String(v||'').trim();
+  let m=t.match(/^(\d{2})\/(\d{2})\/(\d{4})/); if(m) return m[3]+'-'+m[2]+'-'+m[1];
+  m=t.match(/^(\d{4})-(\d{2})-(\d{2})/);       if(m) return m[1]+'-'+m[2]+'-'+m[3];
+  return null;
+}
+function cfSep(l){ return (l.match(/;/g)||[]).length >= (l.match(/,/g)||[]).length ? ';' : ','; }
+function cfPartir(linha,sep){
+  const out=[]; let cur='',dentro=false;
+  for(let i=0;i<linha.length;i++){ const ch=linha[i];
+    if(ch==='"'){ if(dentro&&linha[i+1]==='"'){cur+='"';i++;} else dentro=!dentro; }
+    else if(ch===sep&&!dentro){ out.push(cur); cur=''; } else cur+=ch; }
+  out.push(cur); return out;
+}
+function cfAchar(cab,cands){ for(const c of cands){ const i=cab.indexOf(cfNorm(c)); if(i>=0) return i; } return -1; }
+
+function cfLerCSV(texto,nomeArq){
+  const linhas=texto.replace(/^\uFEFF/,'').split(/\r?\n/).filter(l=>l.trim());
+  if(linhas.length<2) throw new Error('O arquivo '+nomeArq+' não tem linhas de dados.');
+  const sep=cfSep(linhas[0]), cab=cfPartir(linhas[0],sep).map(cfNorm);
+  const iC=cfAchar(cab,CF_COL.conta), iD=cfAchar(cab,CF_COL.data),
+        iCt=cfAchar(cab,CF_COL.contratos), iV=cfAchar(cab,CF_COL.volume),
+        iA=cfAchar(cab,CF_COL.ativo), iAs=cfAchar(cab,CF_COL.assessor),
+        iM=cfAchar(cab,CF_COL.modo), iP=cfAchar(cab,CF_COL.plataforma);
+  const faltam=[];
+  if(iC<0) faltam.push('conta'); if(iD<0) faltam.push('data');
+  if(iCt<0&&iV<0) faltam.push('quantidade');
+  if(faltam.length) throw new Error('Em "'+nomeArq+'" não encontrei a coluna de '+faltam.join(', ')+
+    '.<br><br>Colunas do arquivo:<br>'+cab.join('<br>'));
+
+  const mercado = iCt>=0 ? 'BMF' : 'BOVESPA';
+  const iQ = iCt>=0 ? iCt : iV;
+  const temDigito = cab[iC]===cfNorm(CF_COM_DIGITO);
+  const dma=[], zer=[];
+  for(let r=1;r<linhas.length;r++){
+    const c=cfPartir(linhas[r],sep);
+    if(c.length < cab.length-1) continue;
+    const data=cfData(c[iD]); if(!data) continue;
+    let conta=cfDig(c[iC]); if(temDigito&&conta.length>1) conta=conta.slice(0,-1);
+    if(!conta) continue;
+    const qtd = Number(String(c[iQ]||'').replace(/\./g,'#').replace(',','.').replace(/#/g,''))
+             || Number(c[iQ]) || 0;
+    if(!qtd) continue;
+    const reg={ sinacor:conta, ativo:iA>=0?String(c[iA]||'').trim():'', data:data,
+      quantidade:qtd, mercado:mercado,
+      plataforma:iP>=0?String(c[iP]||'').trim():'',
+      assessor_nome:iAs>=0?cfNorm(c[iAs]):'' };
+    const modo = iM>=0 ? cfNorm(c[iM]) : 'DMA';
+    (modo.includes('MESA')||modo.includes('ZERAGEM') ? zer : dma).push(reg);
+  }
+  return {arquivo:nomeArq,mercado,dma,zer};
+}
+
+function vAuditoria(){
+  cfLidos=[];
+  el("content").innerHTML=`
+    <div class="sec-title">Conferência dos relatórios<span class="rule"></span></div>
+    <div class="note" style="border-left-color:var(--green);margin-bottom:18px">
+      Compara os relatórios da Genial com o que está gravado no CRM. <b>Só leitura</b> —
+      nada é alterado. Serve para saber se algum dia deixou de entrar.
+    </div>
+    <div class="panel" style="padding:0;margin-bottom:18px">
+      <div id="cfDrop" style="border:1.5px dashed var(--border-strong);border-radius:14px;margin:16px;
+        padding:34px 20px;text-align:center;cursor:pointer;transition:.18s">
+        <div style="font-size:15px;font-weight:700;margin-bottom:5px">Arraste os relatórios aqui</div>
+        <div style="font-size:12.5px;color:var(--text-dim)">ou clique para escolher &middot; CSV do BM&amp;F e do Bovespa</div>
+      </div>
+      <input type="file" id="cfFile" multiple accept=".csv,.txt" style="display:none">
+      <div id="cfChips" style="display:flex;flex-wrap:wrap;gap:9px;padding:0 16px 16px"></div>
+      <div id="cfCtrl" class="toolbar hidden" style="border-top:1px solid var(--border);border-bottom:none">
+        <input class="search" id="cfIgnorar" placeholder="Barras a ignorar (separadas por vírgula) — deixe vazio se não houver">
+        <button class="cfg-save" id="cfGo" onclick="cfConferir()">Conferir</button>
+      </div>
+    </div>
+    <div id="cfSaida"></div>`;
+  const drop=el("cfDrop"), inp=el("cfFile");
+  drop.onclick=()=>inp.click();
+  drop.ondragover=e=>{e.preventDefault();drop.style.borderColor='var(--green)';drop.style.background='rgba(46,229,157,.06)';};
+  drop.ondragleave=()=>{drop.style.borderColor='var(--border-strong)';drop.style.background='transparent';};
+  drop.ondrop=e=>{e.preventDefault();drop.ondragleave();cfReceber(e.dataTransfer.files);};
+  inp.onchange=e=>cfReceber(e.target.files);
+}
+
+function cfErro(msg){
+  el("cfSaida").innerHTML=`<div class="panel" style="border-left:3px solid var(--red);padding:18px 20px">
+    <div style="font-weight:700;margin-bottom:6px">Não deu para ler</div>
+    <div style="font-size:13px;color:var(--text-dim);line-height:1.6">${msg}</div></div>`;
+}
+function cfReceber(lista){
+  el("cfSaida").innerHTML="";
+  [...lista].forEach(f=>{ const rd=new FileReader();
+    rd.onload=()=>{ try{ cfLidos.push(cfLerCSV(rd.result,f.name)); cfChips(); }
+                    catch(err){ cfErro(err.message); } };
+    rd.readAsText(f,'UTF-8'); });
+}
+function cfChips(){
+  el("cfChips").innerHTML=cfLidos.map((x,i)=>`
+    <div class="clube-chip" style="cursor:default">
+      <span class="tag ${x.mercado==='BMF'?'t-green':'t-amber'}">${x.mercado}</span>
+      <span style="font-size:12.5px">${x.arquivo}</span>
+      <span class="num" style="font-size:11.5px">${nf(x.dma.length)} DMA · ${nf(x.zer.length)} zeragem</span>
+      <span onclick="cfRemover(${i})" style="cursor:pointer;color:var(--text-faint);font-size:15px">✕</span>
+    </div>`).join("");
+  el("cfCtrl").classList.toggle("hidden", cfLidos.length===0);
+}
+function cfRemover(i){ cfLidos.splice(i,1); cfChips(); el("cfSaida").innerHTML=""; }
+
+async function cfConferir(){
+  const ign=el("cfIgnorar").value.split(',').map(s=>cfNorm(s)).filter(Boolean);
+  const manter = r => !ign.includes(cfNorm(r.assessor_nome));
+  const lote={ dma: cfLidos.flatMap(x=>x.dma).filter(manter),
+               zeragem: cfLidos.flatMap(x=>x.zer).filter(manter) };
+  if(!lote.dma.length && !lote.zeragem.length)
+    return cfErro('Depois dos filtros não sobrou nenhuma linha para conferir.');
+
+  const btn=el("cfGo"); btn.disabled=true; btn.textContent="Conferindo…";
+  el("cfSaida").innerHTML='<div class="loading"><div class="spinner"></div>Comparando com o CRM…</div>';
+  const {data,error}=await sb.rpc("conferir_volume",{lote});
+  btn.disabled=false; btn.textContent="Conferir";
+  if(error) return cfErro((error.message||error).toString());
+  cfPintar(data);
+}
+
+function cfPintar(j){
+  const linhas=(j&&j.resumo)||[];
+  if(!linhas.length) return cfErro('O CRM não devolveu nenhum resumo.');
+  const dias={};
+  linhas.forEach(x=>{
+    const d=dias[x.data]=dias[x.data]||{BMF:null,BOVESPA:null,zer:null,falta:0,sobra:0};
+    if(x.tipo==='zeragem'){ d.zer=d.zer||{a:0,c:0}; d.zer.a+=+x.no_arquivo; d.zer.c+=+x.no_crm; }
+    else d[x.mercado]={a:+x.no_arquivo,c:+x.no_crm};
+    d.falta+=+x.faltando; d.sobra+=+x.sobrando;
+  });
+  const ordem=Object.keys(dias).sort();
+  const ruins=ordem.filter(d=>dias[d].falta||dias[d].sobra);
+  const tF=ordem.reduce((s,d)=>s+dias[d].falta,0);
+  const tS=ordem.reduce((s,d)=>s+dias[d].sobra,0);
+  const par=o=>o?`${nf(o.a)} / ${nf(o.c)}`:'<span style="color:var(--text-faint)">—</span>';
+  const ok=ruins.length===0;
+
+  el("cfSaida").innerHTML=`
+    <div class="panel" style="padding:20px 22px;margin-bottom:18px;
+      border-left:3px solid ${ok?'var(--green)':'var(--amber)'}">
+      <div style="font-size:19px;font-weight:800;letter-spacing:-.3px">
+        ${ok?'Tudo confere':ruins.length+' dia'+(ruins.length>1?'s':'')+' com diferença'}</div>
+      <div style="font-size:13px;color:var(--text-dim);margin-top:5px">
+        ${ok ? nf(ordem.length)+' dia'+(ordem.length>1?'s':'')+' conferido'+(ordem.length>1?'s':'')+', nada faltando nem sobrando.'
+             : nf(tF)+' linha(s) no relatório que não estão no CRM · '+nf(tS)+' no CRM que não estão no relatório'}
+      </div>
+    </div>
+    <div class="panel"><table><thead><tr>
+      <th>Data</th><th>BM&amp;F arq/CRM</th><th>Bovespa arq/CRM</th>
+      <th>Zeragem arq/CRM</th><th>Estado</th></tr></thead><tbody>
+      ${ordem.map(d=>{ const x=dias[d], dif=x.falta+x.sobra;
+        return `<tr style="cursor:default">
+          <td class="num">${fmtData(d)}</td>
+          <td class="num">${par(x.BMF)}</td>
+          <td class="num">${par(x.BOVESPA)}</td>
+          <td class="num">${par(x.zer)}</td>
+          <td><span class="status ${dif?'s-negligenciado':'s-saudavel'}">
+            ${dif?nf(dif)+' fora':'confere'}</span></td></tr>`; }).join("")}
+    </tbody></table></div>`;
 }
 
 // ---------- FICHA (drawer) ----------
