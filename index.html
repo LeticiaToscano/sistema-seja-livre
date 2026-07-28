@@ -463,8 +463,12 @@ function volDisplay(bmf,bov){
   if(v>0) p.push(nfR(v));
   return p.length? p.join(" · ") : "—";
 }
-function btnRD(){ return `<button class="btn-rd" onclick="event.stopPropagation();abrirRD()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16v11H8l-4 3z" stroke-linejoin="round"/></svg>Contato no RD</button>`; }
-function abrirRD(){ window.open("https://app.tallos.com.br/app/chat","_blank"); }
+function btnRD(nome){ return `<button class="btn-rd" onclick="event.stopPropagation();abrirRD(''+(nome||'').replace(/'/g,'')+'')"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16v11H8l-4 3z" stroke-linejoin="round"/></svg>Contato no RD</button>`; }
+function abrirRD(nome){
+  if(nome) sb.rpc("registrar_evento",{p_acao:"abriu_contato",
+    p_resumo:"Abriu o contato de "+nome+" no RD", p_detalhe:{cliente:nome}});
+  window.open("https://app.tallos.com.br/app/chat","_blank");
+}
 const el = id => document.getElementById(id);
 const ini = n => (n||"?").trim().split(/\s+/).slice(0,2).map(w=>w[0]).join("").toUpperCase();
 const nf = n => (n==null?"—":Number(n).toLocaleString("pt-BR"));
@@ -491,6 +495,7 @@ el("loginForm").addEventListener("submit", async e=>{
   const {data,error}=await sb.auth.signInWithPassword({email:el("email").value.trim(),password:el("password").value});
   btn.disabled=false; btn.textContent="Entrar";
   if(error){ el("loginErr").textContent = error.message.includes("Invalid")?"E-mail ou senha incorretos.":error.message; return; }
+  sb.rpc("registrar_evento",{p_acao:"acesso",p_resumo:"Entrou no sistema"});
   mostrarApp(data.session);
 });
 el("logoutBtn").addEventListener("click", async ()=>{ await sb.auth.signOut(); location.reload(); });
@@ -579,7 +584,7 @@ async function carregarFilaFull(){
       <td class="num">${volDisplay(c.contratos_bmf,c.volume_bovespa)}</td>
       <td class="num">${fmtDesde(c.data_ultima_operacao)}</td>
       <td><span class="score-badge" style="color:${c.score>=85?'var(--green)':c.score>=60?'var(--amber)':'var(--text-dim)'}">${c.score??"—"}</span></td>
-      <td>${btnRD()}</td></tr>`).join("")}</tbody></table>
+      <td>${btnRD(c.nome)}</td></tr>`).join("")}</tbody></table>
     <div class="pager">
       <span class="pg-count">Mostrando <b>${nf(de)}–${nf(ate)}</b> de <b>${nf(count)}</b> parados</span>
       <div class="pg-btns">
@@ -915,7 +920,7 @@ async function carregarSolic(){
         <td>${nome}</td><td class="num">${n.barra||"—"}</td>
         <td class="num">${n.data_movimento?fmtData(n.data_movimento):fmtDataHora(n.criado_em)}</td>
         <td class="num">${n.origem}${n.alerta?' <span style="color:var(--amber)">⚠</span>':""}</td>
-        <td>${n.tipo==='saida'?btnRD():""}</td></tr>`;}).join("")}</tbody></table>`;
+        <td>${n.tipo==='saida'?btnRD(nome):""}</td></tr>`;}).join("")}</tbody></table>`;
 }
 
 // ---------- INTEGRAÇÕES ----------
@@ -1275,7 +1280,7 @@ async function cfTelaTrilha(){
     <div class="panel" id="trLista"><div class="loading"><div class="spinner"></div>Carregando…</div></div>`;
 
   const {data,error} = await sb.from("eventos")
-    .select("quando,origem,acao,resumo").order("quando",{ascending:false}).limit(200);
+    .select("quando,origem,acao,resumo,quem").order("quando",{ascending:false}).limit(200);
   if(error) return erro(error,"trLista");
   if(!data||!data.length){
     el("trLista").innerHTML='<div class="empty">A trilha ainda está vazia. Ela começa a encher na próxima importação.</div>';
@@ -1304,7 +1309,7 @@ async function cfTelaTrilha(){
       border-bottom:1px solid rgba(255,255,255,.04)">
       <span class="num" style="font-size:12px;flex:0 0 42px">${d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}</span>
       <span class="tag" style="flex:0 0 auto;background:transparent;border:1px solid ${o.c};color:${o.c}">${o.r}</span>
-      <span style="font-size:13px;flex:1;${alerta?"color:var(--amber);font-weight:600":""}">${e.resumo||e.acao}</span>
+      <span style="font-size:13px;flex:1;${alerta?"color:var(--amber);font-weight:600":""}">${e.resumo||e.acao}${e.quem?` <span style="color:var(--text-faint)">· ${e.quem}</span>`:""}</span>
     </div>`;
   });
   el("trLista").innerHTML=h;
@@ -1433,7 +1438,7 @@ async function abrirFicha(id){
   el("drSub").textContent=`Sinacor ${c.sinacor} · ${c.barra||"sem barra"}`;
   el("drStatus").innerHTML = (s?`<span class="status s-${s.saude}">${SAUDE_LABEL[s.saude]||s.saude}</span>`:"")
     + faixaBadge(s?s.faixa:"sem", s?s.grau:0);
-  el("drActions").innerHTML = btnRD();
+  el("drActions").innerHTML = btnRD(c.nome);
   const aniv = (c.nasc_dia&&c.nasc_mes)? String(c.nasc_dia).padStart(2,"0")+"/"+String(c.nasc_mes).padStart(2,"0") : "—";
 
   // linha do tempo de faixas (últimos 3 meses)
