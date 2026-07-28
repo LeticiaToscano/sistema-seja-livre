@@ -516,7 +516,7 @@ const TITLES={
   fila:["CARTEIRA","Fila de ação"], aniversariantes:["CARTEIRA","Aniversariantes"],
   solicitacoes:["CARTEIRA","Solicitações"],
   fluxos:["ATENDIMENTO","Fluxos"], assessores:["ATENDIMENTO","Assessores"],
-  config:["GESTÃO","Configurações"], auditoria:["GESTÃO","Conferência"], ia:["GESTÃO","CEO de IA"],
+  config:["GESTÃO","Configurações"], auditoria:["GESTÃO","Auditoria"], ia:["GESTÃO","CEO de IA"],
   integracoes:["SISTEMA","Integrações"]
 };
 const RESERVADAS={
@@ -1247,9 +1247,43 @@ function cfLerCSV(texto,nomeArq){
   return {arquivo:nomeArq,mercado,dma,zer};
 }
 
+let cfAba="conferencia";
+
 function vAuditoria(){
-  cfLidos=[];
   el("content").innerHTML=`
+    <div class="sol-tabs">
+      <button class="sol-tab" id="cfTabConf" onclick="cfIrPara('conferencia')">Conferência</button>
+      <button class="sol-tab" id="cfTabTrilha" onclick="cfIrPara('trilha')">Trilha</button>
+    </div>
+    <div id="cfAbaConteudo"></div>`;
+  cfIrPara(cfAba);
+}
+
+function cfIrPara(aba){
+  cfAba=aba;
+  el("cfTabConf").classList.toggle("on", aba==="conferencia");
+  el("cfTabTrilha").classList.toggle("on", aba==="trilha");
+  if(aba==="trilha") cfTelaTrilha(); else cfTelaConferencia();
+}
+
+function cfTelaTrilha(){
+  el("cfAbaConteudo").innerHTML=`
+    <div class="reservada">
+      <div class="rv-icon">${ICONS.auditoria}</div>
+      <div class="rv-title">Trilha</div>
+      <div class="rv-desc">
+        O registro do que o sistema faz — quem importou, quando, quantas linhas entraram,
+        que regra mudou, quem acessou. É o que responde "o que aconteceu aqui?" quando um
+        número parece errado.<br><br>
+        Enquanto não existe, a conferência ao lado responde a outra metade da pergunta:
+        <b>os dados batem com o relatório?</b>
+      </div>
+    </div>`;
+}
+
+function cfTelaConferencia(){
+  cfLidos=[];
+  el("cfAbaConteudo").innerHTML=`
     <div class="sec-title">Conferência dos relatórios<span class="rule"></span></div>
     <div class="note" style="border-left-color:var(--green);margin-bottom:18px">
       Compara os relatórios da Genial com o que está gravado no CRM. <b>Só leitura</b> —
@@ -1416,4 +1450,4 @@ function erro(e,alvo){
 boot();
 </script>
 </body>
-</html>
+</html>S
