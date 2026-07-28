@@ -463,7 +463,7 @@ function volDisplay(bmf,bov){
   if(v>0) p.push(nfR(v));
   return p.length? p.join(" · ") : "—";
 }
-function btnRD(nome){ return `<button class="btn-rd" onclick="event.stopPropagation();abrirRD(''+(nome||'').replace(/'/g,'')+'')"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16v11H8l-4 3z" stroke-linejoin="round"/></svg>Contato no RD</button>`; }
+function btnRD(nome){ return `<button class="btn-rd" onclick="event.stopPropagation();abrirRD('${String(nome||'').replace(/'/g,'')}')"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16v11H8l-4 3z" stroke-linejoin="round"/></svg>Contato no RD</button>`; }
 function abrirRD(nome){
   if(nome) sb.rpc("registrar_evento",{p_acao:"abriu_contato",
     p_resumo:"Abriu o contato de "+nome+" no RD", p_detalhe:{cliente:nome}});
