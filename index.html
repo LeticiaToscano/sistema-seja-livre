@@ -392,6 +392,7 @@
       <div class="nav-label">Gestão</div>
       <button class="nav-item" data-view="config"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 8h14M5 16h14" stroke-linecap="round"/><circle cx="9" cy="8" r="2.2" fill="var(--bg-2)"/><circle cx="15" cy="16" r="2.2" fill="var(--bg-2)"/></svg>Configurações</button>
       <button class="nav-item" data-view="auditoria"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l7 3v5c0 4-3 7-7 8-4-1-7-4-7-8V6z" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg>Auditoria</button>
+      <button class="nav-item" data-view="diagnostico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 13h4l2.5-7 4 14 2.5-7H21" stroke-linecap="round" stroke-linejoin="round"/></svg>Diagnóstico</button>
       <button class="nav-item" data-view="ia"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="5" width="14" height="14" rx="3"/><path d="M9 9h6v6H9z" fill="var(--bg-2)"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke-linecap="round"/></svg>CEO de IA</button>
 
       <div class="nav-label">Sistema</div>
@@ -521,7 +522,8 @@ const TITLES={
   fila:["CARTEIRA","Fila de ação"], aniversariantes:["CARTEIRA","Aniversariantes"],
   solicitacoes:["CARTEIRA","Solicitações"],
   fluxos:["ATENDIMENTO","Fluxos"], assessores:["ATENDIMENTO","Assessores"],
-  config:["GESTÃO","Configurações"], auditoria:["GESTÃO","Auditoria"], ia:["GESTÃO","CEO de IA"],
+  config:["GESTÃO","Configurações"], auditoria:["GESTÃO","Auditoria"],
+  diagnostico:["GESTÃO","Diagnóstico"], ia:["GESTÃO","CEO de IA"],
   integracoes:["SISTEMA","Integrações"]
 };
 const RESERVADAS={
@@ -532,7 +534,7 @@ const RESERVADAS={
   ia:{icon:"ia",desc:"O diagnóstico estratégico da operação em linguagem natural, e o copiloto de IA por assessor — cada um enxergando apenas a própria carteira."},
   integracoes:{icon:"integracoes",desc:"As conexões do sistema — Volume Operado (operação), RD Conversas (atendimento), Gmail/Genial (entrada de clientes) e IA. Ligadas e a ligar."}
 };
-const VIEWS={radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes,auditoria:vAuditoria};
+const VIEWS={radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes,auditoria:vAuditoria,diagnostico:vDiagnostico};
 document.querySelectorAll(".nav-item").forEach(b=>b.addEventListener("click",()=>{
   document.querySelectorAll(".nav-item").forEach(x=>x.classList.remove("active"));
   b.classList.add("active"); el("sidebar").classList.remove("open"); render(b.dataset.view);
@@ -560,29 +562,53 @@ function vReservada(view){
 }
 
 // ---------- FILA DE AÇÃO (tela cheia) ----------
-let filaState={page:0,size:50,total:0};
+let filaState={page:0,size:50,total:0,ordem:"score"};
 async function vFila(){
   el("content").innerHTML=`
-    <div class="sec-title">Maior valor parado · prioridade de reativação (por score)<span class="rule"></span></div>
-    <div class="panel" id="filaFull"><div class="loading"><div class="spinner"></div>Carregando…</div></div>`;
-  filaState={page:0,size:50,total:0};
+    <div class="sec-title">Clientes que pararam de operar<span class="rule"></span></div>
+    <div class="panel">
+      <div class="toolbar">
+        <select class="search select" id="filaOrdem" style="flex:0 0 300px">
+          <option value="score">Maior valor parado</option>
+          <option value="esquecido">Há mais tempo sem contato</option>
+        </select>
+        <span style="font-size:12px;color:var(--text-dim)" id="filaDica"></span>
+      </div>
+      <div id="filaFull"><div class="loading"><div class="spinner"></div>Carregando…</div></div>
+    </div>`;
+  filaState={page:0,size:50,total:0,ordem:filaState.ordem||"score"};
+  el("filaOrdem").value=filaState.ordem;
+  el("filaOrdem").addEventListener("change",function(e){
+    filaState.ordem=e.target.value; filaState.page=0; carregarFilaFull();
+  });
   carregarFilaFull();
 }
 async function carregarFilaFull(){
   const {page,size}=filaState, from=page*size, to=from+size-1;
-  const {data,error,count} = await sb.from("vw_fila_acao")
-    .select("id,nome,barra,contratos_bmf,volume_bovespa,qtd_operacoes,data_ultima_operacao,faixa,grau,score",{count:"exact"})
-    .range(from,to);
+  let q = sb.from("vw_fila_acao")
+    .select("id,nome,barra,contratos_bmf,volume_bovespa,qtd_operacoes,data_ultima_operacao,faixa,grau,score,dias_sem_contato,data_ultimo_contato",{count:"exact"});
+  q = (filaState.ordem==="esquecido")
+    ? q.order("data_ultimo_contato",{ascending:true,nullsFirst:true})
+    : q.order("score",{ascending:false,nullsFirst:false});
+  const {data,error,count} = await q.range(from,to);
   if(error){ return erro(error,"filaFull"); }
   if(!data||!data.length){ el("filaFull").innerHTML='<div class="empty">Nenhum cliente parado no momento.</div>'; return; }
   const de=from+1, ate=from+data.length, totalPags=Math.max(1,Math.ceil((count||0)/size));
-  el("filaFull").innerHTML=`<table><thead><tr><th>Cliente</th><th>Faixa</th><th>Barra</th><th>Atividade</th><th>Parou desde</th><th>Score</th><th></th></tr></thead>
+  el("filaDica").textContent = (filaState.ordem==="esquecido")
+    ? "Quem parou e há mais tempo ninguém fala — os sem contato registrado vêm primeiro."
+    : "Quem parou levando mais volume junto.";
+  el("filaFull").innerHTML=`<table><thead><tr><th>Cliente</th><th>Faixa</th><th>Barra</th><th>Atividade</th><th>Parou desde</th><th>Sem contato</th><th>Score</th><th></th></tr></thead>
     <tbody>${data.map(c=>`<tr class="${c.faixa==='preta'?'linha-preta':''}" onclick="abrirFicha('${c.id}')">
       <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}</div></td>
       <td>${faixaBadge(c.faixa,c.grau)}</td>
       <td class="num">${c.barra||"—"}</td>
       <td class="num">${volDisplay(c.contratos_bmf,c.volume_bovespa)}</td>
       <td class="num">${fmtDesde(c.data_ultima_operacao)}</td>
+      <td class="num">${c.data_ultimo_contato==null
+          ? '<span style="color:var(--red)">nunca</span>'
+          : (c.dias_sem_contato>=180
+              ? '<span style="color:var(--amber)">'+nf(c.dias_sem_contato)+' dias</span>'
+              : nf(c.dias_sem_contato)+' dias')}</td>
       <td><span class="score-badge" style="color:${c.score>=85?'var(--green)':c.score>=60?'var(--amber)':'var(--text-dim)'}">${c.score??"—"}</span></td>
       <td>${btnRD(c.nome)}</td></tr>`).join("")}</tbody></table>
     <div class="pager">
@@ -667,7 +693,7 @@ async function vRadar(){
         <div class="panel" id="aniversariantes"><div class="loading"><div class="spinner"></div>Carregando…</div></div>
       </div>
     </div>
-    <div class="note">A <b>saúde completa da carteira</b> (saudável · negligenciado · em recuperação · crítico) cruza operação com o último contato. O eixo de contato acende quando o RD Conversas for conectado — por ora, o radar mostra a situação de operação, que é a informação disponível.</div>`;
+    <div class="note">A saúde cruza dois eixos: <b>operação</b> e <b>contato</b>. O eixo de contato usa o que está registrado no RD Conversas — atendimento feito por fora da plataforma (telefone pessoal, presencial) não aparece aqui. Então "negligenciado" e "crítico" querem dizer <b>sem contato registrado</b>, que não é exatamente o mesmo que sem contato.</div>`;
 
   carregarFila();
   carregarAniversariantes();
@@ -1424,6 +1450,137 @@ function cfPintar(j){
           <td><span class="status ${dif?'s-negligenciado':'s-saudavel'}">
             ${dif?nf(dif)+' fora':'confere'}</span></td></tr>`; }).join("")}
     </tbody></table></div>`;
+}
+
+// ---------- DIAGNÓSTICO ----------
+// As observações que o sistema faz sozinho. As regras vivem no banco
+// (vw_alertas / vw_diagnosticos) e são recalculadas a cada consulta.
+
+let dgAtual=null, dgFiltro="pendente", dgDados=[];
+
+async function vDiagnostico(){
+  el("content").innerHTML=`
+    <div class="note" style="border-left-color:var(--blue);margin-bottom:18px">
+      O que o sistema encontrou olhando a carteira agora. Cada achado é uma
+      regra que roda no banco — a lista se refaz sozinha a cada dia.
+      Clique num achado para ver os clientes.
+    </div>
+    <div id="dgCards"><div class="loading"><div class="spinner"></div>Analisando…</div></div>
+    <div id="dgLista"></div>`;
+
+  const {data,error} = await sb.from("vw_diagnosticos").select("*").order("ordem");
+  if(error) return erro(error,"dgCards");
+  if(!data||!data.length){ el("dgCards").innerHTML='<div class="empty">Nenhum achado.</div>'; return; }
+
+  const cor = g => g==="alta" ? "var(--red)" : g==="media" ? "var(--amber)" : "var(--green)";
+  el("dgCards").innerHTML = '<div class="integ-grid">' + data.map(d=>`
+    <div class="integ-card" style="cursor:pointer" onclick="dgAbrir('${d.codigo}')">
+      <div class="integ-card-borda" style="position:absolute;top:0;left:0;width:3px;height:100%;background:${cor(d.gravidade)}"></div>
+      <div class="integ-top">
+        <div class="integ-nome" style="font-size:14px;line-height:1.35">${d.titulo}</div>
+        <span class="tag" style="background:transparent;border:1px solid ${cor(d.gravidade)};color:${cor(d.gravidade)}">${d.gravidade}</span>
+      </div>
+      <div style="font-size:30px;font-weight:800;letter-spacing:-1px;margin:6px 0 4px;color:${cor(d.gravidade)}">${nf(d.clientes)}</div>
+      <div class="integ-desc" style="margin-bottom:10px">${d.texto}</div>
+      <div class="integ-recs" style="font-size:12px;color:var(--text-faint)">
+        ${Number(d.contratos)>0 ? nf(d.contratos)+" contratos" : ""}
+        ${Number(d.volume)>0 ? " · "+nfR(d.volume) : ""}
+        ${Number(d.tratados)>0 ? "<br>"+nf(d.tratados)+" já tratados" : ""}
+      </div>
+    </div>`).join("") + '</div>';
+}
+
+function dgCSV(){
+  if(!dgDados.length) return;
+  const cols=["nome","sinacor","barra","parceiros","telefone","faixa","contratos_bmf",
+              "volume_bovespa","qtd_operacoes","data_ultima_operacao","data_ultimo_contato",
+              "dias_sem_contato","situacao","responsavel"];
+  const esc=v=>{ v=(v==null?"":String(v)); return /[";\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
+  const csv=[cols.join(";")].concat(dgDados.map(r=>cols.map(c=>esc(r[c])).join(";"))).join("\r\n");
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"}));
+  a.download="diagnostico_"+dgAtual+"_"+hojeISO()+".csv";
+  a.click(); URL.revokeObjectURL(a.href);
+}
+
+function dgFiltrar(f,btn){
+  dgFiltro=f;
+  document.querySelectorAll("#dgFiltros .sol-tab").forEach(b=>b.classList.remove("on"));
+  btn.classList.add("on");
+  dgAbrir(dgAtual,true);
+}
+
+async function dgMarcar(id,situacao,nome){
+  let obs=null;
+  if(situacao==="ignorar"){
+    obs=prompt("Por que ignorar "+nome+"?\n(ex.: carteira de parceiro, cliente institucional)");
+    if(obs===null) return;
+  }
+  const {error}=await sb.rpc("registrar_tratativa",
+    {p_cliente_id:String(id), p_situacao:situacao, p_codigo:dgAtual, p_observacao:obs});
+  if(error){ toast("Não deu para registrar", error.message, true); return; }
+  toast(situacao==="falei"?"Marcado como contatado":situacao==="ignorar"?"Marcado para ignorar":"Reaberto", nome);
+  dgAbrir(dgAtual,true);
+}
+
+async function dgAbrir(codigo, manterPosicao){
+  dgAtual=codigo;
+  el("dgLista").innerHTML=`
+    <div class="sec-title" style="margin-top:26px">Clientes<span class="rule"></span></div>
+    <div id="dgFiltros" class="sol-tabs">
+      <button class="sol-tab ${dgFiltro==="pendente"?"on":""}" onclick="dgFiltrar('pendente',this)">A tratar</button>
+      <button class="sol-tab ${dgFiltro==="tratado"?"on":""}" onclick="dgFiltrar('tratado',this)">Já tratados</button>
+      <button class="sol-tab ${dgFiltro==="todos"?"on":""}" onclick="dgFiltrar('todos',this)">Todos</button>
+      <button class="sol-tab" onclick="dgCSV()" style="margin-left:auto;border-color:var(--green);color:var(--green)">Exportar CSV</button>
+    </div>
+    <div class="panel" id="dgTab"><div class="loading"><div class="spinner"></div>Carregando…</div></div>`;
+  if(!manterPosicao) document.querySelector(".main").scrollTo({top:el("dgLista").offsetTop-40,behavior:"smooth"});
+
+  let q = sb.from("vw_alertas")
+    .select("id,nome,sinacor,barra,parceiros,telefone,faixa,grau,contratos_bmf,volume_bovespa,qtd_operacoes,data_ultima_operacao,data_ultimo_contato,dias_sem_contato,situacao,responsavel",{count:"exact"})
+    .eq("codigo",codigo);
+  if(dgFiltro==="pendente")     q = q.eq("situacao","pendente");
+  else if(dgFiltro==="tratado") q = q.neq("situacao","pendente");
+  const {data,error,count} = await q
+    .order("contratos_bmf",{ascending:false,nullsFirst:false})
+    .limit(2000);
+  dgDados = data || [];
+  if(error) return erro(error,"dgTab");
+  if(!data||!data.length){
+    el("dgTab").innerHTML='<div class="empty">'+(dgFiltro==="pendente"
+      ? "Nada a tratar aqui. Boa notícia."
+      : "Nenhum cliente neste filtro.")+'</div>';
+    return;
+  }
+
+  el("dgTab").innerHTML=`<table><thead><tr>
+      <th>Cliente</th><th>Faixa</th><th>Barra</th><th>Parceiro</th>
+      <th>Atividade</th><th>Sem contato</th><th>Situação</th><th></th></tr></thead>
+    <tbody>${data.map(c=>`<tr class="${c.faixa==='preta'?'linha-preta':''}" onclick="abrirFicha('${c.id}')">
+      <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}</div></td>
+      <td>${faixaBadge(c.faixa,c.grau)}</td>
+      <td class="num">${c.barra||"—"}</td>
+      <td class="num">${c.parceiros||"—"}</td>
+      <td class="num">${volDisplay(c.contratos_bmf,c.volume_bovespa)}</td>
+      <td class="num">${c.data_ultimo_contato==null
+          ? '<span style="color:var(--red)">nunca</span>'
+          : nf(c.dias_sem_contato)+' dias'}</td>
+      <td>${c.situacao==="pendente"
+          ? '<span class="status s-nunca_operou">a tratar</span>'
+          : c.situacao==="falei"
+            ? '<span class="status s-saudavel">já falei</span>'
+            : c.situacao==="ignorar"
+              ? '<span class="status s-em_recuperacao">ignorado</span>'
+              : '<span class="status s-negligenciado">'+c.situacao+'</span>'}</td>
+      <td style="white-space:nowrap">${btnRD(c.nome)}
+        ${c.situacao==="pendente"
+          ? `<button class="btn-rd" title="Já falei com este cliente" onclick="event.stopPropagation();dgMarcar('${c.id}','falei','${String(c.nome||'').replace(/'/g,'')}')">✓</button>
+             <button class="btn-rd" title="Ignorar" onclick="event.stopPropagation();dgMarcar('${c.id}','ignorar','${String(c.nome||'').replace(/'/g,'')}')">✕</button>`
+          : `<button class="btn-rd" title="Reabrir" onclick="event.stopPropagation();dgMarcar('${c.id}','reabrir','${String(c.nome||'').replace(/'/g,'')}')">↺</button>`}
+      </td></tr>`).join("")}</tbody></table>
+    <div style="padding:11px 16px;font-size:11px;color:var(--text-faint)">
+      Mostrando ${nf(data.length)} de ${nf(count)} · ordenados por volume operado ·
+      o CSV leva o que estiver neste filtro</div>`;
 }
 
 // ---------- FICHA (drawer) ----------
