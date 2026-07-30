@@ -396,6 +396,7 @@
       <button class="nav-item" data-view="ia"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="5" width="14" height="14" rx="3"/><path d="M9 9h6v6H9z" fill="var(--bg-2)"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke-linecap="round"/></svg>CEO de IA</button>
 
       <div class="nav-label">Sistema</div>
+      <button class="nav-item" data-view="legenda"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01" stroke-linecap="round"/></svg>Legenda</button>
       <button class="nav-item" data-view="integracoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 7V4M15 7V4M8 7h8v4a4 4 0 0 1-8 0z" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15v5" stroke-linecap="round"/></svg>Integrações</button>
     </nav>
     <div class="foot">
@@ -523,6 +524,7 @@ const TITLES={
   solicitacoes:["CARTEIRA","Solicitações"],
   fluxos:["ATENDIMENTO","Fluxos"], assessores:["ATENDIMENTO","Assessores"],
   config:["GESTÃO","Configurações"], auditoria:["GESTÃO","Auditoria"],
+  legenda:["SISTEMA","Legenda · o que cada etiqueta significa"],
   diagnostico:["GESTÃO","Diagnóstico"], ia:["GESTÃO","CEO de IA"],
   integracoes:["SISTEMA","Integrações"]
 };
@@ -534,7 +536,7 @@ const RESERVADAS={
   ia:{icon:"ia",desc:"O diagnóstico estratégico da operação em linguagem natural, e o copiloto de IA por assessor — cada um enxergando apenas a própria carteira."},
   integracoes:{icon:"integracoes",desc:"As conexões do sistema — Volume Operado (operação), RD Conversas (atendimento), Gmail/Genial (entrada de clientes) e IA. Ligadas e a ligar."}
 };
-const VIEWS={radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes,auditoria:vAuditoria,diagnostico:vDiagnostico};
+const VIEWS={radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes,auditoria:vAuditoria,diagnostico:vDiagnostico,legenda:vLegenda};
 document.querySelectorAll(".nav-item").forEach(b=>b.addEventListener("click",()=>{
   document.querySelectorAll(".nav-item").forEach(x=>x.classList.remove("active"));
   b.classList.add("active"); el("sidebar").classList.remove("open"); render(b.dataset.view);
@@ -1452,6 +1454,172 @@ function cfPintar(j){
     </tbody></table></div>`;
 }
 
+// ---------- LEGENDA ----------
+// O que cada etiqueta do sistema quer dizer. Os números vêm das réguas
+// em Configurações, não são fixos aqui — se a régua mudar, o texto muda.
+
+let LG_REGRAS = {};
+
+async function lgRegras(){
+  if(Object.keys(LG_REGRAS).length) return LG_REGRAS;
+  const {data} = await sb.from("config_regras").select("chave,valor");
+  (data||[]).forEach(r=>{ LG_REGRAS[r.chave]=r.valor; });
+  return LG_REGRAS;
+}
+
+function lgTextos(r){
+  const dOp = r.dias_parou_operar ?? 60;
+  const dCt = r.dias_contato_frio ?? 30;
+  return {
+    // saúde da carteira
+    saudavel:{t:"Saudável", cls:"status s-saudavel", d:
+      `Está operando e foi contatado nos últimos ${dCt} dias. É o estado que a operação quer para todo mundo.`},
+    negligenciado:{t:"Negligenciado", cls:"status s-negligenciado", d:
+      `Está operando, mas ninguém fala com ele há mais de ${dCt} dias. É o risco mais silencioso: o cliente não reclama, só some um dia.`},
+    em_recuperacao:{t:"Em recuperação", cls:"status s-em_recuperacao", d:
+      `Parou de operar há mais de ${dOp} dias, mas teve contato recente. Alguém já está cuidando.`},
+    critico:{t:"Crítico", cls:"status s-critico", d:
+      `Parou de operar há mais de ${dOp} dias e não tem contato há mais de ${dCt}. Parou e ninguém percebeu.`},
+    nunca_operou:{t:"Nunca operou", cls:"status s-nunca_operou", d:
+      "Abriu conta e nunca fez uma operação. Não entra no cruzamento de saúde porque não há atividade para comparar."},
+    // situação de operação
+    operando:{t:"Operando", cls:"status s-saudavel", d:
+      `Operou nos últimos ${dOp} dias.`},
+    parou:{t:"Parou de operar", cls:"status s-critico", d:
+      `A última operação foi há mais de ${dOp} dias. Esse é o corte da régua "dias_parou_operar", em Configurações.`},
+    // origem do contato
+    rd:{t:"RD", cls:"tag t-blue", d:
+      "Atendimento aberto no RD Conversas — alguém iniciou uma conversa com o cliente. Disparo de campanha por bot, sem atendimento aberto, não aparece aqui."},
+    manual:{t:"à mão", cls:"tag t-green", d:
+      "Contato registrado por alguém no painel, pelo botão Registrar contato na ficha. Serve para atendimento feito fora do RD: telefone pessoal, presencial, e-mail."},
+    // tratativas do Diagnóstico
+    a_tratar:{t:"a tratar", cls:"status s-nunca_operou", d:
+      "Apareceu num diagnóstico e ninguém mexeu ainda."},
+    ja_falei:{t:"já falei", cls:"status s-saudavel", d:
+      "Alguém marcou que já entrou em contato. Sai da lista de pendentes, mas o histórico fica."},
+    ignorado:{t:"ignorado", cls:"status s-em_recuperacao", d:
+      "Marcado para não aparecer mais, com o motivo registrado — por exemplo, cliente de carteira de parceiro."}
+  };
+}
+
+const LG_FAIXAS = [
+  {f:"sem",    g:0, r:"menos de 1.000 contratos",           d:"Ainda não atingiu o mínimo do Clube."},
+  {f:"branca", g:0, r:"de 1.000 a 5.000 contratos",         d:"Primeira faixa do Clube Trader."},
+  {f:"azul",   g:0, r:"de 5.000 a 10.000 contratos",        d:"A partir daqui o cliente é considerado faixa alta nos diagnósticos."},
+  {f:"roxa",   g:0, r:"de 10.000 a 25.000 contratos",       d:""},
+  {f:"marrom", g:0, r:"de 25.000 a 50.000 contratos",       d:""},
+  {f:"preta",  g:1, r:"50.000 contratos ou mais",           d:"A faixa preta ganha estrelas conforme o volume: 1 estrela a partir de 50 mil, até 6 estrelas em 500 mil ou mais."}
+];
+
+async function vLegenda(){
+  const r = await lgRegras();
+  const T = lgTextos(r);
+  const bloco = (titulo, chaves, nota) => `
+    <div class="sec-title">${titulo}<span class="rule"></span></div>
+    ${nota?`<div class="note" style="margin-bottom:14px">${nota}</div>`:""}
+    <div class="panel" style="padding:0;margin-bottom:22px">
+      ${chaves.map(k=>`<div style="display:flex;gap:16px;align-items:baseline;padding:14px 16px;
+          border-bottom:1px solid rgba(255,255,255,.04)">
+        <span style="flex:0 0 150px"><span class="${T[k].cls}">${T[k].t}</span></span>
+        <span style="font-size:13px;color:var(--text-dim);flex:1;line-height:1.55">${T[k].d}</span>
+      </div>`).join("")}
+    </div>`;
+
+  el("content").innerHTML = `
+    <div class="note" style="border-left-color:var(--green);margin-bottom:20px">
+      O que cada etiqueta do sistema quer dizer. Os prazos vêm das réguas em
+      <b>Configurações</b> — hoje: parou de operar em <b>${r.dias_parou_operar ?? 60} dias</b>,
+      contato frio em <b>${r.dias_contato_frio ?? 30} dias</b>. Mudando a régua, muda o significado.
+      <br><br>Em qualquer tela, <b>clique numa etiqueta</b> para ver esta explicação sem sair de onde está.
+    </div>
+
+    ${bloco("Saúde da carteira", ["saudavel","negligenciado","em_recuperacao","critico","nunca_operou"],
+      "Cruza dois eixos: se o cliente está operando e se alguém falou com ele. É o que o Radar mostra.")}
+
+    ${bloco("Situação de operação", ["operando","parou"])}
+
+    ${bloco("De onde veio o contato", ["rd","manual"],
+      "O eixo de contato mede contato <b>registrado</b>. Atendimento feito por fora e não registrado não aparece — por isso existe o botão de registrar à mão.")}
+
+    ${bloco("Tratativas do Diagnóstico", ["a_tratar","ja_falei","ignorado"])}
+
+    <div class="sec-title">Clube Trader · as faixas<span class="rule"></span></div>
+    <div class="note" style="margin-bottom:14px">
+      A faixa vem dos <b>contratos de BM&amp;F no mês</b>, e vale o <b>melhor mês dos últimos três</b> —
+      um mês fraco não rebaixa ninguém de imediato. Só contratos de BM&amp;F contam; volume de Bovespa
+      e operações de zeragem não entram.
+    </div>
+    <div class="panel" style="padding:0">
+      ${LG_FAIXAS.map(x=>`<div style="display:flex;gap:16px;align-items:center;padding:14px 16px;
+          border-bottom:1px solid rgba(255,255,255,.04)">
+        <span style="flex:0 0 150px">${faixaBadge(x.f, x.g)}</span>
+        <span style="flex:0 0 190px;font-size:13px">${x.r}</span>
+        <span style="font-size:13px;color:var(--text-dim);flex:1;line-height:1.55">${x.d}</span>
+      </div>`).join("")}
+    </div>`;
+}
+
+// leva para uma tela marcando o item do menu, como o clique faria
+function lgIr(view){
+  document.querySelectorAll(".nav-item").forEach(x=>{
+    x.classList.toggle("active", x.dataset.view===view);
+  });
+  render(view);
+}
+
+// ---------- CLICAR NUMA ETIQUETA EM QUALQUER TELA ----------
+// Um ouvinte só, no documento inteiro: descobre qual etiqueta foi clicada
+// pela classe dela e mostra a explicação ali mesmo.
+
+const LG_POR_CLASSE = {
+  "s-saudavel":"saudavel", "s-negligenciado":"negligenciado",
+  "s-em_recuperacao":"em_recuperacao", "s-critico":"critico",
+  "s-nunca_operou":"nunca_operou"
+};
+
+async function lgExplicar(chave, rotulo){
+  const T = lgTextos(await lgRegras());
+  const info = T[chave];
+  if(!info) return;
+  let cx = el("lgPop");
+  if(!cx){
+    cx = document.createElement("div");
+    cx.id = "lgPop";
+    cx.style.cssText = "position:fixed;inset:0;z-index:200;display:grid;place-items:center;"+
+                       "background:rgba(0,0,0,.55);padding:20px";
+    cx.onclick = e => { if(e.target===cx) cx.remove(); };
+    document.body.appendChild(cx);
+  }
+  cx.innerHTML = `
+    <div class="panel" style="max-width:420px;padding:22px 24px" onclick="event.stopPropagation()">
+      <div style="margin-bottom:12px"><span class="${info.cls}">${info.t}</span></div>
+      <div style="font-size:14px;line-height:1.6;color:var(--text-dim)">${info.d}</div>
+      <div style="margin-top:18px;display:flex;gap:8px">
+        <button class="btn-rd" onclick="el('lgPop').remove();lgIr('legenda')">Ver todas as etiquetas</button>
+        <button class="btn-rd" onclick="el('lgPop').remove()">Fechar</button>
+      </div>
+    </div>`;
+}
+
+document.addEventListener("click", function(e){
+  const alvo = e.target.closest(".status, .faixa");
+  if(!alvo) return;
+
+  // faixa: manda direto para a tela, que explica todas de uma vez
+  if(alvo.classList.contains("faixa")){
+    e.stopPropagation();
+    lgIr("legenda");
+    return;
+  }
+  for(const cls in LG_POR_CLASSE){
+    if(alvo.classList.contains(cls)){
+      e.stopPropagation();
+      lgExplicar(LG_POR_CLASSE[cls], alvo.textContent.trim());
+      return;
+    }
+  }
+});
+
 // ---------- DIAGNÓSTICO ----------
 // As observações que o sistema faz sozinho. As regras vivem no banco
 // (vw_alertas / vw_diagnosticos) e são recalculadas a cada consulta.
@@ -1636,7 +1804,7 @@ async function abrirFicha(id){
     <div class="dr-sec">Último contato
       <button class="btn-rd" style="float:right;margin-top:-3px" onclick="fcNovoContato()">Registrar contato</button>
     </div>
-    <div class="dr-stats">
+    <div class="dr-stats" id="fcUltimo">
       <div class="dr-stat"><div class="l">Registrado no sistema</div>
         <div class="v" style="font-size:14px${c.data_ultimo_contato?'':';color:var(--red)'}">${c.data_ultimo_contato?fmtData(c.data_ultimo_contato):"nenhum"}</div></div>
     </div>
@@ -1736,20 +1904,47 @@ async function fcSalvarContato(){
 }
 
 async function fcCarregarHistorico(id){
-  const {data} = await sb.from("contatos_manuais")
-    .select("quando,canal,observacao,quem").eq("cliente_id",id)
-    .order("quando",{ascending:false}).limit(10);
-  if(!data || !data.length) return;
+  const {data,error} = await sb.rpc("fn_contatos_cliente",{p_cliente_id:id, p_limite:20});
+  if(error || !data || !data.length){
+    el("fcHistorico").innerHTML = `
+      <div class="dr-sec">Histórico de contato</div>
+      <div class="empty" style="padding:18px">Nenhum contato registrado — nem no RD Conversas, nem à mão.</div>`;
+    return;
+  }
+
+  const noRD = data.filter(x=>x.origem==="rd").length;
+  const aMao = data.length - noRD;
+
+  // completa o bloco de cima com o detalhe do contato mais recente
+  const u = data[0], alvo = el("fcUltimo");
+  if(u && alvo){
+    alvo.innerHTML += `
+      <div class="dr-stat"><div class="l">Por onde</div>
+        <div class="v" style="font-size:14px">${u.origem==="rd"?"RD Conversas":"registro manual"}${u.canal?" · "+u.canal:""}</div></div>
+      <div class="dr-stat"><div class="l">Quem atendeu</div>
+        <div class="v" style="font-size:13px">${u.quem||"—"}</div></div>`;
+  }
+
   el("fcHistorico").innerHTML = `
-    <div class="dr-sec">Contatos registrados à mão</div>
+    <div class="dr-sec">Histórico de contato</div>
+    <div style="font-size:11.5px;color:var(--text-faint);margin:-6px 0 8px">
+      ${noRD} pelo RD Conversas${aMao?" · "+aMao+" registrado"+(aMao>1?"s":"")+" à mão":""}
+      ${data.length>=20?" · mostrando os 20 mais recentes":""}
+    </div>
     <div class="panel" style="padding:0">
-      ${data.map(x=>`<div style="display:flex;gap:12px;align-items:baseline;padding:10px 14px;
-          border-bottom:1px solid rgba(255,255,255,.04)">
-        <span class="num" style="font-size:12px;flex:0 0 108px">${fmtDataHora(x.quando)}</span>
-        <span class="tag t-green" style="flex:0 0 auto">${x.canal}</span>
-        <span style="font-size:12.5px;flex:1">${x.observacao||""}
-          <span style="color:var(--text-faint)"> · ${x.quem||""}</span></span>
-      </div>`).join("")}
+      ${data.map(x=>{
+        const rd = x.origem==="rd";
+        return `<div style="display:flex;gap:12px;align-items:baseline;padding:10px 14px;
+            border-bottom:1px solid rgba(255,255,255,.04)">
+          <span class="num" style="font-size:12px;flex:0 0 108px">${fmtDataHora(x.quando)}</span>
+          <span class="tag ${rd?"t-blue":"t-green"}" style="flex:0 0 auto"
+                title="${rd?"Atendimento aberto no RD Conversas":"Registrado à mão no painel"}">
+            ${rd?"RD":"à mão"}</span>
+          <span style="font-size:12px;color:var(--text-dim);flex:0 0 auto">${x.canal||""}</span>
+          <span style="font-size:12.5px;flex:1">${x.observacao||""}
+            ${x.quem?`<span style="color:var(--text-faint)">${x.observacao?" · ":""}${x.quem}</span>`:""}</span>
+        </div>`;
+      }).join("")}
     </div>`;
 }
 function fecharFicha(){ el("overlay").classList.remove("open"); el("drawer").classList.remove("open"); }
