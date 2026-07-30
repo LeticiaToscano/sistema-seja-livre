@@ -741,42 +741,128 @@ async function carregarAniversariantes(){
 
 // ---------- CLIENTES ----------
 let buscaTimer=null;
-let cliState={termo:"",filtro:"todos",page:0,size:50,total:0};
-function vClientes(){
+let cliState={termo:"",filtro:"todos",barra:"todas",parceiro:"todos",page:0,size:50,total:0};
+let cliSel = new Set();        // ids marcados
+let cliPagina = [];            // o que está na tela agora
+let BARRAS = [];               // cadastro de barras
+let PARCEIROS = [];            // cadastro de parceiros
+async function vClientes(){
+  el("content").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
+  await cliCarregarCadastros();
+
   el("content").innerHTML=`
     <div class="panel">
       <div class="toolbar">
-        <input class="search" id="busca" placeholder="Buscar por nome ou Sinacor…">
+        <input class="search" id="busca" placeholder="Buscar por nome, Sinacor ou parceiro…">
         <select class="search select" id="filtro">
           <option value="todos">Todas as situações</option>
           <option value="operando">Operando</option>
           <option value="parou">Parou de operar</option>
           <option value="nunca_operou">Nunca operou</option>
         </select>
+        <select class="search select" id="filtroBarra">
+          <option value="todas">Todas as barras</option>
+          ${BARRAS.map(b=>`<option value="${b.nome}">${b.nome}</option>`).join("")}
+        </select>
+        <span id="filtroParceiroBox"></span>
+        <button class="btn-rd" onclick="cliNovaBarra()" title="Criar uma barra nova">+ barra</button>
       </div>
+      <div id="cliAcoes"></div>
       <div id="tabelaClientes"><div class="loading"><div class="spinner"></div>Carregando…</div></div>
     </div>`;
-  cliState={termo:"",filtro:"todos",page:0,size:50,total:0};
+
+  cliState={termo:"",filtro:"todos",barra:"todas",parceiro:"todos",page:0,size:50,total:0};
+  cliSel = new Set();
+
   el("busca").addEventListener("input",e=>{ clearTimeout(buscaTimer); buscaTimer=setTimeout(()=>{cliState.termo=e.target.value.trim();cliState.page=0;carregarClientes();},300); });
   el("filtro").addEventListener("change",e=>{ cliState.filtro=e.target.value; cliState.page=0; carregarClientes(); });
+  el("filtroBarra").addEventListener("change",e=>{
+    cliState.barra=e.target.value; cliState.parceiro="todos"; cliState.page=0;
+    cliSel.clear(); cliPintarParceiro(); carregarClientes();
+  });
+  cliPintarParceiro();
   carregarClientes();
+}
+
+// ---------- cadastros de barra e parceiro ----------
+async function cliCarregarCadastros(){
+  const [b,p] = await Promise.all([
+    sb.from("barras").select("nome,usa_parceiros").eq("ativa",true).order("nome"),
+    sb.from("parceiros").select("nome,barra").eq("ativo",true).order("nome")
+  ]);
+  BARRAS = b.data || [];
+  PARCEIROS = p.data || [];
+}
+
+function cliBarraUsaParceiros(nome){
+  const b = BARRAS.find(x=>x.nome===nome);
+  return !!(b && b.usa_parceiros);
+}
+
+// O filtro de parceiro só existe nas barras que se desdobram — hoje, a Redes.
+function cliPintarParceiro(){
+  const box = el("filtroParceiroBox"); if(!box) return;
+  if(!cliBarraUsaParceiros(cliState.barra)){ box.innerHTML=""; return; }
+  const lista = PARCEIROS.filter(p=>p.barra===cliState.barra);
+  box.innerHTML = `
+    <select class="search select" id="filtroParceiro">
+      <option value="todos">Todos os parceiros</option>
+      <option value="__sem">— sem parceiro —</option>
+      ${lista.map(p=>`<option value="${p.nome}">${p.nome}</option>`).join("")}
+    </select>
+    <button class="btn-rd" onclick="cliNovoParceiro()" title="Criar um parceiro nesta barra">+ parceiro</button>`;
+  el("filtroParceiro").value = cliState.parceiro;
+  el("filtroParceiro").addEventListener("change",e=>{
+    cliState.parceiro=e.target.value; cliState.page=0; cliSel.clear(); carregarClientes();
+  });
+}
+
+async function cliNovaBarra(){
+  const nome = prompt("Nome da barra nova:\n(ex.: SEJA LIVRE 200)");
+  if(!nome) return;
+  const {data,error} = await sb.rpc("criar_barra",{p_nome:nome, p_usa_parceiros:false});
+  if(error){ toast("Não deu para criar", error.message, true); return; }
+  toast(data.acao==="criada" ? "Barra criada" : "Essa barra já existia", data.nome);
+  await cliCarregarCadastros(); vClientes();
+}
+
+async function cliNovoParceiro(){
+  const nome = prompt("Nome do parceiro novo:\n(ele fica disponível na barra "+cliState.barra+")");
+  if(!nome) return;
+  const {data,error} = await sb.rpc("criar_parceiro",{p_nome:nome, p_barra:cliState.barra});
+  if(error){ toast("Não deu para criar", error.message, true); return; }
+  toast(data.acao==="criado" ? "Parceiro criado" : "Esse parceiro já existia", data.nome);
+  await cliCarregarCadastros(); cliPintarParceiro();
 }
 async function carregarClientes(){
   const {termo,filtro,page,size}=cliState;
   const from=page*size, to=from+size-1;
-  let q = sb.from("vw_saude_carteira").select("id,nome,sinacor,barra,saude,status_operacao,data_ultima_operacao,contratos_bmf,volume_bovespa,faixa,grau",{count:"exact"}).order("nome").range(from,to);
-  if(termo){ q = q.or(`nome.ilike.%${termo}%,sinacor.ilike.%${termo}%`); }
+  let q = sb.from("vw_saude_carteira").select("id,nome,sinacor,barra,saude,status_operacao,data_ultima_operacao,contratos_bmf,volume_bovespa,faixa,grau,parceiros",{count:"exact"}).order("nome").range(from,to);
+  if(termo){ q = q.or(`nome.ilike.%${termo}%,sinacor.ilike.%${termo}%,parceiros.ilike.%${termo}%`); }
   if(filtro!=="todos"){ q = q.eq("status_operacao",filtro); }
+  if(cliState.barra!=="todas"){ q = q.eq("barra",cliState.barra); }
+  if(cliState.parceiro==="__sem"){ q = q.is("parceiros",null); }
+  else if(cliState.parceiro!=="todos"){ q = q.eq("parceiros",cliState.parceiro); }
   const {data,error,count} = await q;
   if(error){ return erro(error,"tabelaClientes"); }
   cliState.total=count||0;
   if(!data.length){ el("tabelaClientes").innerHTML='<div class="empty">Nenhum cliente encontrado.</div>'; return; }
   const de=from+1, ate=from+data.length, totalPags=Math.max(1,Math.ceil((count||0)/size));
-  el("tabelaClientes").innerHTML=`<table><thead><tr><th>Cliente</th><th>Faixa</th><th>Barra</th><th>Atividade</th><th>Situação</th><th>Última op.</th></tr></thead>
+  cliPagina = data;
+  setTimeout(cliPintarAcoes, 0);
+  const mostraParceiro = cliBarraUsaParceiros(cliState.barra);
+  el("tabelaClientes").innerHTML=`<table><thead><tr>
+      <th style="width:34px"><input type="checkbox" id="cliTodos" onclick="cliMarcarTodos(this.checked)"></th>
+      <th>Cliente</th><th>Faixa</th><th>Barra</th>
+      ${mostraParceiro?"<th>Parceiro</th>":""}
+      <th>Atividade</th><th>Situação</th><th>Última op.</th></tr></thead>
     <tbody>${data.map(c=>`<tr class="${c.faixa==='preta'?'linha-preta':''}" onclick="abrirFicha('${c.id}')">
+      <td onclick="event.stopPropagation()"><input type="checkbox" data-id="${c.id}"
+          ${cliSel.has(c.id)?"checked":""} onclick="cliMarcar('${c.id}',this.checked)"></td>
       <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}</div></td>
       <td>${faixaBadge(c.faixa,c.grau)}</td>
       <td class="num">${c.barra||"—"}</td>
+      ${mostraParceiro?`<td class="num">${c.parceiros||'<span style="color:var(--text-faint)">sem parceiro</span>'}</td>`:""}
       <td class="num">${volDisplay(c.contratos_bmf,c.volume_bovespa)}</td>
       <td><span class="status s-${c.saude}">${SAUDE_LABEL[c.saude]||c.saude}</span></td>
       <td class="num">${fmtData(c.data_ultima_operacao)}</td></tr>`).join("")}</tbody></table>
@@ -789,6 +875,132 @@ async function carregarClientes(){
       </div>
     </div>`;
 }
+// ---------- SELEÇÃO E ETIQUETAGEM EM MASSA ----------
+function cliMarcar(id, marcado){
+  if(marcado) cliSel.add(id); else cliSel.delete(id);
+  cliPintarAcoes();
+}
+function cliMarcarTodos(marcado){
+  cliPagina.forEach(c=>{ if(marcado) cliSel.add(c.id); else cliSel.delete(c.id); });
+  document.querySelectorAll('#tabelaClientes input[data-id]').forEach(i=>{ i.checked = marcado; });
+  cliPintarAcoes();
+}
+function cliLimparSelecao(){
+  cliSel.clear();
+  document.querySelectorAll('#tabelaClientes input[type=checkbox]').forEach(i=>{ i.checked=false; });
+  cliPintarAcoes();
+}
+
+function cliPintarAcoes(){
+  const box = el("cliAcoes"); if(!box) return;
+  const n = cliSel.size;
+  if(!n){ box.innerHTML=""; return; }
+
+  const usaParceiro = cliBarraUsaParceiros(cliState.barra);
+  const lista = PARCEIROS.filter(p=>p.barra===cliState.barra);
+
+  box.innerHTML = `
+    <div class="toolbar" style="background:var(--green-deep);border-top:1px solid var(--border)">
+      <span style="font-size:13px;font-weight:700">${nf(n)} selecionado${n>1?"s":""}</span>
+      ${usaParceiro ? `
+        <select class="search select" id="acaoParceiro" style="flex:0 0 240px">
+          <option value="">Atribuir parceiro…</option>
+          ${lista.map(p=>`<option value="${p.nome}">${p.nome}</option>`).join("")}
+          <option value="__limpar">— tirar a etiqueta —</option>
+        </select>
+        <button class="cfg-save" onclick="cliAplicarParceiro()">Aplicar</button>` : ``}
+      <select class="search select" id="acaoBarra" style="flex:0 0 240px">
+        <option value="">Mover para a barra…</option>
+        ${BARRAS.map(b=>`<option value="${b.nome}">${b.nome}</option>`).join("")}
+      </select>
+      <button class="cfg-save" onclick="cliAplicarBarra()">Mover</button>
+      <button class="btn-rd" onclick="cliLimparSelecao()">Limpar seleção</button>
+    </div>`;
+}
+
+/**
+ * Antes de gravar, avisa quem já tem etiqueta.
+ * Seleção em massa é onde um clique errado atinge centenas de linhas —
+ * então nada é substituído sem a pessoa ver o que vai por cima.
+ */
+async function cliAplicarParceiro(){
+  const escolha = el("acaoParceiro").value;
+  if(!escolha){ toast("Escolha um parceiro", "", true); return; }
+  const limpar = escolha === "__limpar";
+
+  const ids = [...cliSel];
+  const naTela = cliPagina.filter(c=>cliSel.has(c.id));
+  const jaTem = naTela.filter(c=>c.parceiros && c.parceiros.trim());
+
+  let alvo = ids;
+  if(!limpar && jaTem.length){
+    const contagem = {};
+    jaTem.forEach(c=>{ contagem[c.parceiros]=(contagem[c.parceiros]||0)+1; });
+    const detalhe = Object.entries(contagem)
+      .sort((a,b)=>b[1]-a[1]).slice(0,6)
+      .map(([k,v])=>`${k} (${v})`).join(", ");
+
+    const resp = await cliPerguntar(
+      `${jaTem.length} de ${ids.length} selecionados já têm etiqueta`,
+      `Hoje eles estão como: ${detalhe}.<br><br>O que fazer com esses?`,
+      [["Substituir todos","subst"],["Só etiquetar os que estão sem","sem"],["Cancelar",null]]
+    );
+    if(!resp) return;
+    if(resp === "sem"){
+      const semEtiqueta = new Set(naTela.filter(c=>!(c.parceiros&&c.parceiros.trim())).map(c=>c.id));
+      alvo = ids.filter(id=>semEtiqueta.has(id));
+      if(!alvo.length){ toast("Nenhum sem etiqueta na seleção","",true); return; }
+    }
+  }
+
+  const {data,error} = await sb.rpc("atribuir_parceiro",
+    {p_ids: alvo, p_parceiro: limpar ? "" : escolha});
+  if(error){ toast("Não deu para aplicar", error.message, true); return; }
+  toast(limpar ? "Etiqueta removida" : "Parceiro atribuído", nf(data.alterados)+" cliente(s)");
+  cliSel.clear(); carregarClientes();
+}
+
+async function cliAplicarBarra(){
+  const barra = el("acaoBarra").value;
+  if(!barra){ toast("Escolha uma barra","",true); return; }
+  const ids = [...cliSel];
+  const resp = await cliPerguntar(
+    `Mover ${ids.length} cliente(s) para ${barra}?`,
+    "A barra atual deles será substituída. Fica registrado na Trilha.",
+    [["Mover","ok"],["Cancelar",null]]
+  );
+  if(!resp) return;
+  const {data,error} = await sb.rpc("atribuir_barra",{p_ids: ids, p_barra: barra});
+  if(error){ toast("Não deu para mover", error.message, true); return; }
+  toast("Clientes movidos", nf(data.alterados)+" para "+data.barra);
+  cliSel.clear(); await cliCarregarCadastros(); carregarClientes();
+}
+
+/** Pergunta com várias saídas. Devolve o valor escolhido, ou null. */
+function cliPerguntar(titulo, texto, opcoes){
+  return new Promise(resolve=>{
+    const cx = document.createElement("div");
+    cx.style.cssText="position:fixed;inset:0;z-index:220;display:grid;place-items:center;"+
+                     "background:rgba(0,0,0,.6);padding:20px";
+    cx.innerHTML = `
+      <div class="panel" style="max-width:460px;padding:22px 24px">
+        <div style="font-size:16px;font-weight:800;margin-bottom:10px">${titulo}</div>
+        <div style="font-size:13.5px;line-height:1.6;color:var(--text-dim)">${texto}</div>
+        <div style="margin-top:20px;display:flex;gap:8px;flex-wrap:wrap"></div>
+      </div>`;
+    const botoes = cx.querySelector("div > div:last-child");
+    opcoes.forEach(([rotulo,valor],i)=>{
+      const b = document.createElement("button");
+      b.className = i===0 ? "cfg-save" : "btn-rd";
+      b.textContent = rotulo;
+      b.onclick = ()=>{ cx.remove(); resolve(valor); };
+      botoes.appendChild(b);
+    });
+    cx.onclick = e => { if(e.target===cx){ cx.remove(); resolve(null); } };
+    document.body.appendChild(cx);
+  });
+}
+
 function mudarPagina(d){ cliState.page=Math.max(0,cliState.page+d); carregarClientes();
   el("content").scrollTop=0; document.querySelector(".main").scrollTop=0; }
 
@@ -1572,10 +1784,11 @@ async function lgCarregarFaixas(){
   alvo.innerHTML = data.map(x=>{
     const faixa = x.faixa || "sem";
     const estrelas = Number(x.grau)||0;
-    const intervalo = x.ate==null
+    const ate = x.proximo==null ? null : Number(x.proximo) - 1;
+    const intervalo = ate==null
       ? `${num(x.de)} contratos ou mais`
-      : (Number(x.de)===0 ? `até ${num(x.ate)} contratos`
-                          : `de ${num(x.de)} a ${num(x.ate)} contratos`);
+      : (Number(x.de)===0 ? `até ${num(ate)} contratos`
+                          : `de ${num(x.de)} a ${num(ate)} contratos`);
     const nota = estrelas>0
       ? `${estrelas} estrela${estrelas>1?"s":""}`
       : (LG_NOTA_FAIXA[faixa]||"");
