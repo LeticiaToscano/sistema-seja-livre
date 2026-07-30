@@ -2088,7 +2088,12 @@ async function abrirFicha(id){
   for(let i=2;i>=0;i--){ const d=new Date(hoje.getFullYear(),hoje.getMonth()-i,1);
     const chave=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
     const nome=d.toLocaleDateString("pt-BR",{month:"short"}).replace(".","");
-    const r=mapa[chave]; meses.push({nome,faixa:r?r.faixa:"branca",ct:r?Number(r.contratos):0}); }
+    // Sem dado no mês significa SEM FAIXA, não faixa branca. A branca é a
+    // primeira faixa do Clube e exige mil contratos — quem nunca operou
+    // não tem faixa nenhuma.
+    const r=mapa[chave];
+    meses.push({nome, faixa: r ? r.faixa : "sem", grau: r ? r.grau : 0,
+                ct: r ? Number(r.contratos) : 0}); }
   const timeline = meses.map(m=>`<div class="tl-mes"><div class="m">${m.nome}</div>${faixaBadge(m.faixa,m.grau)}<div class="ct">${m.ct>0?nf(m.ct)+" ct":"—"}</div></div>`).join("");
 
   el("drBody").innerHTML=`
