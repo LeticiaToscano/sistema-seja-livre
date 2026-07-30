@@ -1502,14 +1502,17 @@ function lgTextos(r){
   };
 }
 
-const LG_FAIXAS = [
-  {f:"sem",    g:0, r:"menos de 1.000 contratos",           d:"Ainda não atingiu o mínimo do Clube."},
-  {f:"branca", g:0, r:"de 1.000 a 5.000 contratos",         d:"Primeira faixa do Clube Trader."},
-  {f:"azul",   g:0, r:"de 5.000 a 10.000 contratos",        d:"A partir daqui o cliente é considerado faixa alta nos diagnósticos."},
-  {f:"roxa",   g:0, r:"de 10.000 a 25.000 contratos",       d:""},
-  {f:"marrom", g:0, r:"de 25.000 a 50.000 contratos",       d:""},
-  {f:"preta",  g:1, r:"50.000 contratos ou mais",           d:"A faixa preta ganha estrelas conforme o volume: 1 estrela a partir de 50 mil, até 6 estrelas em 500 mil ou mais."}
-];
+// Os limites das faixas e das estrelas vêm da view vw_legenda_faixas, que
+// os descobre perguntando às próprias funções fn_faixa e fn_grau. Nada é
+// escrito à mão aqui — se a regra mudar no banco, a tela acompanha.
+const LG_NOTA_FAIXA = {
+  sem:    "Ainda não atingiu o mínimo do Clube.",
+  branca: "Primeira faixa do Clube Trader.",
+  azul:   "A partir daqui o cliente conta como faixa alta nos diagnósticos.",
+  roxa:   "",
+  marrom: "",
+  preta:  "A partir daqui a faixa não muda mais — o que sobe são as estrelas."
+};
 
 async function vLegenda(){
   const r = await lgRegras();
@@ -1548,15 +1551,41 @@ async function vLegenda(){
       A faixa vem dos <b>contratos de BM&amp;F no mês</b>, e vale o <b>melhor mês dos últimos três</b> —
       um mês fraco não rebaixa ninguém de imediato. Só contratos de BM&amp;F contam; volume de Bovespa
       e operações de zeragem não entram.
+      <br><br>A partir da <b>faixa preta</b> o que evolui são as <b>estrelas</b>: a faixa continua preta e
+      cada degrau acrescenta uma estrela. Os limites abaixo são lidos direto das regras do banco.
     </div>
-    <div class="panel" style="padding:0">
-      ${LG_FAIXAS.map(x=>`<div style="display:flex;gap:16px;align-items:center;padding:14px 16px;
-          border-bottom:1px solid rgba(255,255,255,.04)">
-        <span style="flex:0 0 150px">${faixaBadge(x.f, x.g)}</span>
-        <span style="flex:0 0 190px;font-size:13px">${x.r}</span>
-        <span style="font-size:13px;color:var(--text-dim);flex:1;line-height:1.55">${x.d}</span>
-      </div>`).join("")}
+    <div class="panel" style="padding:0" id="lgFaixas">
+      <div class="loading"><div class="spinner"></div>Lendo as regras do banco…</div>
     </div>`;
+
+  lgCarregarFaixas();
+}
+
+async function lgCarregarFaixas(){
+  const {data,error} = await sb.from("vw_legenda_faixas").select("*");
+  const alvo = el("lgFaixas"); if(!alvo) return;
+  if(error || !data || !data.length){
+    alvo.innerHTML = '<div class="empty">Não consegui ler as regras de faixa do banco.</div>';
+    return;
+  }
+  const num = n => Number(n).toLocaleString("pt-BR");
+  alvo.innerHTML = data.map(x=>{
+    const faixa = x.faixa || "sem";
+    const estrelas = Number(x.grau)||0;
+    const intervalo = x.ate==null
+      ? `${num(x.de)} contratos ou mais`
+      : (Number(x.de)===0 ? `até ${num(x.ate)} contratos`
+                          : `de ${num(x.de)} a ${num(x.ate)} contratos`);
+    const nota = estrelas>0
+      ? `${estrelas} estrela${estrelas>1?"s":""}`
+      : (LG_NOTA_FAIXA[faixa]||"");
+    return `<div style="display:flex;gap:16px;align-items:center;padding:13px 16px;
+        border-bottom:1px solid rgba(255,255,255,.04)">
+      <span style="flex:0 0 170px">${faixaBadge(faixa, estrelas)}</span>
+      <span style="flex:0 0 210px;font-size:13px">${intervalo}</span>
+      <span style="font-size:13px;color:var(--text-dim);flex:1;line-height:1.55">${nota}</span>
+    </div>`;
+  }).join("");
 }
 
 // leva para uma tela marcando o item do menu, como o clique faria
