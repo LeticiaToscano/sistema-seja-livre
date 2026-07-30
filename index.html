@@ -1584,6 +1584,8 @@ async function dgAbrir(codigo, manterPosicao){
 }
 
 // ---------- FICHA (drawer) ----------
+let fichaAtual = null;
+
 async function abrirFicha(id){
   el("overlay").classList.add("open"); el("drawer").classList.add("open");
   el("drBody").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
@@ -1591,6 +1593,7 @@ async function abrirFicha(id){
   const {data:c} = await sb.from("clientes").select("*").eq("id",id).single();
   const {data:s} = await sb.from("vw_saude_carteira").select("saude,status_operacao,data_ativacao,data_ultima_operacao,contratos_bmf,volume_bovespa,qtd_operacoes,faixa,grau").eq("id",id).maybeSingle();
   if(!c){ el("drBody").innerHTML='<div class="empty">Cliente não encontrado.</div>'; return; }
+  fichaAtual = c;
   el("drName").textContent=c.nome;
   el("drSub").textContent=`Sinacor ${c.sinacor} · ${c.barra||"sem barra"}`;
   el("drStatus").innerHTML = (s?`<span class="status s-${s.saude}">${SAUDE_LABEL[s.saude]||s.saude}</span>`:"")
@@ -1619,11 +1622,134 @@ async function abrirFicha(id){
     </div>
     <div class="dr-sec">Evolução de faixa · últimos 3 meses</div>
     <div class="timeline">${timeline}</div>
-    <div class="dr-sec">Contato</div>
-    <div class="dr-stats">
-      <div class="dr-stat"><div class="l">Telefone</div><div class="v" style="font-size:13px">${c.telefone||"—"}</div></div>
-      <div class="dr-stat"><div class="l">E-mail</div><div class="v" style="font-size:12px;word-break:break-all">${c.email||"—"}</div></div>
+    <div class="dr-sec">Contato
+      <button class="btn-rd" style="float:right;margin-top:-3px" onclick="fcEditar()">Editar cadastro</button>
+    </div>
+    <div class="dr-stats" id="fcDados">
+      <div class="dr-stat"><div class="l">Telefone</div><div class="v" style="font-size:13px${c.telefone?'':';color:var(--red)'}">${c.telefone||"faltando"}</div></div>
+      <div class="dr-stat"><div class="l">E-mail</div><div class="v" style="font-size:12px;word-break:break-all${c.email?'':';color:var(--red)'}">${c.email||"faltando"}</div></div>
+      <div class="dr-stat"><div class="l">CPF</div><div class="v" style="font-size:13px${c.cpf?'':';color:var(--red)'}">${c.cpf||"faltando"}</div></div>
       <div class="dr-stat"><div class="l">Aniversário</div><div class="v" style="font-size:14px">${aniv}</div></div>
+    </div>
+    <div id="fcForm"></div>
+
+    <div class="dr-sec">Último contato
+      <button class="btn-rd" style="float:right;margin-top:-3px" onclick="fcNovoContato()">Registrar contato</button>
+    </div>
+    <div class="dr-stats">
+      <div class="dr-stat"><div class="l">Registrado no sistema</div>
+        <div class="v" style="font-size:14px${c.data_ultimo_contato?'':';color:var(--red)'}">${c.data_ultimo_contato?fmtData(c.data_ultimo_contato):"nenhum"}</div></div>
+    </div>
+    <div id="fcContatoForm"></div>
+    <div id="fcHistorico"></div>`;
+
+  fcCarregarHistorico(c.id);
+}
+
+// ---------- COMPLETAR CADASTRO E REGISTRAR CONTATO ----------
+// Nem todo atendimento passa pelo RD, e nem todo cadastro vem completo.
+// Estas duas peças deixam a pessoa preencher o que a automação não alcança.
+
+function fcEditar(){
+  const c = fichaAtual; if(!c) return;
+  el("fcForm").innerHTML = `
+    <div class="panel" style="padding:14px;margin-top:10px">
+      <div style="display:grid;gap:10px">
+        <div><label style="font-size:11px;color:var(--text-dim)">Telefone</label>
+          <input class="search" id="fcTel" value="${c.telefone||""}" placeholder="(11) 98888-7777"></div>
+        <div><label style="font-size:11px;color:var(--text-dim)">E-mail</label>
+          <input class="search" id="fcMail" value="${c.email||""}" placeholder="nome@email.com"></div>
+        <div><label style="font-size:11px;color:var(--text-dim)">CPF</label>
+          <input class="search" id="fcCpf" value="${c.cpf||""}" placeholder="somente números"></div>
+        <div style="display:flex;gap:8px">
+          <button class="cfg-save" onclick="fcSalvar()">Salvar</button>
+          <button class="btn-rd" onclick="el('fcForm').innerHTML=''">Cancelar</button>
+        </div>
+      </div>
+    </div>`;
+  el("fcTel").focus();
+}
+
+async function fcSalvar(){
+  const c = fichaAtual; if(!c) return;
+  const {data,error} = await sb.rpc("atualizar_cadastro",{
+    p_cliente_id: c.id,
+    p_telefone: el("fcTel").value,
+    p_email: el("fcMail").value,
+    p_cpf: el("fcCpf").value
+  });
+  if(error){ toast("Não deu para salvar", error.message, true); return; }
+  toast(data && data.mudou ? "Cadastro atualizado" : "Nada mudou", c.nome);
+  el("fcForm").innerHTML="";
+  abrirFicha(c.id);
+}
+
+function fcNovoContato(){
+  const c = fichaAtual; if(!c) return;
+  const agora = new Date();
+  const dia = agora.getFullYear()+"-"+String(agora.getMonth()+1).padStart(2,"0")+"-"+String(agora.getDate()).padStart(2,"0");
+  const hora = String(agora.getHours()).padStart(2,"0")+":"+String(agora.getMinutes()).padStart(2,"0");
+  el("fcContatoForm").innerHTML = `
+    <div class="panel" style="padding:14px;margin-top:10px">
+      <div style="display:grid;gap:10px">
+        <div style="display:flex;gap:8px">
+          <div style="flex:1"><label style="font-size:11px;color:var(--text-dim)">Dia</label>
+            <input class="search" type="date" id="fcDia" value="${dia}" max="${dia}"></div>
+          <div style="flex:1"><label style="font-size:11px;color:var(--text-dim)">Hora</label>
+            <input class="search" type="time" id="fcHora" value="${hora}"></div>
+        </div>
+        <div><label style="font-size:11px;color:var(--text-dim)">Canal</label>
+          <select class="search select" id="fcCanal">
+            <option value="telefone">Telefone</option>
+            <option value="whatsapp">WhatsApp</option>
+            <option value="presencial">Presencial</option>
+            <option value="email">E-mail</option>
+            <option value="outro">Outro</option>
+          </select></div>
+        <div><label style="font-size:11px;color:var(--text-dim)">Observação (opcional)</label>
+          <input class="search" id="fcObs" placeholder="o que foi tratado"></div>
+        <div style="display:flex;gap:8px">
+          <button class="cfg-save" onclick="fcSalvarContato()">Registrar</button>
+          <button class="btn-rd" onclick="el('fcContatoForm').innerHTML=''">Cancelar</button>
+        </div>
+        <div style="font-size:11px;color:var(--text-faint)">
+          Fica registrado em seu nome e passa a contar como último contato do cliente.
+        </div>
+      </div>
+    </div>`;
+}
+
+async function fcSalvarContato(){
+  const c = fichaAtual; if(!c) return;
+  const dia = el("fcDia").value, hora = el("fcHora").value || "12:00";
+  if(!dia){ toast("Informe o dia", "", true); return; }
+  const {error} = await sb.rpc("registrar_contato_manual",{
+    p_cliente_id: c.id,
+    p_quando: dia + "T" + hora + ":00",
+    p_canal: el("fcCanal").value,
+    p_observacao: el("fcObs").value
+  });
+  if(error){ toast("Não deu para registrar", error.message, true); return; }
+  toast("Contato registrado", c.nome);
+  el("fcContatoForm").innerHTML="";
+  abrirFicha(c.id);
+}
+
+async function fcCarregarHistorico(id){
+  const {data} = await sb.from("contatos_manuais")
+    .select("quando,canal,observacao,quem").eq("cliente_id",id)
+    .order("quando",{ascending:false}).limit(10);
+  if(!data || !data.length) return;
+  el("fcHistorico").innerHTML = `
+    <div class="dr-sec">Contatos registrados à mão</div>
+    <div class="panel" style="padding:0">
+      ${data.map(x=>`<div style="display:flex;gap:12px;align-items:baseline;padding:10px 14px;
+          border-bottom:1px solid rgba(255,255,255,.04)">
+        <span class="num" style="font-size:12px;flex:0 0 108px">${fmtDataHora(x.quando)}</span>
+        <span class="tag t-green" style="flex:0 0 auto">${x.canal}</span>
+        <span style="font-size:12.5px;flex:1">${x.observacao||""}
+          <span style="color:var(--text-faint)"> · ${x.quem||""}</span></span>
+      </div>`).join("")}
     </div>`;
 }
 function fecharFicha(){ el("overlay").classList.remove("open"); el("drawer").classList.remove("open"); }
