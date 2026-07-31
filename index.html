@@ -490,7 +490,15 @@ function abrirRD(nome){
 const el = id => document.getElementById(id);
 const ini = n => (n||"?").trim().split(/\s+/).slice(0,2).map(w=>w[0]).join("").toUpperCase();
 const nf = n => (n==null?"—":Number(n).toLocaleString("pt-BR"));
-const fmtData = d => d ? new Date(d+"T00:00:00").toLocaleDateString("pt-BR") : "nunca";
+// Aceita tanto data pura ("2026-07-30") quanto data com hora vinda de um
+// timestamptz. No primeiro caso acrescenta a hora zero de propósito: sem
+// isso o navegador interpreta como UTC e a data volta um dia.
+const fmtData = d => {
+  if(!d) return "nunca";
+  const s = String(d);
+  const x = new Date(/^\d{4}-\d{2}-\d{2}$/.test(s) ? s + "T00:00:00" : s);
+  return isNaN(x.getTime()) ? "—" : x.toLocaleDateString("pt-BR");
+};
 const fmtDataHora = d => { if(!d) return "—"; const x=new Date(d); return x.toLocaleDateString("pt-BR")+" "+x.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}); };
 const fmtDesde = d => {
   if(!d) return "—";
@@ -1796,7 +1804,7 @@ async function ldCarregar(){
   const de = ldState.page * ldState.size, ate = de + ldState.size - 1;
 
   let q = sb.from("vw_leads_rd")
-    .select("id,nome,telefone_rd,cpf,atendimentos,ultimo_contato,ultimo_assessor,criado_no_rd",{count:"exact"})
+    .select("id,nome,telefone_rd,cpf,chave,atendimentos,primeiro_contato,ultimo_contato,ultimo_assessor,criado_no_rd,registros_manuais",{count:"exact"})
     .eq("tipo", ldState.tipo);
 
   if(ldState.termo){
@@ -1814,6 +1822,7 @@ async function ldCarregar(){
   const {data,error,count} = await q.range(de,ate);
   if(error) return erro(error,"ldTab");
   ldState.total = count || 0;
+  window.__ldPagina = data || [];
   if(!data || !data.length){
     el("ldTab").innerHTML='<div class="empty">Nenhum lead neste filtro.</div>';
     return;
@@ -1830,15 +1839,16 @@ async function ldCarregar(){
       <th>Nome no RD</th><th>Telefone</th>
       ${conversou?"<th>Conversas</th><th>Último contato</th><th>Quem atendeu</th>":"<th>Entrou no RD</th>"}
       <th></th></tr></thead>
-    <tbody>${data.map(l=>`<tr style="cursor:default">
-      <td><div class="cell-name"><span class="mini-av">${ini(l.nome||"?")}</span>${l.nome||"(sem nome)"}</div></td>
+    <tbody>${data.map(l=>`<tr onclick="ldAbrir('${l.chave}')">
+      <td><div class="cell-name"><span class="mini-av">${ini(l.nome||"?")}</span>${l.nome||"(sem nome)"}
+        ${l.registros_manuais>0?`<span class="tag t-green" style="font-size:10.5px">${l.registros_manuais} registro${l.registros_manuais>1?"s":""}</span>`:""}</div></td>
       <td class="num">${fone(l.telefone_rd)}</td>
       ${conversou
         ? `<td class="num">${nf(l.atendimentos)}</td>
            <td class="num">${l.ultimo_contato?fmtData(l.ultimo_contato):"—"}</td>
            <td class="num">${l.ultimo_assessor||"—"}</td>`
         : `<td class="num">${l.criado_no_rd?fmtData(l.criado_no_rd):"—"}</td>`}
-      <td>${btnRD(l.nome||"")}</td></tr>`).join("")}</tbody></table>
+      <td onclick="event.stopPropagation()">${btnRD(l.nome||"")}</td></tr>`).join("")}</tbody></table>
     <div class="paginacao">
       <button class="pag-btn" onclick="ldPagina(-1)" ${ldState.page===0?"disabled":""}>Anterior</button>
       <span class="pag-info">${nf(de+1)}–${nf(Math.min(ate+1,ldState.total))} de ${nf(ldState.total)}</span>
@@ -1850,6 +1860,146 @@ function ldPagina(d){
   ldState.page = Math.max(0, ldState.page + d);
   ldCarregar();
   document.querySelector(".main").scrollTo({top:0,behavior:"smooth"});
+}
+
+// ---------- FICHA DO LEAD ----------
+// O lead não é cliente, então não tem ficha nem cliente_id. O que ele tem
+// é um telefone — e é por ele que tudo se liga: as conversas do RD e os
+// registros feitos à mão.
+
+let leadAtual = null;
+
+async function ldAbrir(chave){
+  const l = (window.__ldPagina||[]).find(x=>x.chave===chave);
+  if(!l) return;
+  leadAtual = l;
+
+  el("overlay").classList.add("open");
+  el("drawer").classList.add("open");
+  el("drName").textContent = l.nome || "(sem nome)";
+  el("drSub").innerHTML = `${l.telefone_rd||"sem telefone"} · lead do RD Conversas`;
+  el("drActions").innerHTML = btnRD(l.nome||"");
+
+  const dias = l.ultimo_contato
+    ? Math.floor((Date.now() - new Date(l.ultimo_contato).getTime())/86400000) : null;
+
+  el("drBody").innerHTML = `
+    <div class="note" style="border-left-color:var(--amber);margin-bottom:16px">
+      Este contato existe no RD Conversas e <b>não está na base de clientes</b> —
+      nem pelo telefone, nem pelo CPF, nem pelo nome.
+    </div>
+
+    <div class="dr-sec">Diagnóstico</div>
+    <div class="dr-stats">
+      <div class="dr-stat"><div class="l">Conversas no RD</div>
+        <div class="v">${nf(l.atendimentos||0)}</div></div>
+      <div class="dr-stat"><div class="l">Primeiro contato</div>
+        <div class="v" style="font-size:14px">${l.primeiro_contato?fmtData(l.primeiro_contato):"—"}</div></div>
+      <div class="dr-stat"><div class="l">Último contato</div>
+        <div class="v" style="font-size:14px">${l.ultimo_contato?fmtData(l.ultimo_contato):"—"}</div></div>
+      <div class="dr-stat"><div class="l">Há quanto tempo</div>
+        <div class="v" style="font-size:14px;${dias!==null&&dias>90?"color:var(--amber)":""}">${
+          dias===null?"nunca falaram":dias===0?"hoje":nf(dias)+" dias"}</div></div>
+      <div class="dr-stat"><div class="l">Quem atendeu por último</div>
+        <div class="v" style="font-size:13px">${l.ultimo_assessor||"—"}</div></div>
+      <div class="dr-stat"><div class="l">CPF</div>
+        <div class="v" style="font-size:13px">${l.cpf||"não informado"}</div></div>
+    </div>
+
+    <div class="dr-sec">Registrar contato
+      <button class="btn-rd" style="float:right;margin-top:-3px" onclick="ldNovoContato()">Novo registro</button>
+    </div>
+    <div id="ldForm"></div>
+    <div id="ldHist"><div class="loading"><div class="spinner"></div>Carregando histórico…</div></div>
+
+    <div class="dr-sec">Não é lead?</div>
+    <div class="panel" style="padding:14px">
+      <div style="font-size:13px;color:var(--text-dim);line-height:1.6;margin-bottom:10px">
+        Se essa pessoa já é cliente com outro telefone, ou não deve aparecer aqui,
+        dá para tirar da lista. Fica registrado quem tirou e por quê.
+      </div>
+      <button class="btn-rd" onclick="ldOcultar()">Tirar da lista de leads</button>
+    </div>`;
+
+  ldHistorico(chave);
+}
+
+async function ldHistorico(chave){
+  const {data,error} = await sb.rpc("fn_historico_lead",{p_chave:chave, p_limite:30});
+  const alvo = el("ldHist"); if(!alvo) return;
+  if(error || !data || !data.length){
+    alvo.innerHTML = '<div class="empty" style="padding:18px">Nenhuma conversa registrada.</div>';
+    return;
+  }
+  alvo.innerHTML = `<div class="panel" style="padding:0">
+    ${data.map(x=>{
+      const rd = x.origem==="rd";
+      return `<div style="display:flex;gap:12px;align-items:baseline;padding:10px 14px;
+          border-bottom:1px solid rgba(255,255,255,.04)">
+        <span class="num" style="font-size:12px;flex:0 0 108px">${fmtDataHora(x.quando)}</span>
+        <span class="tag ${rd?"t-blue":"t-green"}" style="flex:0 0 auto">${rd?"RD":"à mão"}</span>
+        <span style="font-size:12px;color:var(--text-dim);flex:0 0 auto">${x.canal||""}</span>
+        <span style="font-size:12.5px;flex:1">${x.observacao||""}
+          ${x.quem?`<span style="color:var(--text-faint)">${x.observacao?" · ":""}${x.quem}</span>`:""}</span>
+      </div>`;
+    }).join("")}</div>`;
+}
+
+function ldNovoContato(){
+  const agora = new Date();
+  const dia = agora.getFullYear()+"-"+String(agora.getMonth()+1).padStart(2,"0")+"-"+String(agora.getDate()).padStart(2,"0");
+  const hora = String(agora.getHours()).padStart(2,"0")+":"+String(agora.getMinutes()).padStart(2,"0");
+  el("ldForm").innerHTML = `
+    <div class="panel" style="padding:14px;margin-bottom:12px">
+      <div style="display:grid;gap:10px">
+        <div style="display:flex;gap:8px">
+          <div style="flex:1"><label style="font-size:11px;color:var(--text-dim)">Dia</label>
+            <input class="search" type="date" id="ldDia" value="${dia}" max="${dia}"></div>
+          <div style="flex:1"><label style="font-size:11px;color:var(--text-dim)">Hora</label>
+            <input class="search" type="time" id="ldHora" value="${hora}"></div>
+        </div>
+        <div><label style="font-size:11px;color:var(--text-dim)">Canal</label>
+          <select class="search select" id="ldCanal">
+            <option value="whatsapp">WhatsApp</option>
+            <option value="telefone">Telefone</option>
+            <option value="presencial">Presencial</option>
+            <option value="email">E-mail</option>
+            <option value="outro">Outro</option>
+          </select></div>
+        <div><label style="font-size:11px;color:var(--text-dim)">Observação</label>
+          <input class="search" id="ldObs" placeholder="o que foi tratado, próximo passo"></div>
+        <div style="display:flex;gap:8px">
+          <button class="cfg-save" onclick="ldSalvarContato()">Registrar</button>
+          <button class="btn-rd" onclick="el('ldForm').innerHTML=''">Cancelar</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function ldSalvarContato(){
+  if(!leadAtual) return;
+  const dia = el("ldDia").value, hora = el("ldHora").value || "12:00";
+  if(!dia){ toast("Informe o dia","",true); return; }
+  const {error} = await sb.rpc("registrar_contato_lead",{
+    p_chave: leadAtual.chave,
+    p_quando: dia+"T"+hora+":00",
+    p_canal: el("ldCanal").value,
+    p_observacao: el("ldObs").value
+  });
+  if(error){ toast("Não deu para registrar", error.message, true); return; }
+  toast("Contato registrado", leadAtual.nome||leadAtual.telefone_rd);
+  el("ldForm").innerHTML="";
+  ldHistorico(leadAtual.chave);
+}
+
+async function ldOcultar(){
+  if(!leadAtual) return;
+  const motivo = prompt("Por que tirar da lista?\n(ex.: já é cliente com outro telefone, número errado)");
+  if(motivo===null) return;
+  const {error} = await sb.rpc("ocultar_lead",{p_chave:leadAtual.chave, p_motivo:motivo});
+  if(error){ toast("Não deu para tirar", error.message, true); return; }
+  toast("Tirado da lista", leadAtual.nome||leadAtual.telefone_rd);
+  fecharFicha(); ldCarregar();
 }
 
 // ---------- LEGENDA ----------
