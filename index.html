@@ -390,9 +390,11 @@
       <button class="nav-item" data-view="assessores"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="9" r="2.6"/><circle cx="16" cy="9" r="2.6"/><path d="M3 18c.5-2.6 2.4-4 5-4s4.5 1.4 5 4M13.5 14.2c2.2-.2 3.9 1.1 4.5 3.8" stroke-linecap="round"/></svg>Assessores</button>
 
       <div class="nav-label">Comercial</div>
+      <button class="nav-item" data-view="saidas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" stroke-linecap="round" stroke-linejoin="round"/></svg>Saíram</button>
       <button class="nav-item" data-view="leads"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" stroke-linecap="round"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6" stroke-linecap="round"/></svg>Leads</button>
 
       <div class="nav-label">Gestão</div>
+      <button class="nav-item" data-view="importacoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" stroke-linecap="round" stroke-linejoin="round"/></svg>Importações</button>
       <button class="nav-item" data-view="config"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 8h14M5 16h14" stroke-linecap="round"/><circle cx="9" cy="8" r="2.2" fill="var(--bg-2)"/><circle cx="15" cy="16" r="2.2" fill="var(--bg-2)"/></svg>Configurações</button>
       <button class="nav-item" data-view="auditoria"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l7 3v5c0 4-3 7-7 8-4-1-7-4-7-8V6z" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg>Auditoria</button>
       <button class="nav-item" data-view="diagnostico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 13h4l2.5-7 4 14 2.5-7H21" stroke-linecap="round" stroke-linejoin="round"/></svg>Diagnóstico</button>
@@ -566,6 +568,8 @@ const TITLES={
   fluxos:["ATENDIMENTO","Fluxos"], assessores:["ATENDIMENTO","Assessores"],
   config:["GESTÃO","Configurações"], auditoria:["GESTÃO","Auditoria"],
   leads:["COMERCIAL","Leads · falaram no RD e não são clientes"],
+  saidas:["COMERCIAL","Saíram da assessoria"],
+  importacoes:["GESTÃO","Importações · os relatórios da corretora"],
   legenda:["SISTEMA","Legenda · o que cada etiqueta significa"],
   diagnostico:["GESTÃO","Diagnóstico"], ia:["GESTÃO","CEO de IA"],
   integracoes:["SISTEMA","Integrações"]
@@ -578,7 +582,7 @@ const RESERVADAS={
   ia:{icon:"ia",desc:"O diagnóstico estratégico da operação em linguagem natural, e o copiloto de IA por assessor — cada um enxergando apenas a própria carteira."},
   integracoes:{icon:"integracoes",desc:"As conexões do sistema — Volume Operado (operação), RD Conversas (atendimento), Gmail/Genial (entrada de clientes) e IA. Ligadas e a ligar."}
 };
-const VIEWS={radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes,auditoria:vAuditoria,diagnostico:vDiagnostico,legenda:vLegenda,leads:vLeads};
+const VIEWS={radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes,auditoria:vAuditoria,diagnostico:vDiagnostico,legenda:vLegenda,leads:vLeads,importacoes:vImportacoes,saidas:vSaidas};
 document.querySelectorAll(".nav-item").forEach(b=>b.addEventListener("click",()=>{
   document.querySelectorAll(".nav-item").forEach(x=>x.classList.remove("active"));
   b.classList.add("active"); el("sidebar").classList.remove("open"); render(b.dataset.view);
@@ -1763,6 +1767,259 @@ function cfPintar(j){
           <td><span class="status ${dif?'s-negligenciado':'s-saudavel'}">
             ${dif?nf(dif)+' fora':'confere'}</span></td></tr>`; }).join("")}
     </tbody></table></div>`;
+}
+
+// ---------- SAÍRAM DA ASSESSORIA ----------
+// Quem a corretora declarou como saída no relatório SAIU_DA_LIVRE. Não é
+// dedução por ausência: é afirmação, com data e arquivo de prova.
+//
+// Ao processar, o cliente vira inativo e some do Radar, da Fila, do Clube
+// e de todas as contagens — porque as views filtram por ativo. Aqui ele
+// continua visível, que é o ponto: saída de cliente grande é informação.
+
+let saState = {mostrar:"ativos"};
+
+async function vSaidas(){
+  el("content").innerHTML=`
+    <div class="note" style="border-left-color:var(--amber);margin-bottom:16px">
+      Clientes que a corretora declarou como saída. Eles não aparecem mais no Radar,
+      na Fila nem nas contagens da carteira — mas continuam aqui, com o volume que
+      operavam e se alguém falou com eles antes de sair.
+    </div>
+    <div class="sol-tabs">
+      <button class="sol-tab on" onclick="saMostrar('ativos',this)">Saíram</button>
+      <button class="sol-tab" onclick="saMostrar('reativados',this)">Voltaram</button>
+      <button class="sol-tab" onclick="saMostrar('todos',this)">Todos</button>
+    </div>
+    <div class="panel" id="saTab"><div class="loading"><div class="spinner"></div>Carregando…</div></div>`;
+  saState = {mostrar:"ativos"};
+  saCarregar();
+}
+
+function saMostrar(m, btn){
+  saState.mostrar = m;
+  document.querySelectorAll(".sol-tabs .sol-tab").forEach(b=>b.classList.remove("on"));
+  btn.classList.add("on");
+  saCarregar();
+}
+
+async function saCarregar(){
+  el("saTab").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
+  let q = sb.from("vw_saidas").select("*",{count:"exact"});
+  if(saState.mostrar === "ativos")          q = q.eq("reativado", false);
+  else if(saState.mostrar === "reativados") q = q.eq("reativado", true);
+  const {data,error,count} = await q.limit(500);
+  if(error) return erro(error,"saTab");
+  if(!data || !data.length){
+    el("saTab").innerHTML='<div class="empty">Nenhuma saída registrada neste filtro.</div>';
+    return;
+  }
+
+  const totalCt = data.reduce((s,x)=>s + Number(x.contratos_bmf||0), 0);
+
+  el("saTab").innerHTML = `
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border);font-size:13px;color:var(--text-dim)">
+      ${nf(count)} saída${count>1?"s":""}${totalCt>0?` · ${nf(totalCt)} contratos que a casa deixou de operar`:""}
+    </div>
+    <table><thead><tr>
+      <th>Cliente</th><th>Barra</th><th>Saiu em</th><th>Há</th>
+      <th>Contratos</th><th>Última op.</th><th>Retenção</th><th></th></tr></thead>
+    <tbody>${data.map(s=>`<tr style="cursor:default">
+      <td><div class="cell-name"><span class="mini-av">${ini(s.nome)}</span>${s.nome}
+        <span class="num" style="font-size:11px;color:var(--text-faint)">${s.sinacor}</span></div></td>
+      <td class="num">${s.barra_anterior||"—"}</td>
+      <td class="num">${fmtData(s.data_saida)}</td>
+      <td class="num">${nf(s.dias_desde_saida)} dias</td>
+      <td class="num">${s.contratos_bmf?nf(s.contratos_bmf):"—"}</td>
+      <td class="num">${s.ultima_operacao?fmtData(s.ultima_operacao):"—"}</td>
+      <td><span class="status ${s.teve_retencao==="ninguém falou com ele"?"s-critico":
+            s.teve_retencao==="falaram no último mês"?"s-saudavel":"s-em_recuperacao"}">${s.teve_retencao}</span></td>
+      <td>${s.reativado
+            ? `<span class="tag t-green" title="Voltou em ${fmtDataHora(s.reativado_em)}${s.motivo_volta?" — "+s.motivo_volta:""}">voltou</span>`
+            : `<button class="btn-rd" onclick="saReativar(${s.id},'${String(s.nome).replace(/'/g,"")}')">Reativar</button>`}</td>
+    </tr>`).join("")}</tbody></table>`;
+}
+
+async function saReativar(id, nome){
+  const motivo = prompt("Por que reativar " + nome + "?\n(ex.: foi retido, saiu por engano, voltou para a casa)");
+  if(motivo === null) return;
+  const {error} = await sb.rpc("reativar_cliente",{p_saida_id:id, p_motivo:motivo});
+  if(error){ toast("Não deu para reativar", error.message, true); return; }
+  toast("Cliente reativado", nome + " voltou para a carteira");
+  saCarregar();
+}
+
+// ---------- IMPORTAÇÕES ----------
+// A corretora manda vários relatórios por dia. Até agora, cada um que a
+// gente quis usar virou código novo. Aqui é o contrário: joga o arquivo,
+// o sistema diz o que é. Formato novo não dá erro — ele é catalogado, e
+// ensinar o sistema a reconhecê-lo passa a ser uma linha no cadastro.
+
+async function vImportacoes(){
+  el("content").innerHTML=`
+    <div class="note" style="border-left-color:var(--green);margin-bottom:18px">
+      Jogue aqui qualquer relatório da corretora. O sistema identifica o formato
+      pelas colunas e diz para que ele serve. <b>Formato que ele ainda não conhece
+      não dá erro</b> — fica registrado com as colunas que tem, para ser ensinado depois.
+    </div>
+
+    <div class="panel" style="padding:0;margin-bottom:22px">
+      <div id="impDrop" style="border:1.5px dashed var(--border-strong);border-radius:14px;margin:16px;
+        padding:34px 20px;text-align:center;cursor:pointer;transition:.18s">
+        <div style="font-size:15px;font-weight:700;margin-bottom:5px">Arraste os relatórios aqui</div>
+        <div style="font-size:12.5px;color:var(--text-dim)">ou clique para escolher &middot; pode soltar vários de uma vez</div>
+      </div>
+      <input type="file" id="impFile" multiple accept=".csv,.txt" style="display:none">
+      <div id="impSaida" style="padding:0 16px 16px"></div>
+    </div>
+
+    <div class="sec-title">O que o sistema reconhece<span class="rule"></span></div>
+    <div class="panel" id="impFormatos" style="margin-bottom:22px">
+      <div class="loading"><div class="spinner"></div>Carregando…</div>
+    </div>
+
+    <div class="sec-title">Últimas importações<span class="rule"></span></div>
+    <div class="panel" id="impHist"><div class="loading"><div class="spinner"></div>Carregando…</div></div>`;
+
+  const drop = el("impDrop"), inp = el("impFile");
+  drop.onclick = ()=>inp.click();
+  drop.ondragover = e=>{e.preventDefault();drop.style.borderColor="var(--green)";drop.style.background="rgba(46,229,157,.06)";};
+  drop.ondragleave = ()=>{drop.style.borderColor="var(--border-strong)";drop.style.background="transparent";};
+  drop.ondrop = e=>{e.preventDefault();drop.ondragleave();impReceber(e.dataTransfer.files);};
+  inp.onchange = e=>impReceber(e.target.files);
+
+  impFormatos();
+  impHistorico();
+}
+
+async function impFormatos(){
+  const {data,error} = await sb.from("formatos_importacao")
+    .select("codigo,nome,descricao,o_que_alimenta,destino").eq("ativo",true).order("codigo");
+  const alvo = el("impFormatos"); if(!alvo) return;
+  if(error || !data || !data.length){ alvo.innerHTML='<div class="empty">Nenhum formato cadastrado.</div>'; return; }
+  alvo.innerHTML = `<div style="padding:0">${data.map(f=>`
+    <div style="padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.04)">
+      <div style="display:flex;gap:10px;align-items:baseline">
+        <span style="font-weight:700;font-size:14px">${f.nome}</span>
+        ${f.destino?'<span class="tag t-green" style="font-size:10.5px">processa</span>'
+                   :'<span class="tag" style="font-size:10.5px;background:transparent;border:1px dashed var(--text-faint);color:var(--text-faint)">só cataloga</span>'}
+      </div>
+      <div style="font-size:12.5px;color:var(--text-dim);margin-top:4px;line-height:1.55">${f.o_que_alimenta||f.descricao||""}</div>
+    </div>`).join("")}</div>`;
+}
+
+async function impHistorico(){
+  const {data,error} = await sb.from("importacoes")
+    .select("arquivo,formato,linhas,quando,quem,processado")
+    .order("quando",{ascending:false}).limit(30);
+  const alvo = el("impHist"); if(!alvo) return;
+  if(error || !data || !data.length){
+    alvo.innerHTML='<div class="empty">Nenhum arquivo importado ainda.</div>'; return;
+  }
+  alvo.innerHTML = `<table><thead><tr>
+      <th>Quando</th><th>Arquivo</th><th>Formato</th><th>Linhas</th><th>Quem</th></tr></thead>
+    <tbody>${data.map(i=>`<tr style="cursor:default">
+      <td class="num">${fmtDataHora(i.quando)}</td>
+      <td>${i.arquivo}</td>
+      <td>${i.formato ? i.formato
+            : '<span style="color:var(--amber)">não reconhecido</span>'}</td>
+      <td class="num">${nf(i.linhas)}</td>
+      <td class="num">${i.quem||"—"}</td>
+    </tr>`).join("")}</tbody></table>`;
+}
+
+function impReceber(lista){
+  [...lista].forEach(f=>{
+    const rd = new FileReader();
+    rd.onload = ()=>impProcessar(f.name, rd.result);
+    rd.readAsText(f, "UTF-8");
+  });
+}
+
+async function impProcessar(nome, texto){
+  const linhas = String(texto).replace(/^\uFEFF/,"").split(/\r?\n/).filter(l=>l.trim());
+  if(linhas.length < 2){
+    impCartao(nome, null, 0, [], "O arquivo não tem linhas de dados.");
+    return;
+  }
+  const sep = (linhas[0].match(/;/g)||[]).length >= (linhas[0].match(/,/g)||[]).length ? ";" : ",";
+  const colunas = linhas[0].split(sep).map(c=>c.replace(/^"|"$/g,"").trim()).filter(Boolean);
+  const primeira = linhas[1].split(sep).map(c=>c.replace(/^"|"$/g,"").trim());
+  const amostra = {};
+  colunas.forEach((c,i)=>{ amostra[c] = primeira[i] ?? ""; });
+
+  const {data,error} = await sb.rpc("registrar_importacao",{
+    p_arquivo: nome, p_colunas: colunas,
+    p_linhas: linhas.length - 1, p_amostra: amostra
+  });
+  if(error){ impCartao(nome, null, linhas.length-1, colunas, error.message); return; }
+
+  // guarda as linhas para o processamento, quando o formato tiver destino
+  if(data && data.formato === "saiu_da_livre"){
+    const iSin = colunas.findIndex(c=>/CONTA_SINACOR_SEM_DIGITO/i.test(c));
+    const iDt  = colunas.findIndex(c=>/DT_PARTITION|DATA/i.test(c));
+    const itens = linhas.slice(1).map(l=>{
+      const p = l.split(sep).map(x=>x.replace(/^"|"$/g,"").trim());
+      return { sinacor: p[iSin], data: iDt>=0 ? p[iDt] : null };
+    }).filter(x=>x.sinacor);
+    impCartao(nome, data, linhas.length-1, colunas, null, {arquivo:nome, itens:itens});
+  } else {
+    impCartao(nome, data, linhas.length-1, colunas, null);
+  }
+  impHistorico();
+}
+
+/**
+ * Desligar cliente é a ação mais pesada do sistema, então ela nunca é
+ * automática: o arquivo é reconhecido, mostra o que vai acontecer, e
+ * espera alguém confirmar.
+ */
+async function impProcessarSaidas(){
+  const lote = window.__impSaidas;
+  if(!lote || !lote.itens.length) return;
+  const ok = confirm(
+    "Desligar " + lote.itens.length + " cliente(s)?\n\n" +
+    "Eles saem do Radar, da Fila, do Clube e de todas as contagens, e passam " +
+    "para a aba Saíram, em Comercial.\n\nDá para reativar depois, se for engano.");
+  if(!ok) return;
+  const {data,error} = await sb.rpc("processar_saidas",{lote:lote});
+  if(error){ toast("Não deu para processar", error.message, true); return; }
+  toast("Saídas processadas",
+        nf(data.desligados) + " desligado(s)" +
+        (data.sem_ficha ? " · " + nf(data.sem_ficha) + " sem ficha no CRM" : ""));
+  impHistorico();
+}
+
+function impCartao(nome, res, linhas, colunas, erroTxt, loteSaida){
+  if(loteSaida) window.__impSaidas = loteSaida;
+  const reconhecido = res && res.reconhecido;
+  const cor = erroTxt ? "var(--red)" : reconhecido ? "var(--green)" : "var(--amber)";
+  const div = document.createElement("div");
+  div.className = "panel";
+  div.style.cssText = "padding:16px 18px;margin-top:12px;border-left:3px solid " + cor;
+  div.innerHTML = `
+    <div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap">
+      <span style="font-weight:700;font-size:14px">${nome}</span>
+      <span style="font-size:12px;color:var(--text-dim)">${nf(linhas)} linhas · ${colunas.length} colunas</span>
+    </div>
+    ${erroTxt ? `<div style="font-size:13px;color:var(--red);margin-top:8px">${erroTxt}</div>`
+     : reconhecido
+       ? `<div style="margin-top:8px">
+            <span class="tag t-green">${res.nome}</span>
+            <div style="font-size:13px;color:var(--text-dim);margin-top:6px;line-height:1.55">${res.o_que_alimenta||""}</div>
+            ${loteSaida ? `<button class="cfg-save" style="margin-top:12px" onclick="impProcessarSaidas()">
+              Processar as ${nf(loteSaida.itens.length)} saída(s)</button>` : ""}
+          </div>`
+       : `<div style="margin-top:8px">
+            <span class="tag t-amber">formato ainda não reconhecido</span>
+            <div style="font-size:13px;color:var(--text-dim);margin-top:6px;line-height:1.55">
+              Ficou registrado com as colunas abaixo. Mande esta lista para ensinar o sistema
+              a reconhecer e usar este relatório.
+            </div>
+            <div style="font-size:11.5px;color:var(--text-faint);margin-top:8px;font-family:monospace;
+                        word-break:break-word;line-height:1.7">${colunas.join(" · ")}</div>
+          </div>`}`;
+  el("impSaida").appendChild(div);
 }
 
 // ---------- LEADS DO RD ----------
