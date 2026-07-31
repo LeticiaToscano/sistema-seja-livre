@@ -2279,7 +2279,7 @@ async function dgSFCarregar(){
   el("dgTab").innerHTML = `<table><thead><tr>
       <th>Sinacor</th><th>Nome no RD</th><th>Barra</th>
       <th>Contratos</th><th>Operações</th><th>Última op.</th>
-      <th>Telefone</th><th>Situação</th></tr></thead>
+      <th>Telefone</th><th>Situação</th><th></th></tr></thead>
     <tbody>${data.map(c=>`<tr style="cursor:default">
       <td class="num" style="font-weight:700">${c.sinacor}</td>
       <td>${c.nome_no_rd || '<span style="color:var(--text-faint)">não identificado</span>'}</td>
@@ -2290,10 +2290,104 @@ async function dgSFCarregar(){
       <td class="num">${c.telefone_rd||"—"}</td>
       <td><span class="status ${c.situacao==="ativo"?"s-critico":"s-nunca_operou"}">${
         c.situacao==="ativo"?"ativo":c.situacao==="parou_ha_pouco"?"parou há pouco":"parado"}</span></td>
+      <td><button class="cfg-save" style="padding:6px 12px;font-size:12px"
+            onclick="sfCriar('${c.sinacor}')">Criar ficha</button></td>
     </tr>`).join("")}</tbody></table>
     <div style="padding:11px 16px;font-size:11px;color:var(--text-faint)">
       Mostrando ${nf(data.length)} de ${nf(count)} · ordenados por contratos ·
       o CSV leva o que estiver neste filtro</div>`;
+}
+
+/**
+ * Aprovação, um a um.
+ * A função em lote cria as 134 de uma vez e quem não tem nome no RD entra
+ * como "Cliente 746566". Aqui é o contrário: mostra o que se sabe, deixa
+ * completar o que falta, e só cria quando alguém aprova.
+ */
+async function sfCriar(sinacor){
+  const c = (dgDados||[]).find(x=>String(x.sinacor)===String(sinacor));
+  if(!c) return;
+
+  if(!BARRAS.length) await cliCarregarCadastros();
+
+  const cx = document.createElement("div");
+  cx.id = "sfModal";
+  cx.style.cssText = "position:fixed;inset:0;z-index:240;display:grid;place-items:center;"+
+                     "background:rgba(0,0,0,.6);padding:20px;overflow:auto";
+  cx.onclick = e => { if(e.target===cx) cx.remove(); };
+  cx.innerHTML = `
+    <div class="panel" style="max-width:520px;width:100%;padding:24px" onclick="event.stopPropagation()">
+      <div style="font-size:18px;font-weight:800;letter-spacing:-.3px">Criar ficha · Sinacor ${c.sinacor}</div>
+      <div style="font-size:13px;color:var(--text-dim);margin:8px 0 18px;line-height:1.6">
+        Esta conta operou <b>${nf(c.operacoes)} vezes</b>${c.contratos_bmf?` e movimentou <b>${nf(c.contratos_bmf)} contratos</b>`:""},
+        com última operação em <b>${fmtData(c.ultima_operacao)}</b> — e nunca teve cadastro.
+        Confira e complete antes de criar.
+      </div>
+
+      <div style="display:grid;gap:12px">
+        <div>
+          <label style="font-size:11px;color:var(--text-dim)">Nome completo *</label>
+          <input class="search" id="sfNome" value="${(c.nome_no_rd||"").replace(/"/g,'')}"
+                 placeholder="como deve aparecer no sistema">
+          ${c.nome_no_rd?`<div style="font-size:11px;color:var(--text-faint);margin-top:4px">
+             veio do contato do RD — provavelmente incompleto</div>`
+            :`<div style="font-size:11px;color:var(--amber);margin-top:4px">
+             o RD não tem esse Sinacor. Alguém da casa vai saber de quem é a conta.</div>`}
+        </div>
+        <div style="display:flex;gap:10px">
+          <div style="flex:1">
+            <label style="font-size:11px;color:var(--text-dim)">Telefone</label>
+            <input class="search" id="sfTel" value="${c.telefone_rd||""}" placeholder="(11) 98888-7777">
+          </div>
+          <div style="flex:1">
+            <label style="font-size:11px;color:var(--text-dim)">CPF</label>
+            <input class="search" id="sfCpf" value="${c.cpf_no_rd||""}" placeholder="somente números">
+          </div>
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--text-dim)">E-mail</label>
+          <input class="search" id="sfMail" placeholder="opcional">
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--text-dim)">Barra</label>
+          <select class="search select" id="sfBarra">
+            <option value="">— sem barra —</option>
+            ${BARRAS.map(b=>`<option value="${b.nome}" ${
+              c.barra && b.nome===c.barra ? "selected" : ""}>${b.nome}</option>`).join("")}
+          </select>
+          ${c.barra?`<div style="font-size:11px;color:var(--text-faint);margin-top:4px">
+            veio da operação mais recente</div>`:""}
+        </div>
+      </div>
+
+      <div style="margin-top:22px;display:flex;gap:8px">
+        <button class="cfg-save" id="sfOk" onclick="sfSalvar('${c.sinacor}')">Criar ficha</button>
+        <button class="btn-rd" onclick="el('sfModal').remove()">Cancelar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(cx);
+  el("sfNome").focus();
+}
+
+async function sfSalvar(sinacor){
+  const btn = el("sfOk"); btn.disabled = true; btn.textContent = "Criando…";
+  const {data,error} = await sb.rpc("criar_ficha_cliente",{
+    p_sinacor: sinacor,
+    p_nome:    el("sfNome").value,
+    p_telefone:el("sfTel").value,
+    p_cpf:     el("sfCpf").value,
+    p_barra:   el("sfBarra").value,
+    p_email:   el("sfMail").value
+  });
+  btn.disabled = false; btn.textContent = "Criar ficha";
+
+  if(error){ toast("Não deu para criar", error.message, true); return; }
+  if(!data.ok){ toast("Já existe", "Esse Sinacor já tem ficha", true); el("sfModal").remove(); dgSFCarregar(); return; }
+
+  el("sfModal").remove();
+  toast("Ficha criada", data.nome + " · " + nf(data.operacoes_antes) + " operações entram no histórico");
+  dgSFCarregar();
+  carregarRadar && carregarRadar();
 }
 
 function dgCSV(){
