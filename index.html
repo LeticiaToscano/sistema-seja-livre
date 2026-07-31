@@ -2218,7 +2218,7 @@ document.addEventListener("click", function(e){
 // As observações que o sistema faz sozinho. As regras vivem no banco
 // (vw_alertas / vw_diagnosticos) e são recalculadas a cada consulta.
 
-let dgAtual=null, dgFiltro="pendente", dgDados=[];
+let dgAtual=null, dgFiltro="pendente", dgContatoFiltro="todos", dgDados=[];
 
 async function vDiagnostico(){
   el("content").innerHTML=`
@@ -2413,13 +2413,18 @@ function dgCSV(){
        "ultima_operacao","dias_sem_operar","situacao","telefone_rd","cpf_no_rd"]
     : ["nome","sinacor","barra","parceiros","telefone","faixa","contratos_bmf",
        "volume_bovespa","qtd_operacoes","data_ultima_operacao","data_ultimo_contato",
-       "dias_sem_contato","situacao","responsavel"];
+       "dias_sem_contato","tipo_contato","data_ultima_campanha","situacao","responsavel"];
   const esc=v=>{ v=(v==null?"":String(v)); return /[";\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
   const csv=[cols.join(";")].concat(dgDados.map(r=>cols.map(c=>esc(r[c])).join(";"))).join("\r\n");
   const a=document.createElement("a");
   a.href=URL.createObjectURL(new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"}));
   a.download="diagnostico_"+dgAtual+"_"+hojeISO()+".csv";
   a.click(); URL.revokeObjectURL(a.href);
+}
+
+function dgContatoMudou(v){
+  dgContatoFiltro = v;
+  dgAbrir(dgAtual, true);
 }
 
 function dgFiltrar(f,btn){
@@ -2454,16 +2459,25 @@ async function dgAbrir(codigo, manterPosicao){
       <button class="sol-tab ${dgFiltro==="pendente"?"on":""}" onclick="dgFiltrar('pendente',this)">A tratar</button>
       <button class="sol-tab ${dgFiltro==="tratado"?"on":""}" onclick="dgFiltrar('tratado',this)">Já tratados</button>
       <button class="sol-tab ${dgFiltro==="todos"?"on":""}" onclick="dgFiltrar('todos',this)">Todos</button>
+      <select class="search select" id="dgContato" style="flex:0 0 230px;margin-left:14px"
+              onchange="dgContatoMudou(this.value)">
+        <option value="todos">Qualquer alcance</option>
+        <option value="so_campanha">Só receberam campanha</option>
+        <option value="nenhum">Ninguém tocou</option>
+        <option value="pessoal">Já falaram com alguém</option>
+      </select>
       <button class="sol-tab" onclick="dgCSV()" style="margin-left:auto;border-color:var(--green);color:var(--green)">Exportar CSV</button>
     </div>
     <div class="panel" id="dgTab"><div class="loading"><div class="spinner"></div>Carregando…</div></div>`;
   if(!manterPosicao) document.querySelector(".main").scrollTo({top:el("dgLista").offsetTop-40,behavior:"smooth"});
+  if(el("dgContato")) el("dgContato").value = dgContatoFiltro;
 
   let q = sb.from("vw_alertas")
-    .select("id,nome,sinacor,barra,parceiros,telefone,faixa,grau,contratos_bmf,volume_bovespa,qtd_operacoes,data_ultima_operacao,data_ultimo_contato,dias_sem_contato,situacao,responsavel",{count:"exact"})
+    .select("id,nome,sinacor,barra,parceiros,telefone,faixa,grau,contratos_bmf,volume_bovespa,qtd_operacoes,data_ultima_operacao,data_ultimo_contato,dias_sem_contato,situacao,responsavel,tipo_contato,data_ultima_campanha",{count:"exact"})
     .eq("codigo",codigo);
   if(dgFiltro==="pendente")     q = q.eq("situacao","pendente");
   else if(dgFiltro==="tratado") q = q.neq("situacao","pendente");
+  if(dgContatoFiltro !== "todos") q = q.eq("tipo_contato", dgContatoFiltro);
   const {data,error,count} = await q
     .order("contratos_bmf",{ascending:false,nullsFirst:false})
     .limit(2000);
@@ -2485,9 +2499,11 @@ async function dgAbrir(codigo, manterPosicao){
       <td class="num">${c.barra||"—"}</td>
       <td class="num">${c.parceiros||"—"}</td>
       <td class="num">${volDisplay(c.contratos_bmf,c.volume_bovespa)}</td>
-      <td class="num">${c.data_ultimo_contato==null
-          ? '<span style="color:var(--red)">nunca</span>'
-          : nf(c.dias_sem_contato)+' dias'}</td>
+      <td class="num">${c.data_ultimo_contato!=null
+          ? nf(c.dias_sem_contato)+' dias'
+          : (c.data_ultima_campanha
+              ? `<span style="color:var(--amber)" title="Sem conversa com uma pessoa. Última campanha em ${fmtData(c.data_ultima_campanha)}">só campanha</span>`
+              : '<span style="color:var(--red)">nada</span>')}</td>
       <td>${c.situacao==="pendente"
           ? '<span class="status s-nunca_operou">a tratar</span>'
           : c.situacao==="falei"
