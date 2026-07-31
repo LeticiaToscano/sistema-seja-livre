@@ -475,13 +475,14 @@ function tagParceiro(barra, parceiro){
  * diferentes: quem ninguém tocou e quem recebeu campanha e nunca teve
  * conversa. O segundo é oportunidade meio aberta — o alcance já foi pago.
  */
-function tagContato(tipo){
+function tagContato(tipo, completa){
   if(tipo === "so_campanha")
-    return `<span class="tag t-amber" title="Recebeu disparo de campanha, mas nenhuma conversa com uma pessoa"
-      style="font-size:10.5px">só campanha</span>`;
+    return `<span class="tag t-amber" title="Só recebeu disparo de campanha. Nenhuma conversa com uma pessoa."
+      style="font-size:10.5px">${completa ? "só falou com o bot" : "só campanha"}</span>`;
   if(tipo === "nenhum")
-    return `<span class="tag" title="Nenhum contato de nenhum tipo — nem campanha"
-      style="background:transparent;border:1px dashed var(--red);color:var(--red);font-size:10.5px">sem contato</span>`;
+    return `<span class="tag" title="Nenhum contato de nenhum tipo — nem campanha de bot"
+      style="background:transparent;border:1px dashed var(--red);color:var(--red);font-size:10.5px">${
+        completa ? "ninguém tocou" : "sem contato"}</span>`;
   return "";
 }
 
@@ -2536,7 +2537,9 @@ async function abrirFicha(id){
   el("drName").textContent=c.nome;
   el("drSub").innerHTML=`Sinacor ${c.sinacor} · ${c.barra||"sem barra"} ${tagParceiro(c.barra,c.parceiros)}`;
   el("drStatus").innerHTML = (s?`<span class="status s-${s.saude}">${SAUDE_LABEL[s.saude]||s.saude}</span>`:"")
-    + faixaBadge(s?s.faixa:"sem", s?s.grau:0);
+    + faixaBadge(s?s.faixa:"sem", s?s.grau:0)
+    + tagContato(c.data_ultimo_contato ? "pessoal"
+                 : (c.data_ultima_campanha ? "so_campanha" : "nenhum"), true);
   el("drActions").innerHTML = btnRD(c.nome);
   const aniv = (c.nasc_dia&&c.nasc_mes)? String(c.nasc_dia).padStart(2,"0")+"/"+String(c.nasc_mes).padStart(2,"0") : "—";
 
