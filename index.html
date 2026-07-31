@@ -469,6 +469,22 @@ function tagParceiro(barra, parceiro){
   return `<span class="tag t-blue" title="Parceiro: ${p}" style="font-size:10.5px">${p}</span>`;
 }
 
+/**
+ * Etiqueta de como o cliente foi alcançado.
+ * Três estados, porque "sem contato" misturava duas coisas muito
+ * diferentes: quem ninguém tocou e quem recebeu campanha e nunca teve
+ * conversa. O segundo é oportunidade meio aberta — o alcance já foi pago.
+ */
+function tagContato(tipo){
+  if(tipo === "so_campanha")
+    return `<span class="tag t-amber" title="Recebeu disparo de campanha, mas nenhuma conversa com uma pessoa"
+      style="font-size:10.5px">só campanha</span>`;
+  if(tipo === "nenhum")
+    return `<span class="tag" title="Nenhum contato de nenhum tipo — nem campanha"
+      style="background:transparent;border:1px dashed var(--red);color:var(--red);font-size:10.5px">sem contato</span>`;
+  return "";
+}
+
 function faixaBadge(faixa, grau){
   faixa = faixa || "sem";
   if(faixa==="sem") return `<span class="faixa sem">${beltSVG("sem")}<span class="fn">Sem faixa</span></span>`;
@@ -626,7 +642,7 @@ async function carregarFilaFull(){
     : "Quem parou levando mais volume junto.";
   el("filaFull").innerHTML=`<table><thead><tr><th>Cliente</th><th>Faixa</th><th>Barra</th><th>Atividade</th><th>Parou desde</th><th>Sem contato</th><th>Score</th><th></th></tr></thead>
     <tbody>${data.map(c=>`<tr class="${c.faixa==='preta'?'linha-preta':''}" onclick="abrirFicha('${c.id}')">
-      <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}${tagParceiro(c.barra,c.parceiros)}</div></td>
+      <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}${tagParceiro(c.barra,c.parceiros)}${tagContato(c.tipo_contato)}</div></td>
       <td>${faixaBadge(c.faixa,c.grau)}</td>
       <td class="num">${c.barra||"—"}</td>
       <td class="num">${volDisplay(c.contratos_bmf,c.volume_bovespa)}</td>
@@ -749,7 +765,7 @@ async function carregarFila(){
   if(!data||!data.length){ el("filaAcao").innerHTML='<div class="empty">Nenhum cliente parado no momento.</div>'; return; }
   el("filaAcao").innerHTML=`<table><thead><tr><th>Cliente</th><th>Faixa</th><th>Atividade</th><th>Parou desde</th></tr></thead>
     <tbody>${data.map(c=>`<tr class="${c.faixa==='preta'?'linha-preta':''}" onclick="abrirFicha('${c.id}')">
-      <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}${tagParceiro(c.barra,c.parceiros)}</div></td>
+      <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}${tagParceiro(c.barra,c.parceiros)}${tagContato(c.tipo_contato)}</div></td>
       <td>${faixaBadge(c.faixa,c.grau)}</td>
       <td class="num">${volDisplay(c.contratos_bmf,c.volume_bovespa)}</td>
       <td class="num">${fmtDesde(c.data_ultima_operacao)}</td></tr>`).join("")}</tbody></table>`;
@@ -919,7 +935,7 @@ async function cliNovoParceiro(){
 async function carregarClientes(){
   const {termo,filtro,page,size}=cliState;
   const from=page*size, to=from+size-1;
-  let q = sb.from("vw_saude_carteira").select("id,nome,sinacor,barra,saude,status_operacao,data_ultima_operacao,contratos_bmf,volume_bovespa,faixa,grau,parceiros",{count:"exact"}).order("nome").range(from,to);
+  let q = sb.from("vw_saude_carteira").select("id,nome,sinacor,barra,saude,status_operacao,data_ultima_operacao,contratos_bmf,volume_bovespa,faixa,grau,parceiros,tipo_contato",{count:"exact"}).order("nome").range(from,to);
   if(termo){ q = q.or(`nome.ilike.%${termo}%,sinacor.ilike.%${termo}%,parceiros.ilike.%${termo}%`); }
   if(filtro!=="todos"){ q = q.eq("status_operacao",filtro); }
   if(cliState.barra!=="todas"){ q = q.eq("barra",cliState.barra); }
@@ -941,7 +957,7 @@ async function carregarClientes(){
     <tbody>${data.map(c=>`<tr class="${c.faixa==='preta'?'linha-preta':''}" onclick="abrirFicha('${c.id}')">
       <td onclick="event.stopPropagation()"><input type="checkbox" data-id="${c.id}"
           ${cliSel.has(c.id)?"checked":""} onclick="cliMarcar('${c.id}',this.checked)"></td>
-      <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}${tagParceiro(c.barra,c.parceiros)}</div></td>
+      <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}${tagParceiro(c.barra,c.parceiros)}${tagContato(c.tipo_contato)}</div></td>
       <td>${faixaBadge(c.faixa,c.grau)}</td>
       <td class="num">${c.barra||"—"}</td>
       ${mostraParceiro?`<td class="num">${c.parceiros||'<span style="color:var(--text-faint)">sem parceiro</span>'}</td>`:""}
@@ -1121,7 +1137,7 @@ async function carregarDestaques(){
   el("tabelaDest").innerHTML=`<table><thead><tr><th>#</th><th>Cliente</th><th>Faixa</th><th>Barra</th><th>Atividade</th><th>Última op.</th><th>Score</th></tr></thead>
     <tbody>${data.map((c,i)=>`<tr class="${c.faixa==='preta'?'linha-preta':''}" onclick="abrirFicha('${c.id}')">
       <td class="num">${i+1}</td>
-      <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}${tagParceiro(c.barra,c.parceiros)}</div></td>
+      <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}${tagParceiro(c.barra,c.parceiros)}${tagContato(c.tipo_contato)}</div></td>
       <td>${faixaBadge(c.faixa,c.grau)}</td>
       <td class="num">${c.barra||"—"}</td>
       <td class="num">${volDisplay(c.contratos_bmf,c.volume_bovespa)}</td>
@@ -1363,7 +1379,7 @@ async function carregarExplorar(){
   const de=from+1, ate=from+data.length, totalPags=Math.max(1,Math.ceil((count||0)/size));
   el("exTab").innerHTML=`<table><thead><tr><th>Cliente</th><th>Faixa</th><th>Barra</th><th>Atividade no período</th><th>Operações</th><th>Última op.</th></tr></thead>
     <tbody>${data.map(c=>`<tr class="${c.faixa==='preta'?'linha-preta':''}" onclick="abrirFicha('${c.id}')">
-      <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}${tagParceiro(c.barra,c.parceiros)}</div></td>
+      <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}${tagParceiro(c.barra,c.parceiros)}${tagContato(c.tipo_contato)}</div></td>
       <td>${faixaBadge(c.faixa,c.grau)}</td>
       <td class="num">${c.barra||"—"}</td>
       <td class="num">${volDisplay(c.contratos_periodo,c.volume_bov_periodo)}</td>
@@ -1484,7 +1500,7 @@ async function carregarClube(){
   el("tabelaClube").innerHTML=`<table><thead><tr><th>#</th><th>Cliente</th><th>Faixa</th><th>Barra</th><th>Atividade</th><th>Última op.</th><th>Score</th></tr></thead>
     <tbody>${data.map((c,i)=>`<tr class="${c.faixa==='preta'?'linha-preta':''}" onclick="abrirFicha('${c.id}')">
       <td class="num">${from+i+1}</td>
-      <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}${tagParceiro(c.barra,c.parceiros)}</div></td>
+      <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}${tagParceiro(c.barra,c.parceiros)}${tagContato(c.tipo_contato)}</div></td>
       <td>${faixaBadge(c.faixa,c.grau)}</td>
       <td class="num">${c.barra||"—"}</td>
       <td class="num">${volDisplay(c.contratos_bmf,c.volume_bovespa)}</td>
@@ -2464,7 +2480,7 @@ async function dgAbrir(codigo, manterPosicao){
       <th>Cliente</th><th>Faixa</th><th>Barra</th><th>Parceiro</th>
       <th>Atividade</th><th>Sem contato</th><th>Situação</th><th></th></tr></thead>
     <tbody>${data.map(c=>`<tr class="${c.faixa==='preta'?'linha-preta':''}" onclick="abrirFicha('${c.id}')">
-      <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}${tagParceiro(c.barra,c.parceiros)}</div></td>
+      <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}${tagParceiro(c.barra,c.parceiros)}${tagContato(c.tipo_contato)}</div></td>
       <td>${faixaBadge(c.faixa,c.grau)}</td>
       <td class="num">${c.barra||"—"}</td>
       <td class="num">${c.parceiros||"—"}</td>
@@ -2545,12 +2561,15 @@ async function abrirFicha(id){
     </div>
     <div id="fcForm"></div>
 
-    <div class="dr-sec">Último contato
+    <div class="dr-sec">Último contato ${tagContato(
+        c.data_ultimo_contato ? "pessoal" : (c.data_ultima_campanha ? "so_campanha" : "nenhum"))}
       <button class="btn-rd" style="float:right;margin-top:-3px" onclick="fcNovoContato()">Registrar contato</button>
     </div>
     <div class="dr-stats" id="fcUltimo">
-      <div class="dr-stat"><div class="l">Registrado no sistema</div>
-        <div class="v" style="font-size:14px${c.data_ultimo_contato?'':';color:var(--red)'}">${c.data_ultimo_contato?fmtData(c.data_ultimo_contato):"nenhum"}</div></div>
+      <div class="dr-stat"><div class="l">Conversa com uma pessoa</div>
+        <div class="v" style="font-size:14px${c.data_ultimo_contato?'':';color:var(--red)'}">${c.data_ultimo_contato?fmtData(c.data_ultimo_contato):"nenhuma"}</div></div>
+      <div class="dr-stat"><div class="l">Última campanha de bot</div>
+        <div class="v" style="font-size:14px${c.data_ultima_campanha?'':';color:var(--text-faint)'}">${c.data_ultima_campanha?fmtData(c.data_ultima_campanha):"nenhuma"}</div></div>
     </div>
     <div id="fcContatoForm"></div>
     <div id="fcHistorico"></div>`;
