@@ -2236,11 +2236,74 @@ async function vDiagnostico(){
     </div>`).join("") + '</div>';
 }
 
+async function dgSemFicha(manterPosicao){
+  el("dgLista").innerHTML = `
+    <div class="sec-title" style="margin-top:26px">Sinacores sem cadastro<span class="rule"></span></div>
+    <div class="note" style="border-left-color:var(--amber);margin-bottom:14px">
+      Estes números operam e não têm ficha. Os <b>ativos</b> operaram nos últimos
+      60 dias — esses são clientes de verdade que o sistema não enxerga. Os demais
+      pararam há meses e provavelmente saíram da casa; para eles, não ter ficha
+      pode estar correto.
+    </div>
+    <div id="dgFiltros" class="sol-tabs">
+      <button class="sol-tab on" onclick="dgSFTipo('ativo',this)">Ativos</button>
+      <button class="sol-tab" onclick="dgSFTipo('todos',this)">Todos</button>
+      <button class="sol-tab" onclick="dgCSV()" style="margin-left:auto;border-color:var(--green);color:var(--green)">Exportar CSV</button>
+    </div>
+    <div class="panel" id="dgTab"><div class="loading"><div class="spinner"></div>Carregando…</div></div>`;
+  if(!manterPosicao) document.querySelector(".main").scrollTo({top:el("dgLista").offsetTop-40,behavior:"smooth"});
+  dgSFCarregar();
+}
+
+let dgSFFiltro = "ativo";
+function dgSFTipo(t, btn){
+  dgSFFiltro = t;
+  document.querySelectorAll("#dgFiltros .sol-tab").forEach(b=>b.classList.remove("on"));
+  btn.classList.add("on");
+  dgSFCarregar();
+}
+
+async function dgSFCarregar(){
+  let q = sb.from("vw_sem_ficha")
+    .select("sinacor,barra,contratos_bmf,volume_bovespa,operacoes,ultima_operacao,dias_sem_operar,situacao,nome_no_rd,telefone_rd,cpf_no_rd",{count:"exact"});
+  if(dgSFFiltro === "ativo") q = q.eq("situacao","ativo");
+  const {data,error,count} = await q
+    .order("contratos_bmf",{ascending:false,nullsFirst:false}).limit(500);
+  if(error) return erro(error,"dgTab");
+  dgDados = data || [];
+  if(!data || !data.length){
+    el("dgTab").innerHTML='<div class="empty">Ninguém nesta situação. Boa notícia.</div>';
+    return;
+  }
+
+  el("dgTab").innerHTML = `<table><thead><tr>
+      <th>Sinacor</th><th>Nome no RD</th><th>Barra</th>
+      <th>Contratos</th><th>Operações</th><th>Última op.</th>
+      <th>Telefone</th><th>Situação</th></tr></thead>
+    <tbody>${data.map(c=>`<tr style="cursor:default">
+      <td class="num" style="font-weight:700">${c.sinacor}</td>
+      <td>${c.nome_no_rd || '<span style="color:var(--text-faint)">não identificado</span>'}</td>
+      <td class="num">${c.barra||"—"}</td>
+      <td class="num">${c.contratos_bmf?nf(c.contratos_bmf):"—"}</td>
+      <td class="num">${nf(c.operacoes)}</td>
+      <td class="num">${fmtData(c.ultima_operacao)}</td>
+      <td class="num">${c.telefone_rd||"—"}</td>
+      <td><span class="status ${c.situacao==="ativo"?"s-critico":"s-nunca_operou"}">${
+        c.situacao==="ativo"?"ativo":c.situacao==="parou_ha_pouco"?"parou há pouco":"parado"}</span></td>
+    </tr>`).join("")}</tbody></table>
+    <div style="padding:11px 16px;font-size:11px;color:var(--text-faint)">
+      Mostrando ${nf(data.length)} de ${nf(count)} · ordenados por contratos ·
+      o CSV leva o que estiver neste filtro</div>`;
+}
+
 function dgCSV(){
   if(!dgDados.length) return;
-  const cols=["nome","sinacor","barra","parceiros","telefone","faixa","contratos_bmf",
-              "volume_bovespa","qtd_operacoes","data_ultima_operacao","data_ultimo_contato",
-              "dias_sem_contato","situacao","responsavel"];
+  const cols = dgAtual === "opera_sem_ficha"
+    ? ["sinacor","nome_no_rd","barra","contratos_bmf","volume_bovespa","operacoes",
+       "ultima_operacao","dias_sem_operar","situacao","telefone_rd","cpf_no_rd"]
+    : ["nome","sinacor","barra","parceiros","telefone","faixa","contratos_bmf",
+       "volume_bovespa","qtd_operacoes","data_ultima_operacao","data_ultimo_contato",
+       "dias_sem_contato","situacao","responsavel"];
   const esc=v=>{ v=(v==null?"":String(v)); return /[";\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
   const csv=[cols.join(";")].concat(dgDados.map(r=>cols.map(c=>esc(r[c])).join(";"))).join("\r\n");
   const a=document.createElement("a");
@@ -2271,6 +2334,10 @@ async function dgMarcar(id,situacao,nome){
 
 async function dgAbrir(codigo, manterPosicao){
   dgAtual=codigo;
+
+  // Este achado não é sobre clientes — é sobre quem NÃO é cliente. Não tem
+  // ficha para abrir nem tratativa para marcar, então tem lista própria.
+  if(codigo === "opera_sem_ficha") return dgSemFicha(manterPosicao);
   el("dgLista").innerHTML=`
     <div class="sec-title" style="margin-top:26px">Clientes<span class="rule"></span></div>
     <div id="dgFiltros" class="sol-tabs">
