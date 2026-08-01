@@ -1804,20 +1804,20 @@ async function vPlataformas(){
 }
 
 async function plResumo(){
-  const {data,error} = await sb.from("vw_plataformas_cliente")
-    .select("ferramenta,familia,eh_plataforma,esta_usando").limit(50000);
+  // A conta é feita no banco: trazer as 22 mil adesões para contar aqui
+  // esbarrava no corte de mil linhas do Supabase, e o RLP aparecia com
+  // 697 em vez de 15.639.
+  const {data,error} = await sb.from("vw_plataformas_resumo").select("*");
   if(error) return erro(error,"plResumo");
 
-  const por = {};
-  (data||[]).forEach(r=>{
-    const k = r.ferramenta;
-    por[k] = por[k] || {nome:k, familia:r.familia, plat:r.eh_plataforma, total:0, usando:0};
-    por[k].total++;
-    if(r.esta_usando) por[k].usando++;
-  });
-  const lista = Object.values(por).sort((a,b)=>b.total-a.total);
+  const lista = (data||[]).map(r=>({
+    nome: r.ferramenta, familia: r.familia, plat: r.eh_plataforma,
+    total: r.contrataram, usando: r.usando
+  }));
 
   // preenche o seletor
+  window.__plServicos = lista.filter(f=>f.plat === false).map(f=>f.nome);
+
   const sel = el("plFerr");
   if(sel) sel.innerHTML = '<option value="todas">Todas as ferramentas</option>' +
     lista.map(f=>`<option value="${f.nome}">${f.nome} (${nf(f.total)})</option>`).join("");
@@ -1867,7 +1867,19 @@ async function plFiltrar(){
 
   const {data,error,count} = await q.order("data_inicio",{ascending:false}).limit(300);
   if(error) return erro(error,"plTab");
-  if(!data || !data.length){ el("plTab").innerHTML='<div class="empty">Ninguém neste filtro.</div>'; return; }
+  if(!data || !data.length){
+    // serviço não tem lista de clientes por design — a tela filtra por
+    // plataformas de operação, e RLP, calculadoras e afins não são
+    const servico = (window.__plServicos||[]).includes(plState.ferramenta);
+    el("plTab").innerHTML = servico
+      ? `<div class="empty" style="padding:24px;line-height:1.7">
+           <b>${plState.ferramenta}</b> é um serviço contratado, não uma plataforma de operação —
+           então não existe "operar nela".<br>
+           Está aqui para você ver quantos contrataram, mas a lista de clientes é só das plataformas.
+         </div>`
+      : '<div class="empty">Ninguém neste filtro.</div>';
+    return;
+  }
 
   const sins = [...new Set(data.map(d=>d.sinacor))];
   const {data:cli} = await sb.from("clientes").select("id,sinacor,nome,barra").in("sinacor", sins);
@@ -3225,3 +3237,4 @@ boot();
 </script>
 </body>
 </html>
+  
