@@ -381,6 +381,7 @@
       <button class="nav-item" data-view="explorar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M16 16l5 5" stroke-linecap="round"/><path d="M8 11h6M11 8v6" stroke-linecap="round"/></svg>Explorar</button>
       <button class="nav-item" data-view="destaques"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l2.5 5 5.5.8-4 3.9 1 5.5L12 16l-5 2.7 1-5.5-4-3.9 5.5-.8z" stroke-linejoin="round"/></svg>Destaques</button>
       <button class="nav-item" data-view="clube"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="9" width="18" height="5" rx="1.4"/><path d="M9 9v5M15 9v5"/><path d="M6 17l2.5 3M18 17l-2.5 3" stroke-linecap="round"/></svg>Clube Trader</button>
+      <button class="nav-item" data-view="plataformas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8M12 18v3" stroke-linecap="round"/></svg>Plataformas</button>
       <button class="nav-item" data-view="fila"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h10M4 12h10M4 18h7" stroke-linecap="round"/><path d="M17 15l2.2 2.2L23 13" stroke-linecap="round" stroke-linejoin="round"/></svg>Fila de ação</button>
       <button class="nav-item" data-view="aniversariantes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20h16v-8H4z"/><path d="M4 14c2 0 2-1.3 4-1.3s2 1.3 4 1.3 2-1.3 4-1.3 2 1.3 4 1.3" stroke-linecap="round"/><path d="M12 8V5" stroke-linecap="round"/></svg>Aniversariantes</button>
       <button class="nav-item" data-view="solicitacoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h16v14H4z"/><path d="M4 9h16M9 5v4" stroke-linecap="round"/><path d="M8 14l2.5 2.5L16 11" stroke-linecap="round" stroke-linejoin="round"/></svg>Solicitações</button>
@@ -568,6 +569,7 @@ const TITLES={
   fluxos:["ATENDIMENTO","Fluxos"], assessores:["ATENDIMENTO","Assessores"],
   config:["GESTÃO","Configurações"], auditoria:["GESTÃO","Auditoria"],
   leads:["COMERCIAL","Leads · falaram no RD e não são clientes"],
+  plataformas:["CARTEIRA","Plataformas · o que a carteira contrata e usa"],
   saidas:["COMERCIAL","Saíram da assessoria"],
   importacoes:["GESTÃO","Importações · os relatórios da corretora"],
   legenda:["SISTEMA","Legenda · o que cada etiqueta significa"],
@@ -582,7 +584,7 @@ const RESERVADAS={
   ia:{icon:"ia",desc:"O diagnóstico estratégico da operação em linguagem natural, e o copiloto de IA por assessor — cada um enxergando apenas a própria carteira."},
   integracoes:{icon:"integracoes",desc:"As conexões do sistema — Volume Operado (operação), RD Conversas (atendimento), Gmail/Genial (entrada de clientes) e IA. Ligadas e a ligar."}
 };
-const VIEWS={radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes,auditoria:vAuditoria,diagnostico:vDiagnostico,legenda:vLegenda,leads:vLeads,importacoes:vImportacoes,saidas:vSaidas};
+const VIEWS={radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes,auditoria:vAuditoria,diagnostico:vDiagnostico,legenda:vLegenda,leads:vLeads,importacoes:vImportacoes,saidas:vSaidas,plataformas:vPlataformas};
 document.querySelectorAll(".nav-item").forEach(b=>b.addEventListener("click",()=>{
   document.querySelectorAll(".nav-item").forEach(x=>x.classList.remove("active"));
   b.classList.add("active"); el("sidebar").classList.remove("open"); render(b.dataset.view);
@@ -1769,6 +1771,127 @@ function cfPintar(j){
     </tbody></table></div>`;
 }
 
+// ---------- PLATAFORMAS ----------
+// Duas fontes que dizem coisas diferentes:
+//   o relatório PLATAFORMA diz o que o cliente CONTRATOU
+//   a coluna das operações diz onde ele OPERA
+// A diferença entre as duas é o que interessa: quem contratou e não usa.
+
+let plState = {ferramenta:"todas", so_ociosos:false};
+
+async function vPlataformas(){
+  el("content").innerHTML=`
+    <div class="note" style="border-left-color:var(--blue);margin-bottom:18px">
+      O relatório da corretora diz o que cada cliente <b>contratou</b>; as operações
+      dizem onde ele <b>opera</b>. Quando alguém contrata uma ferramenta e não opera
+      nela, aparece aqui como <b>não usa</b>.
+    </div>
+    <div id="plResumo"><div class="loading"><div class="spinner"></div>Carregando…</div></div>
+    <div class="sec-title" style="margin-top:26px">Clientes<span class="rule"></span></div>
+    <div class="panel">
+      <div class="toolbar">
+        <select class="search select" id="plFerr" style="flex:0 0 300px" onchange="plFiltrar()">
+          <option value="todas">Todas as ferramentas</option>
+        </select>
+        <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:var(--text-dim);white-space:nowrap">
+          <input type="checkbox" id="plOciosos" onchange="plFiltrar()"> só quem contratou e não usa
+        </label>
+      </div>
+      <div id="plTab"><div class="empty">Escolha uma ferramenta para ver os clientes.</div></div>
+    </div>`;
+  plState = {ferramenta:"todas", so_ociosos:false};
+  plResumo();
+}
+
+async function plResumo(){
+  const {data,error} = await sb.from("vw_plataformas_cliente")
+    .select("ferramenta,familia,eh_plataforma,esta_usando").limit(50000);
+  if(error) return erro(error,"plResumo");
+
+  const por = {};
+  (data||[]).forEach(r=>{
+    const k = r.ferramenta;
+    por[k] = por[k] || {nome:k, familia:r.familia, plat:r.eh_plataforma, total:0, usando:0};
+    por[k].total++;
+    if(r.esta_usando) por[k].usando++;
+  });
+  const lista = Object.values(por).sort((a,b)=>b.total-a.total);
+
+  // preenche o seletor
+  const sel = el("plFerr");
+  if(sel) sel.innerHTML = '<option value="todas">Todas as ferramentas</option>' +
+    lista.map(f=>`<option value="${f.nome}">${f.nome} (${nf(f.total)})</option>`).join("");
+
+  el("plResumo").innerHTML = `<div class="panel" style="padding:0">
+    <table><thead><tr>
+      <th>Ferramenta</th><th>Família</th><th>Contrataram</th><th>Operam nela</th><th>Ociosa</th></tr></thead>
+    <tbody>${lista.map(f=>{
+      const ocioso = f.total - f.usando;
+      const pct = f.total ? Math.round(100*ocioso/f.total) : 0;
+      return `<tr style="cursor:pointer" onclick="plEscolher('${f.nome.replace(/'/g,"")}')">
+        <td>${f.nome}${f.plat===false?' <span class="tag" style="font-size:10px;background:transparent;border:1px dashed var(--text-faint);color:var(--text-faint)">não é plataforma</span>':''}</td>
+        <td class="num">${f.familia||"—"}</td>
+        <td class="num">${nf(f.total)}</td>
+        <td class="num">${f.plat===false?"—":nf(f.usando)}</td>
+        <td class="num">${f.plat===false?"—":
+          `<span style="color:${pct>80?'var(--amber)':'var(--text-dim)'}">${nf(ocioso)} · ${pct}%</span>`}</td>
+      </tr>`;
+    }).join("")}</tbody></table>
+    <div style="padding:11px 16px;font-size:11px;color:var(--text-faint)">
+      "Ociosa" é quem contratou e não tem operação registrada naquela ferramenta.
+      Como a plataforma só passou a ser gravada nas operações em julho, o número
+      está inflado para quem não operou desde então.</div>
+  </div>`;
+}
+
+function plEscolher(f){
+  el("plFerr").value = f;
+  plFiltrar();
+  document.querySelector(".main").scrollTo({top:el("plTab").offsetTop-120,behavior:"smooth"});
+}
+
+async function plFiltrar(){
+  plState.ferramenta = el("plFerr").value;
+  plState.so_ociosos = el("plOciosos").checked;
+  if(plState.ferramenta === "todas" && !plState.so_ociosos){
+    el("plTab").innerHTML = '<div class="empty">Escolha uma ferramenta para ver os clientes.</div>';
+    return;
+  }
+  el("plTab").innerHTML = '<div class="loading"><div class="spinner"></div>Carregando…</div>';
+
+  let q = sb.from("vw_plataformas_cliente")
+    .select("sinacor,ferramenta,familia,data_inicio,esta_usando,ultima_operacao_nela",{count:"exact"})
+    .eq("eh_plataforma", true);
+  if(plState.ferramenta !== "todas") q = q.eq("ferramenta", plState.ferramenta);
+  if(plState.so_ociosos)             q = q.eq("esta_usando", false);
+
+  const {data,error,count} = await q.order("data_inicio",{ascending:false}).limit(300);
+  if(error) return erro(error,"plTab");
+  if(!data || !data.length){ el("plTab").innerHTML='<div class="empty">Ninguém neste filtro.</div>'; return; }
+
+  const sins = [...new Set(data.map(d=>d.sinacor))];
+  const {data:cli} = await sb.from("clientes").select("id,sinacor,nome,barra").in("sinacor", sins);
+  const mapa = {}; (cli||[]).forEach(c=>{ mapa[c.sinacor]=c; });
+
+  el("plTab").innerHTML = `<table><thead><tr>
+      <th>Cliente</th><th>Barra</th><th>Ferramenta</th><th>Aderiu em</th><th>Usa</th></tr></thead>
+    <tbody>${data.map(r=>{
+      const c = mapa[r.sinacor];
+      return `<tr ${c?`onclick="abrirFicha('${c.id}')"`:'style="cursor:default"'}>
+        <td>${c?`<div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}</div>`
+               :`<span style="color:var(--text-faint)">Sinacor ${r.sinacor} · sem ficha</span>`}</td>
+        <td class="num">${c?(c.barra||"—"):"—"}</td>
+        <td class="num">${r.ferramenta}</td>
+        <td class="num">${r.data_inicio?fmtData(r.data_inicio):"—"}</td>
+        <td>${r.esta_usando
+              ? `<span class="status s-saudavel">opera nela</span>`
+              : `<span class="status s-em_recuperacao">não usa</span>`}</td>
+      </tr>`;
+    }).join("")}</tbody></table>
+    <div style="padding:11px 16px;font-size:11px;color:var(--text-faint)">
+      Mostrando ${nf(data.length)} de ${nf(count)}</div>`;
+}
+
 // ---------- SAÍRAM DA ASSESSORIA ----------
 // Quem a corretora declarou como saída no relatório SAIU_DA_LIVRE. Não é
 // dedução por ausência: é afirmação, com data e arquivo de prova.
@@ -1955,7 +2078,18 @@ async function impProcessar(nome, texto){
   if(error){ impCartao(nome, null, linhas.length-1, colunas, error.message); return; }
 
   // guarda as linhas para o processamento, quando o formato tiver destino
-  if(data && data.formato === "saiu_da_livre"){
+  if(data && data.formato === "plataformas"){
+    const idx = n => colunas.findIndex(c=>new RegExp("^"+n+"$","i").test(c));
+    const iC=idx("CD_CONTA_COM_DIGITO"), iD=idx("DATA_INICIO"), iF=idx("NOME_FERRAMENTA"),
+          iS=idx("SITUACAO_ADESAO"), iT=idx("TP_PESSOA"), iA=idx("NOME_ASSESSOR_ATUAL");
+    const itens = linhas.slice(1).map(l=>{
+      const p = l.split(sep).map(x=>x.replace(/^"|"$/g,"").trim());
+      return { conta:p[iC], data:p[iD], ferramenta:p[iF],
+               situacao:p[iS], tp_pessoa:p[iT], assessor:p[iA] };
+    }).filter(x=>x.conta && x.ferramenta);
+    window.__impPlat = {arquivo:nome, itens:itens};
+    impCartao(nome, data, linhas.length-1, colunas, null, null, itens.length);
+  } else if(data && data.formato === "saiu_da_livre"){
     const iSin = colunas.findIndex(c=>/CONTA_SINACOR_SEM_DIGITO/i.test(c));
     const iDt  = colunas.findIndex(c=>/DT_PARTITION|DATA/i.test(c));
     const itens = linhas.slice(1).map(l=>{
@@ -1974,6 +2108,26 @@ async function impProcessar(nome, texto){
  * automática: o arquivo é reconhecido, mostra o que vai acontecer, e
  * espera alguém confirmar.
  */
+/**
+ * O relatório de plataformas é uma FOTO das adesões vigentes, não um
+ * movimento do dia. Cada importação substitui a anterior — quem cancelou
+ * uma ferramenta some, em vez de ficar registrado para sempre.
+ */
+async function impProcessarPlataformas(){
+  const lote = window.__impPlat;
+  if(!lote || !lote.itens.length) return;
+  const ok = confirm(
+    "Atualizar as plataformas contratadas com " + lote.itens.length + " adesões?\n\n" +
+    "Este relatório é uma foto do momento, então ele substitui o que estava " +
+    "registrado antes — quem cancelou alguma ferramenta deixa de aparecer.");
+  if(!ok) return;
+  const {data,error} = await sb.rpc("receber_plataformas",{lote:lote});
+  if(error){ toast("Não deu para processar", error.message, true); return; }
+  toast("Plataformas atualizadas",
+        nf(data.gravadas) + " adesões" + (data.antes ? " · antes eram " + nf(data.antes) : ""));
+  impHistorico();
+}
+
 async function impProcessarSaidas(){
   const lote = window.__impSaidas;
   if(!lote || !lote.itens.length) return;
@@ -1990,7 +2144,7 @@ async function impProcessarSaidas(){
   impHistorico();
 }
 
-function impCartao(nome, res, linhas, colunas, erroTxt, loteSaida){
+function impCartao(nome, res, linhas, colunas, erroTxt, loteSaida, qtdPlat){
   if(loteSaida) window.__impSaidas = loteSaida;
   const reconhecido = res && res.reconhecido;
   const cor = erroTxt ? "var(--red)" : reconhecido ? "var(--green)" : "var(--amber)";
@@ -2009,6 +2163,8 @@ function impCartao(nome, res, linhas, colunas, erroTxt, loteSaida){
             <div style="font-size:13px;color:var(--text-dim);margin-top:6px;line-height:1.55">${res.o_que_alimenta||""}</div>
             ${loteSaida ? `<button class="cfg-save" style="margin-top:12px" onclick="impProcessarSaidas()">
               Processar as ${nf(loteSaida.itens.length)} saída(s)</button>` : ""}
+            ${qtdPlat ? `<button class="cfg-save" style="margin-top:12px" onclick="impProcessarPlataformas()">
+              Atualizar ${nf(qtdPlat)} adesões</button>` : ""}
           </div>`
        : `<div style="margin-top:8px">
             <span class="tag t-amber">formato ainda não reconhecido</span>
@@ -2957,9 +3113,32 @@ async function fcPlataforma(sinacor){
     .select("principal,quantas,todas,ultima_operacao,pct_na_principal,residuais")
     .eq("sinacor", sinacor).maybeSingle();
 
+  const {data:contratadas} = await sb.from("vw_plataformas_cliente")
+    .select("ferramenta,familia,data_inicio,esta_usando,eh_plataforma")
+    .eq("sinacor", sinacor).order("eh_plataforma",{ascending:false});
+
+  const etiquetas = (contratadas||[]).map(f=>{
+    const cor = f.eh_plataforma === false ? "" : (f.esta_usando ? "t-green" : "t-amber");
+    const dica = f.eh_plataforma === false ? "Serviço contratado, não é plataforma de operação"
+               : f.esta_usando ? "Contratou e opera nela"
+               : "Contratou e não há operação registrada nela";
+    return `<span class="tag ${cor}" title="${dica}" style="font-size:11px${
+      f.eh_plataforma===false?";background:transparent;border:1px dashed var(--text-faint);color:var(--text-faint)":""}">${f.ferramenta}</span>`;
+  }).join(" ");
+
+  const blocoContratadas = etiquetas ? `
+    <div class="dr-sec">Contratado na corretora</div>
+    <div class="panel" style="padding:14px 16px">
+      <div style="display:flex;flex-wrap:wrap;gap:7px">${etiquetas}</div>
+      <div style="font-size:11.5px;color:var(--text-faint);margin-top:10px;line-height:1.6">
+        Verde: contratou e opera nela · Âmbar: contratou e não há operação registrada ·
+        Tracejado: serviço, não plataforma
+      </div>
+    </div>` : "";
+
   if(!data || !data.principal){
-    alvo.innerHTML = `
-      <div class="dr-sec">Plataforma</div>
+    alvo.innerHTML = blocoContratadas + `
+      <div class="dr-sec">Onde opera</div>
       <div class="panel" style="padding:14px 16px;font-size:13px;color:var(--text-dim);line-height:1.6">
         Sem registro. A plataforma passou a ser gravada nas operações em julho —
         aparece assim que este cliente operar de novo.
@@ -2968,8 +3147,8 @@ async function fcPlataforma(sinacor){
   }
 
   const outras = (data.todas||[]).filter(p=>p !== data.principal);
-  alvo.innerHTML = `
-    <div class="dr-sec">Plataforma</div>
+  alvo.innerHTML = blocoContratadas + `
+    <div class="dr-sec">Onde opera</div>
     <div class="dr-stats">
       <div class="dr-stat"><div class="l">Onde opera</div>
         <div class="v" style="font-size:15px">${data.principal}</div></div>
@@ -3046,4 +3225,3 @@ boot();
 </script>
 </body>
 </html>
-  
