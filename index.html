@@ -2826,6 +2826,8 @@ async function abrirFicha(id){
     </div>
     <div class="dr-sec">Evolução de faixa · últimos 3 meses</div>
     <div class="timeline">${timeline}</div>
+    <div id="fcPlat"></div>
+
     <div class="dr-sec">Contato
       <button class="btn-rd" style="float:right;margin-top:-3px" onclick="fcEditar()">Editar cadastro</button>
     </div>
@@ -2851,6 +2853,7 @@ async function abrirFicha(id){
     <div id="fcHistorico"></div>`;
 
   fcCarregarHistorico(c.id);
+  fcPlataforma(c.sinacor);
 }
 
 // ---------- COMPLETAR CADASTRO E REGISTRAR CONTATO ----------
@@ -2940,6 +2943,44 @@ async function fcSalvarContato(){
   toast("Contato registrado", c.nome);
   el("fcContatoForm").innerHTML="";
   abrirFicha(c.id);
+}
+
+/**
+ * Onde o cliente opera.
+ * O dado vem da coluna PLATAFORMA das operações, que existia desde sempre
+ * e nunca tinha sido usada. Só está preenchida de julho em diante — antes
+ * disso o gateway não mandava a coluna.
+ */
+async function fcPlataforma(sinacor){
+  const alvo = el("fcPlat"); if(!alvo || !sinacor) return;
+  const {data} = await sb.from("vw_plataforma_cliente")
+    .select("principal,quantas,todas,ultima_operacao,pct_na_principal")
+    .eq("sinacor", sinacor).maybeSingle();
+
+  if(!data || !data.principal){
+    alvo.innerHTML = `
+      <div class="dr-sec">Plataforma</div>
+      <div class="panel" style="padding:14px 16px;font-size:13px;color:var(--text-dim);line-height:1.6">
+        Sem registro. A plataforma passou a ser gravada nas operações em julho —
+        aparece assim que este cliente operar de novo.
+      </div>`;
+    return;
+  }
+
+  const outras = (data.todas||[]).filter(p=>p !== data.principal);
+  alvo.innerHTML = `
+    <div class="dr-sec">Plataforma</div>
+    <div class="dr-stats">
+      <div class="dr-stat"><div class="l">Onde opera</div>
+        <div class="v" style="font-size:15px">${data.principal}</div></div>
+      ${data.quantas > 1 ? `
+        <div class="dr-stat"><div class="l">Concentração</div>
+          <div class="v" style="font-size:14px">${data.pct_na_principal}% do volume</div></div>
+        <div class="dr-stat"><div class="l">Também usa</div>
+          <div class="v" style="font-size:13px">${outras.join(", ")}</div></div>` : ""}
+      <div class="dr-stat"><div class="l">Última operação nela</div>
+        <div class="v" style="font-size:14px">${fmtData(data.ultima_operacao)}</div></div>
+    </div>`;
 }
 
 async function fcCarregarHistorico(id){
