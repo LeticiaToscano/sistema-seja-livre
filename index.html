@@ -2954,7 +2954,7 @@ async function fcSalvarContato(){
 async function fcPlataforma(sinacor){
   const alvo = el("fcPlat"); if(!alvo || !sinacor) return;
   const {data} = await sb.from("vw_plataforma_cliente")
-    .select("principal,quantas,todas,ultima_operacao,pct_na_principal")
+    .select("principal,quantas,todas,ultima_operacao,pct_na_principal,residuais")
     .eq("sinacor", sinacor).maybeSingle();
 
   if(!data || !data.principal){
@@ -2975,9 +2975,12 @@ async function fcPlataforma(sinacor){
         <div class="v" style="font-size:15px">${data.principal}</div></div>
       ${data.quantas > 1 ? `
         <div class="dr-stat"><div class="l">Concentração</div>
-          <div class="v" style="font-size:14px">${data.pct_na_principal}% do volume</div></div>
+          <div class="v" style="font-size:14px">${data.pct_na_principal}% do movimento</div></div>
         <div class="dr-stat"><div class="l">Também usa</div>
           <div class="v" style="font-size:13px">${outras.join(", ")}</div></div>` : ""}
+      ${data.residuais > 0 ? `
+        <div class="dr-stat"><div class="l">Só experimentou</div>
+          <div class="v" style="font-size:13px" title="Plataformas com menos de 5% do movimento — teste ou conexão pouco usada">${data.residuais} outra${data.residuais>1?"s":""}</div></div>` : ""}
       <div class="dr-stat"><div class="l">Última operação nela</div>
         <div class="v" style="font-size:14px">${fmtData(data.ultima_operacao)}</div></div>
     </div>`;
@@ -3043,3 +3046,4 @@ boot();
 </script>
 </body>
 </html>
+  
