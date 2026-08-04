@@ -411,7 +411,7 @@
       <button class="nav-item" data-view="integracoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 7V4M15 7V4M8 7h8v4a4 4 0 0 1-8 0z" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15v5" stroke-linecap="round"/></svg>Integrações</button>
     </nav>
     <div class="foot">
-      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v04/08 17:47</div></div></div>
+      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v04/08 17:53</div></div></div>
       <button class="btn-logout" id="logoutBtn">Sair</button>
     </div>
   </aside>
@@ -1849,7 +1849,7 @@ async function cbCarregar(){
 
   const {data,error,count} = await sb.from("vw_conferencia_base")
     .select("*",{count:"exact"}).eq("onde", cbState.lado)
-    .order("patrimonio",{ascending:false,nullsFirst:false}).limit(300);
+    .order("patrimonio",{ascending:false,nullsFirst:false}).limit(3000);
   if(error) return erro(error,"cbTab");
 
   const naPlanilha = cbState.lado === "so_na_planilha";
@@ -1867,7 +1867,12 @@ async function cbCarregar(){
   }
 
   el("cbTab").innerHTML = `
-    <div class="note" style="border-left-color:var(--amber);margin-bottom:14px">${aviso}</div>
+    <div class="note" style="border-left-color:var(--amber);margin-bottom:14px">${aviso}
+      <div style="margin-top:12px">
+        <button class="cfg-save" onclick="cbCSV()">Exportar em planilha</button>
+        <span style="font-size:11.5px;color:var(--text-faint);margin-left:10px">
+          leva todos os ${nf(count)}, com tudo o que o sistema sabe de cada um</span>
+      </div></div>
     <div class="panel"><table><thead><tr>
       <th>Cliente</th><th>Sinacor</th><th>Barra</th><th>Telefone</th>
       ${naPlanilha?"<th>Situação</th><th>Patrimônio</th>"
@@ -1890,6 +1895,41 @@ async function cbCarregar(){
     </tr>`).join("")}</tbody></table>
     <div style="padding:11px 16px;font-size:11px;color:var(--text-faint)">
       Mostrando ${nf(data.length)} de ${nf(count)}${naPlanilha?" · do maior patrimônio para o menor":""}</div></div>`;
+}
+
+/**
+ * Exporta a lista inteira, não só o que está na tela. Busca em páginas,
+ * porque o Supabase entrega no máximo mil linhas por consulta.
+ */
+async function cbCSV(){
+  const naPlanilha = cbState.lado === "so_na_planilha";
+  let todos = [], de = 0;
+  while(true){
+    const {data,error} = await sb.from("vw_conferencia_base")
+      .select("*").eq("onde", cbState.lado).order("sinacor").range(de, de + 999);
+    if(error){ toast("Não deu para exportar", error.message, true); return; }
+    todos = todos.concat(data || []);
+    if(!data || data.length < 1000) break;
+    de += 1000;
+  }
+  if(!todos.length){ toast("Nada para exportar","",true); return; }
+
+  const cols = ["onde","sinacor","nome","cpf","barra","telefone","email",
+                "situacao_conta","patrimonio","data_ref","ultima_operacao","contratos"];
+  const rotulos = ["lado","sinacor","nome","cpf","barra","telefone","email",
+                   "situacao na corretora","patrimonio",
+                   naPlanilha ? "habilitacao" : "cadastro no CRM",
+                   "ultima operacao","contratos BMF"];
+  const esc = v => { v = (v==null?"":String(v));
+    return /[";\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; };
+  const csv = [rotulos.join(";")]
+    .concat(todos.map(r => cols.map(c => esc(r[c])).join(";"))).join("\r\n");
+
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob(["\ufeff"+csv], {type:"text/csv;charset=utf-8"}));
+  a.download = "conferencia_" + cbState.lado + "_" + hojeISO() + ".csv";
+  a.click(); URL.revokeObjectURL(a.href);
+  toast("Planilha gerada", nf(todos.length) + " linhas");
 }
 
 /** Cria a ficha com o que a planilha já sabe — não precisa perguntar nada. */
@@ -3822,4 +3862,3 @@ boot();
 </script>
 </body>
 </html>
-  
