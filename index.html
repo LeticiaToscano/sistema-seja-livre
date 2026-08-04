@@ -411,7 +411,7 @@
       <button class="nav-item" data-view="integracoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 7V4M15 7V4M8 7h8v4a4 4 0 0 1-8 0z" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15v5" stroke-linecap="round"/></svg>Integrações</button>
     </nav>
     <div class="foot">
-      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v04/08 19:16</div></div></div>
+      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v04/08 20:40</div></div></div>
       <button class="btn-logout" id="logoutBtn">Sair</button>
     </div>
   </aside>
@@ -1997,7 +1997,9 @@ async function cbCSV(){
   let todos = [], de = 0;
   while(true){
     const {data,error} = await sb.from("vw_conferencia_base")
-      .select("*").eq("onde", cbState.lado).order("sinacor").range(de, de + 999);
+      .select("*").eq("onde", cbState.lado)
+      .order("motivo").order("contratos",{ascending:false,nullsFirst:false})
+      .range(de, de + 999);
     if(error){ toast("Não deu para exportar", error.message, true); return; }
     todos = todos.concat(data || []);
     if(!data || data.length < 1000) break;
@@ -2005,12 +2007,15 @@ async function cbCSV(){
   }
   if(!todos.length){ toast("Nada para exportar","",true); return; }
 
-  const cols = ["onde","sinacor","nome","cpf","barra","telefone","email",
-                "situacao_conta","patrimonio","data_ref","ultima_operacao","contratos"];
-  const rotulos = ["lado","sinacor","nome","cpf","barra","telefone","email",
+  // o motivo vem primeiro: sem ele a planilha nao da para trabalhar,
+  // porque os grupos ficam misturados numa lista so
+  const cols = ["motivo","sinacor","nome","cpf","barra","telefone","email",
+                "situacao_conta","patrimonio","data_ref","data_aviso",
+                "ultima_operacao","contratos"];
+  const rotulos = ["motivo","sinacor","nome","cpf","barra","telefone","email",
                    "situacao na corretora","patrimonio",
                    naPlanilha ? "habilitacao" : "cadastro no CRM",
-                   "ultima operacao","contratos BMF"];
+                   "data do aviso","ultima operacao","contratos BMF"];
   const esc = v => { v = (v==null?"":String(v));
     return /[";\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; };
   const csv = [rotulos.join(";")]
