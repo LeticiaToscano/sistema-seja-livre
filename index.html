@@ -411,7 +411,7 @@
       <button class="nav-item" data-view="integracoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 7V4M15 7V4M8 7h8v4a4 4 0 0 1-8 0z" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15v5" stroke-linecap="round"/></svg>Integrações</button>
     </nav>
     <div class="foot">
-      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v04/08 20:40</div></div></div>
+      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v04/08 20:47</div></div></div>
       <button class="btn-logout" id="logoutBtn">Sair</button>
     </div>
   </aside>
@@ -1934,6 +1934,36 @@ function cbLado(l, btn){
   cbCarregar();
 }
 
+/**
+ * O motivo de cada linha, com a cor dizendo se precisa de acao.
+ * Verde: e so esperar. Ambar: precisa de alguem. Vermelho: nao sabemos.
+ */
+function cbMotivo(m){
+  const cor = {
+    "falta criar a ficha":            ["s-critico",       "falta criar a ficha"],
+    "conta inativa na corretora":     ["s-nunca_operou",  "conta inativa"],
+    "troca em processo":              ["s-saudavel",      "troca em processo"],
+    "saida em processo":              ["s-saudavel",      "saida em processo"],
+    "aberto ha pouco":                ["s-saudavel",      "aberto ha pouco"],
+    "pediu saida":                    ["s-em_recuperacao","pediu saida"],
+    "troca antiga que nao entrou":    ["s-em_recuperacao","troca antiga"],
+    "nao consta na base da corretora":["s-critico",       "nao consta na corretora"]
+  }[m] || ["s-nunca_operou", m || "—"];
+  return `<span class="status ${cor[0]}" title="${m||""}">${cor[1]}</span>`;
+}
+
+/** O que fazer com cada motivo, em uma linha. */
+const CB_EXPLICA = {
+  "falta criar a ficha":            "Cliente da corretora sem ficha no CRM. Criar.",
+  "conta inativa na corretora":     "Conta inativa na Genial — nao vira ficha de proposito.",
+  "troca em processo":              "Pediu troca nos ultimos 90 dias. Tem 72h para cancelar; so esperar.",
+  "saida em processo":              "Pediu saida ha menos de 3 dias. Ainda pode cancelar.",
+  "aberto ha pouco":                "Conta aberta nos ultimos 90 dias, ainda entrando na base.",
+  "pediu saida":                    "Pediu saida ha mais de 3 dias e sumiu da base. Desligar.",
+  "troca antiga que nao entrou":    "Pediu troca ha mais de 90 dias e nunca chegou.",
+  "nao consta na base da corretora":"Ficha completa, muitos operando, e a Genial nao tem. Pergunta em aberto."
+};
+
 async function cbCarregar(){
   el("cbTab").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
   if(cbState.lado === "mudancas") return cbMudancas();
@@ -1964,8 +1994,9 @@ async function cbCarregar(){
         <span style="font-size:11.5px;color:var(--text-faint);margin-left:10px">
           leva todos os ${nf(count)}, com tudo o que o sistema sabe de cada um</span>
       </div></div>
+    ${cbResumoMotivos(data)}
     <div class="panel"><table><thead><tr>
-      <th>Cliente</th><th>Sinacor</th><th>Barra</th><th>Telefone</th>
+      <th>Cliente</th><th>Sinacor</th><th>Barra</th><th>Motivo</th><th>Telefone</th>
       ${naPlanilha?"<th>Situação</th><th>Patrimônio</th>"
                   :"<th>Última op.</th><th>Contratos</th>"}
       <th></th></tr></thead>
@@ -1973,6 +2004,7 @@ async function cbCarregar(){
       <td><div class="cell-name"><span class="mini-av">${ini(c.nome||"?")}</span>${c.nome||"—"}</div></td>
       <td class="num">${c.sinacor}</td>
       <td class="num">${c.barra||"—"}</td>
+      <td>${cbMotivo(c.motivo)}</td>
       <td class="num">${c.telefone||"—"}</td>
       ${naPlanilha
         ? `<td><span class="status ${c.situacao_conta==="ATIVA"?"s-saudavel":"s-em_recuperacao"}">${c.situacao_conta||"—"}</span></td>
@@ -1986,6 +2018,21 @@ async function cbCarregar(){
     </tr>`).join("")}</tbody></table>
     <div style="padding:11px 16px;font-size:11px;color:var(--text-faint)">
       Mostrando ${nf(data.length)} de ${nf(count)}${naPlanilha?" · do maior patrimônio para o menor":""}</div></div>`;
+}
+
+/** Quantos de cada motivo, com o que fazer escrito ao lado. */
+function cbResumoMotivos(data){
+  const c = {};
+  (data||[]).forEach(r => { c[r.motivo] = (c[r.motivo]||0) + 1; });
+  const lista = Object.entries(c).sort((a,b)=>b[1]-a[1]);
+  if(lista.length < 2) return "";
+  return `<div class="panel" style="padding:0;margin-bottom:14px">
+    ${lista.map(([m,n])=>`<div style="display:flex;gap:14px;align-items:baseline;padding:11px 16px;
+        border-bottom:1px solid rgba(255,255,255,.04)">
+      <span style="flex:0 0 190px">${cbMotivo(m)}</span>
+      <span class="num" style="flex:0 0 60px;font-weight:700">${nf(n)}</span>
+      <span style="font-size:12.5px;color:var(--text-dim);flex:1">${CB_EXPLICA[m]||""}</span>
+    </div>`).join("")}</div>`;
 }
 
 /**
