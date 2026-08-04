@@ -2351,7 +2351,12 @@ async function impProcessar(nome, texto){
           iIM=idx("IMPOSTO"), iVL=idx("VALOR LIQUIDO AAI"), iCO=idx("COMISSÃO ASSESSOR"),
           iDE=idx("DESCRICAO");
     const num = v => {
-      const t = String(v||"").replace(/[R$\s.]/g,"").replace(",",".");
+      // O Excel convertido sai no formato americano ("-51.4"); um CSV
+      // exportado a mao sai no brasileiro ("-51,40" ou "-1.234,56").
+      // Tratar ponto sempre como milhar multiplicava tudo por dez.
+      let t = String(v||"").replace(/R\$|\s/g,"");
+      if(t === "") return null;
+      if(t.includes(",")){ t = t.replace(/\./g,"").replace(",","."); }
       const n = Number(t);
       return isNaN(n) ? null : n;
     };
