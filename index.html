@@ -398,6 +398,7 @@
       <button class="nav-item" data-view="leads"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" stroke-linecap="round"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6" stroke-linecap="round"/></svg>Leads</button>
 
       <div class="nav-label">Gestão</div>
+      <button class="nav-item" data-view="conferencia"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l3 3 8-8M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9" stroke-linecap="round" stroke-linejoin="round"/></svg>Conferência</button>
       <button class="nav-item" data-view="custos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v20M17 6.5c0-1.9-2.2-3-5-3s-5 1.1-5 3 2.2 2.8 5 3.3 5 1.4 5 3.4-2.2 3.3-5 3.3-5-1.3-5-3.3" stroke-linecap="round"/></svg>Custos</button>
       <button class="nav-item" data-view="importacoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" stroke-linecap="round" stroke-linejoin="round"/></svg>Importações</button>
       <button class="nav-item" data-view="config"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 8h14M5 16h14" stroke-linecap="round"/><circle cx="9" cy="8" r="2.2" fill="var(--bg-2)"/><circle cx="15" cy="16" r="2.2" fill="var(--bg-2)"/></svg>Configurações</button>
@@ -585,6 +586,7 @@ const TITLES={
   leads:["COMERCIAL","Leads · falaram no RD e não são clientes"],
   plataformas:["CARTEIRA","Plataformas · o que a carteira contrata e usa"],
   saidas:["COMERCIAL","Saíram da assessoria"],
+  conferencia:["GESTÃO","Conferência · CRM contra a base da corretora"],
   custos:["GESTÃO","Custos por cliente e plataforma"],
   importacoes:["GESTÃO","Importações · os relatórios da corretora"],
   legenda:["SISTEMA","Legenda · o que cada etiqueta significa"],
@@ -599,7 +601,7 @@ const RESERVADAS={
   ia:{icon:"ia",desc:"O diagnóstico estratégico da operação em linguagem natural, e o copiloto de IA por assessor — cada um enxergando apenas a própria carteira."},
   integracoes:{icon:"integracoes",desc:"As conexões do sistema — Volume Operado (operação), RD Conversas (atendimento), Gmail/Genial (entrada de clientes) e IA. Ligadas e a ligar."}
 };
-const VIEWS={radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes,auditoria:vAuditoria,diagnostico:vDiagnostico,legenda:vLegenda,leads:vLeads,importacoes:vImportacoes,saidas:vSaidas,plataformas:vPlataformas,custos:vCustos};
+const VIEWS={radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes,auditoria:vAuditoria,diagnostico:vDiagnostico,legenda:vLegenda,leads:vLeads,importacoes:vImportacoes,saidas:vSaidas,plataformas:vPlataformas,custos:vCustos,conferencia:vConferencia};
 document.querySelectorAll(".nav-item").forEach(b=>b.addEventListener("click",()=>{
   document.querySelectorAll(".nav-item").forEach(x=>x.classList.remove("active"));
   b.classList.add("active"); el("sidebar").classList.remove("open"); render(b.dataset.view);
@@ -1617,8 +1619,8 @@ let cfAba="conferencia";
 function vAuditoria(){
   el("content").innerHTML=`
     <div class="sol-tabs">
-      <button class="sol-tab" id="cfTabConf" onclick="cfIrPara('conferencia')">Conferência</button>
-      <button class="sol-tab" id="cfTabTrilha" onclick="cfIrPara('trilha')">Trilha</button>
+      <button class="sol-tab" id="cbTabConf" onclick="cfIrPara('conferencia')">Conferência</button>
+      <button class="sol-tab" id="cbTabTrilha" onclick="cfIrPara('trilha')">Trilha</button>
     </div>
     <div id="cfAbaConteudo"></div>`;
   cfIrPara(cfAba);
@@ -1626,8 +1628,8 @@ function vAuditoria(){
 
 function cfIrPara(aba){
   cfAba=aba;
-  el("cfTabConf").classList.toggle("on", aba==="conferencia");
-  el("cfTabTrilha").classList.toggle("on", aba==="trilha");
+  el("cbTabConf").classList.toggle("on", aba==="conferencia");
+  el("cbTabTrilha").classList.toggle("on", aba==="trilha");
   if(aba==="trilha") cfTelaTrilha(); else cfTelaConferencia();
 }
 
@@ -1784,6 +1786,151 @@ function cfPintar(j){
           <td><span class="status ${dif?'s-negligenciado':'s-saudavel'}">
             ${dif?nf(dif)+' fora':'confere'}</span></td></tr>`; }).join("")}
     </tbody></table></div>`;
+}
+
+// ---------- CONFERÊNCIA COM A BASE DA CORRETORA ----------
+// O Diversificador é a base inteira da corretora. Comparando com o CRM,
+// as diferenças aparecem nos dois sentidos — e cada uma quer dizer uma
+// coisa diferente.
+
+let cbState = {lado:"so_na_planilha"};
+
+async function vConferencia(){
+  el("content").innerHTML='<div class="loading"><div class="spinner"></div>Comparando…</div>';
+
+  const {count:naPlanilha} = await sb.from("diversificador")
+    .select("sinacor",{count:"exact",head:true});
+
+  if(!naPlanilha){
+    el("content").innerHTML=`
+      <div class="empty" style="padding:40px;line-height:1.7">
+        A base da corretora ainda não foi importada.<br>
+        Suba o arquivo <b>DIVERSIFICADOR</b> em Gestão → Importações.
+      </div>`;
+    return;
+  }
+
+  const [a,b,ult] = await Promise.all([
+    sb.from("vw_conferencia_base").select("sinacor",{count:"exact",head:true}).eq("onde","so_na_planilha"),
+    sb.from("vw_conferencia_base").select("sinacor",{count:"exact",head:true}).eq("onde","so_no_crm"),
+    sb.from("diversificador").select("competencia,arquivo").order("importado_em",{ascending:false}).limit(1)
+  ]);
+  const foto = (ult.data||[])[0] || {};
+
+  el("content").innerHTML=`
+    <div class="note" style="border-left-color:var(--blue);margin-bottom:18px">
+      Comparação entre o CRM e a base da corretora${foto.competencia?` de <b>${fmtData(foto.competencia)}</b>`:""}.
+      <b>${nf(naPlanilha)}</b> clientes na planilha.
+      As diferenças não significam a mesma coisa nos dois sentidos — veja a explicação em cada aba.
+    </div>
+    <div class="sol-tabs">
+      <button class="sol-tab on" onclick="cbLado('so_na_planilha',this)">
+        Na planilha e não no CRM · ${nf(a.count||0)}</button>
+      <button class="sol-tab" onclick="cbLado('so_no_crm',this)">
+        No CRM e não na planilha · ${nf(b.count||0)}</button>
+      <button class="sol-tab" onclick="cbLado('mudancas',this)">O que mudou</button>
+    </div>
+    <div id="cbTab"><div class="loading"><div class="spinner"></div>Carregando…</div></div>`;
+
+  cbState = {lado:"so_na_planilha"};
+  cbCarregar();
+}
+
+function cbLado(l, btn){
+  cbState.lado = l;
+  document.querySelectorAll(".sol-tabs .sol-tab").forEach(x=>x.classList.remove("on"));
+  btn.classList.add("on");
+  cbCarregar();
+}
+
+async function cbCarregar(){
+  el("cbTab").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
+  if(cbState.lado === "mudancas") return cbMudancas();
+
+  const {data,error,count} = await sb.from("vw_conferencia_base")
+    .select("*",{count:"exact"}).eq("onde", cbState.lado)
+    .order("patrimonio",{ascending:false,nullsFirst:false}).limit(300);
+  if(error) return erro(error,"cbTab");
+
+  const naPlanilha = cbState.lado === "so_na_planilha";
+  const aviso = naPlanilha
+    ? `Estão na base da corretora e <b>não têm ficha no CRM</b>. São clientes de verdade
+       que o sistema não conhece — não aparecem no Radar, no Clube nem em nenhuma contagem.`
+    : `Têm ficha no CRM e <b>não aparecem na base da corretora</b>. Pode ser cliente que saiu,
+       mas também pode ser ausência no arquivo daquele dia. <b>Ninguém é desativado
+       automaticamente</b> — confira antes de agir.`;
+
+  if(!data || !data.length){
+    el("cbTab").innerHTML = `<div class="note" style="border-left-color:var(--amber);margin-bottom:14px">${aviso}</div>
+      <div class="empty">Nenhuma diferença deste lado. Os dois estão iguais.</div>`;
+    return;
+  }
+
+  el("cbTab").innerHTML = `
+    <div class="note" style="border-left-color:var(--amber);margin-bottom:14px">${aviso}</div>
+    <div class="panel"><table><thead><tr>
+      <th>Cliente</th><th>Sinacor</th><th>Barra</th><th>Telefone</th>
+      ${naPlanilha?"<th>Situação</th><th>Patrimônio</th>"
+                  :"<th>Última op.</th><th>Contratos</th>"}
+      <th></th></tr></thead>
+    <tbody>${data.map(c=>`<tr style="cursor:default">
+      <td><div class="cell-name"><span class="mini-av">${ini(c.nome||"?")}</span>${c.nome||"—"}</div></td>
+      <td class="num">${c.sinacor}</td>
+      <td class="num">${c.barra||"—"}</td>
+      <td class="num">${c.telefone||"—"}</td>
+      ${naPlanilha
+        ? `<td><span class="status ${c.situacao_conta==="ATIVA"?"s-saudavel":"s-em_recuperacao"}">${c.situacao_conta||"—"}</span></td>
+           <td class="num">${c.patrimonio?nfR(c.patrimonio):"—"}</td>`
+        : `<td class="num">${c.ultima_operacao?fmtData(c.ultima_operacao):'<span style="color:var(--amber)">nunca operou</span>'}</td>
+           <td class="num">${c.contratos?nf(c.contratos):"—"}</td>`}
+      <td>${naPlanilha
+            ? `<button class="cfg-save" style="padding:6px 12px;font-size:12px"
+                 onclick="cbCriar('${c.sinacor}')">Criar ficha</button>`
+            : ""}</td>
+    </tr>`).join("")}</tbody></table>
+    <div style="padding:11px 16px;font-size:11px;color:var(--text-faint)">
+      Mostrando ${nf(data.length)} de ${nf(count)}${naPlanilha?" · do maior patrimônio para o menor":""}</div></div>`;
+}
+
+/** Cria a ficha com o que a planilha já sabe — não precisa perguntar nada. */
+async function cbCriar(sinacor){
+  const {data:d} = await sb.from("diversificador").select("*").eq("sinacor",sinacor).maybeSingle();
+  if(!d) return;
+  const {data,error} = await sb.rpc("criar_ficha_cliente",{
+    p_sinacor: sinacor, p_nome: d.nome, p_telefone: d.telefone,
+    p_cpf: d.cpf, p_barra: d.barra, p_email: d.email
+  });
+  if(error){ toast("Não deu para criar", error.message, true); return; }
+  if(!data.ok){ toast("Já existe","Esse Sinacor já tem ficha",true); cbCarregar(); return; }
+  toast("Ficha criada", data.nome);
+  cbCarregar();
+}
+
+async function cbMudancas(){
+  const {data,error,count} = await sb.from("alteracoes_cadastro")
+    .select("*",{count:"exact"}).order("quando",{ascending:false}).limit(300);
+  if(error) return erro(error,"cbTab");
+  if(!data || !data.length){
+    el("cbTab").innerHTML='<div class="empty">Nenhuma alteração registrada ainda.</div>';
+    return;
+  }
+  el("cbTab").innerHTML = `
+    <div class="note" style="border-left-color:var(--green);margin-bottom:14px">
+      Cada campo que a planilha sobrescreveu, com o valor que estava antes.
+      É por aqui que se desfaz um engano.
+    </div>
+    <div class="panel"><table><thead><tr>
+      <th>Quando</th><th>Sinacor</th><th>Campo</th><th>Estava</th><th>Passou a ser</th><th>Origem</th></tr></thead>
+    <tbody>${data.map(a=>`<tr style="cursor:default">
+      <td class="num">${fmtDataHora(a.quando)}</td>
+      <td class="num">${a.sinacor}</td>
+      <td>${a.campo}</td>
+      <td class="num" style="color:var(--text-faint)">${a.de||"—"}</td>
+      <td class="num">${a.para||"—"}</td>
+      <td class="num" style="font-size:11.5px">${a.origem}</td>
+    </tr>`).join("")}</tbody></table>
+    <div style="padding:11px 16px;font-size:11px;color:var(--text-faint)">
+      Mostrando ${nf(data.length)} de ${nf(count)} alterações</div></div>`;
 }
 
 // ---------- CUSTOS ----------
@@ -2390,7 +2537,40 @@ async function impProcessar(nome, texto){
   if(error){ impCartao(nome, null, linhas.length-1, colunas, error.message); return; }
 
   // guarda as linhas para o processamento, quando o formato tiver destino
-  if(data && data.formato === "custos"){
+  if(data && data.formato === "diversificador"){
+    const idx = n => colunas.findIndex(c=>c.trim().toUpperCase() === n);
+    const col = {
+      sinacor:idx("CD_CONTA_SEM_DIGITO"), nome:idx("NOME_CLIENTE"), cpf:idx("CPF_CNPJ"),
+      barra:idx("ASSESSOR"), telefone:idx("TELEFONE"), email:idx("EMAIL"),
+      profissao:idx("PROFISSAO"), patrimonio:idx("PATRIMONIO"), rendimentos:idx("RENDIMENTOS"),
+      uf:idx("UF"), perfil:idx("PERFIL"), suitability:idx("PERFIL_SUITABILITY"),
+      sexo:idx("SEXO"), estado_civil:idx("ESTADO_CIVIL"), nascimento:idx("DT_NASC"),
+      habilitacao:idx("DATA_HABILITACAO"), situacao:idx("SITUACAO_CONTA"),
+      tp_pessoa:idx("TP_PESSOA"), soma_total:idx("SOMA_TOTAL"), dt:idx("DT_PARTITION")
+    };
+    const numero = v => {
+      let t = String(v||"").trim();
+      if(t === "" || t === "NULL") return null;
+      if(t.includes(",")) t = t.replace(/\./g,"").replace(",",".");
+      const n = Number(t);
+      return isNaN(n) ? null : n;
+    };
+    const itens = linhas.slice(1).map(l=>{
+      const p = l.split(sep).map(x=>x.replace(/^"|"$/g,"").trim());
+      const g = k => col[k] >= 0 ? (p[col[k]] || "") : "";
+      return { sinacor:g("sinacor"), nome:g("nome"), cpf:g("cpf"), barra:g("barra"),
+               telefone:g("telefone"), email:g("email"), profissao:g("profissao"),
+               patrimonio:numero(g("patrimonio")), rendimentos:numero(g("rendimentos")),
+               uf:g("uf"), perfil:g("perfil"), suitability:g("suitability"),
+               sexo:g("sexo"), estado_civil:g("estado_civil"),
+               nascimento:g("nascimento"), habilitacao:g("habilitacao"),
+               situacao:g("situacao"), tp_pessoa:g("tp_pessoa"),
+               soma_total:numero(g("soma_total")) };
+    }).filter(x=>x.sinacor);
+    const comp = col.dt >= 0 ? (linhas[1].split(sep)[col.dt]||"").replace(/^"|"$/g,"").trim() : "";
+    window.__impDiv = {arquivo:nome, competencia:comp, itens:itens};
+    impCartao(nome, data, linhas.length-1, colunas, null, null, null, null, itens.length);
+  } else if(data && data.formato === "custos"){
     const idx = n => colunas.findIndex(c=>c.trim().toUpperCase() === n);
     const iS=idx("COD SINACOR CLIENTE SEM DIGITO"), iA=idx("ASSESSOR"),
           iTP=idx("TIPO PRODUTO"), iP=idx("PRODUTO"), iCPF=idx("CPF/CNPJ"),
@@ -2454,6 +2634,63 @@ async function impProcessar(nome, texto){
  * movimento do dia. Cada importação substitui a anterior — quem cancelou
  * uma ferramenta some, em vez de ficar registrado para sempre.
  */
+/**
+ * A base inteira num arquivo só: 20 mil linhas não cabem numa chamada.
+ * Vai em lotes, com barra de progresso — a importação leva alguns
+ * segundos e sem retorno visual parece travada.
+ */
+async function impProcessarDiversificador(){
+  const lote = window.__impDiv;
+  if(!lote || !lote.itens.length) return;
+
+  const ok = confirm(
+    "Atualizar o cadastro com " + nf(lote.itens.length) + " clientes?\n\n" +
+    "A planilha SOBRESCREVE o que estiver diferente no CRM. Cada mudança fica " +
+    "registrada com o valor antigo e o novo, e dá para consultar depois.\n\n" +
+    "Ninguém é desativado automaticamente.");
+  if(!ok) return;
+
+  const alvo = el("impSaida");
+  const barra = document.createElement("div");
+  barra.className = "panel";
+  barra.style.cssText = "padding:16px 18px;margin-top:12px;border-left:3px solid var(--green)";
+  alvo.appendChild(barra);
+
+  const LOTE = 1500;
+  let rec = 0, mud = 0, sem = 0, erro = null;
+
+  for(let i = 0; i < lote.itens.length; i += LOTE){
+    const parte = lote.itens.slice(i, i + LOTE);
+    barra.innerHTML = `<div style="font-weight:700;margin-bottom:6px">Atualizando cadastro…</div>
+      <div style="font-size:13px;color:var(--text-dim)">${nf(Math.min(i+LOTE, lote.itens.length))} de ${nf(lote.itens.length)}</div>`;
+
+    const {data,error} = await sb.rpc("receber_diversificador",{
+      lote:{ arquivo: lote.arquivo, competencia: lote.competencia, itens: parte }
+    });
+    if(error){ erro = error.message; break; }
+    rec += data.recebidos || 0; mud += data.mudancas || 0; sem += data.sem_ficha || 0;
+  }
+
+  if(erro){
+    barra.style.borderLeftColor = "var(--red)";
+    barra.innerHTML = `<div style="font-weight:700;margin-bottom:6px">Parou no meio</div>
+      <div style="font-size:13px;color:var(--red)">${erro}</div>
+      <div style="font-size:12.5px;color:var(--text-dim);margin-top:6px">
+        ${nf(rec)} clientes já foram atualizados. Rodar de novo continua de onde parou,
+        porque a atualização é por Sinacor.</div>`;
+    return;
+  }
+
+  barra.innerHTML = `<div style="font-weight:700;margin-bottom:8px">Cadastro atualizado</div>
+    <div style="font-size:13.5px;color:var(--text-dim);line-height:1.7">
+      ${nf(rec)} clientes na planilha<br>
+      ${nf(mud)} campo(s) alterado(s) — o valor antigo ficou registrado<br>
+      ${sem ? `<span style="color:var(--amber)">${nf(sem)} estão na planilha e não têm ficha no CRM</span>` : ""}
+    </div>
+    <button class="cfg-save" style="margin-top:12px" onclick="lgIr('conferencia')">Ver a conferência</button>`;
+  impHistorico();
+}
+
 async function impProcessarCustos(){
   const lote = window.__impCustos;
   if(!lote || !lote.itens.length) return;
@@ -2499,7 +2736,7 @@ async function impProcessarSaidas(){
   impHistorico();
 }
 
-function impCartao(nome, res, linhas, colunas, erroTxt, loteSaida, qtdPlat, qtdCusto){
+function impCartao(nome, res, linhas, colunas, erroTxt, loteSaida, qtdPlat, qtdCusto, qtdDiv){
   if(loteSaida) window.__impSaidas = loteSaida;
   const reconhecido = res && res.reconhecido;
   const cor = erroTxt ? "var(--red)" : reconhecido ? "var(--green)" : "var(--amber)";
@@ -2522,6 +2759,8 @@ function impCartao(nome, res, linhas, colunas, erroTxt, loteSaida, qtdPlat, qtdC
               Atualizar ${nf(qtdPlat)} adesões</button>` : ""}
             ${qtdCusto ? `<button class="cfg-save" style="margin-top:12px" onclick="impProcessarCustos()">
               Importar ${nf(qtdCusto)} linhas de custo</button>` : ""}
+            ${qtdDiv ? `<button class="cfg-save" style="margin-top:12px" onclick="impProcessarDiversificador()">
+              Atualizar ${nf(qtdDiv)} cadastros</button>` : ""}
           </div>`
        : `<div style="margin-top:8px">
             <span class="tag t-amber">formato ainda não reconhecido</span>
