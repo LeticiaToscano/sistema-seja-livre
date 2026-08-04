@@ -411,7 +411,7 @@
       <button class="nav-item" data-view="integracoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 7V4M15 7V4M8 7h8v4a4 4 0 0 1-8 0z" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15v5" stroke-linecap="round"/></svg>Integrações</button>
     </nav>
     <div class="foot">
-      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v04/08 18:53</div></div></div>
+      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v04/08 19:16</div></div></div>
       <button class="btn-logout" id="logoutBtn">Sair</button>
     </div>
   </aside>
@@ -1823,6 +1823,7 @@ async function vConferencia(){
       <b>${nf(naPlanilha)}</b> clientes na planilha.
       As diferenças não significam a mesma coisa nos dois sentidos — veja a explicação em cada aba.
     </div>
+    <div id="cbIdade"></div>
     <div id="cbAcoes"></div>
     <div class="sol-tabs">
       <button class="sol-tab on" onclick="cbLado('so_na_planilha',this)">
@@ -1834,6 +1835,7 @@ async function vConferencia(){
     <div id="cbTab"><div class="loading"><div class="spinner"></div>Carregando…</div></div>`;
 
   cbState = {lado:"so_na_planilha"};
+  cbIdade();
   cbAcoes();
   cbCarregar();
 }
@@ -1843,6 +1845,34 @@ async function vConferencia(){
  * Rodam pelo painel e nao pelo editor de SQL de proposito: e aqui que
  * existe sessao, e sem ela nao da para registrar quem fez.
  */
+/**
+ * A idade do relatorio, em destaque.
+ * O arquivo vem do portal e a importacao depende de alguem — sem essa
+ * marca, da para olhar uma foto de semana passada achando que e de hoje.
+ * Foi assim que tirei conclusoes erradas sobre trocas canceladas.
+ */
+async function cbIdade(){
+  const {data} = await sb.from("vw_idade_relatorios")
+    .select("*").eq("relatorio","diversificador").maybeSingle();
+  const alvo = el("cbIdade"); if(!alvo) return;
+  if(!data || data.dias == null){ alvo.innerHTML=""; return; }
+
+  const d = Number(data.dias);
+  if(d <= 1){ alvo.innerHTML=""; return; }   // de hoje ou de ontem: nada a dizer
+
+  const grave = d > 7;
+  alvo.innerHTML = `
+    <div class="panel" style="padding:14px 18px;margin-bottom:16px;
+      border-left:3px solid ${grave?'var(--red)':'var(--amber)'}">
+      <div style="font-size:13.5px;line-height:1.6">
+        <b style="color:${grave?'var(--red)':'var(--amber)'}">
+          O relatorio e de ${fmtData(data.competencia)}, ha ${nf(d)} dias.</b><br>
+        <span style="color:var(--text-dim)">As diferencas abaixo sao daquela data, nao de hoje.
+        Cliente que entrou depois aparece como ausente sem estar.</span>
+      </div>
+    </div>`;
+}
+
 async function cbAcoes(){
   const [c,d] = await Promise.all([
     sb.rpc("criar_fichas_da_planilha",{p_executar:false}),
@@ -3564,6 +3594,9 @@ async function dgAbrir(codigo, manterPosicao){
   // Este achado não é sobre clientes — é sobre quem NÃO é cliente. Não tem
   // ficha para abrir nem tratativa para marcar, então tem lista própria.
   if(codigo === "opera_sem_ficha") return dgSemFicha(manterPosicao);
+  // este cartao nao tem lista propria: a Conferencia ja mostra tudo,
+  // com os motivos e os botoes de acao
+  if(codigo === "falta_ficha_corretora") return lgIr("conferencia");
   el("dgLista").innerHTML=`
     <div class="sec-title" style="margin-top:26px">Clientes<span class="rule"></span></div>
     <div id="dgFiltros" class="sol-tabs">
