@@ -411,7 +411,7 @@
       <button class="nav-item" data-view="integracoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 7V4M15 7V4M8 7h8v4a4 4 0 0 1-8 0z" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15v5" stroke-linecap="round"/></svg>Integrações</button>
     </nav>
     <div class="foot">
-      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v04/08 17:56</div></div></div>
+      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v04/08 18:53</div></div></div>
       <button class="btn-logout" id="logoutBtn">Sair</button>
     </div>
   </aside>
@@ -1823,6 +1823,7 @@ async function vConferencia(){
       <b>${nf(naPlanilha)}</b> clientes na planilha.
       As diferenças não significam a mesma coisa nos dois sentidos — veja a explicação em cada aba.
     </div>
+    <div id="cbAcoes"></div>
     <div class="sol-tabs">
       <button class="sol-tab on" onclick="cbLado('so_na_planilha',this)">
         Na planilha e não no CRM · ${nf(a.count||0)}</button>
@@ -1833,7 +1834,67 @@ async function vConferencia(){
     <div id="cbTab"><div class="loading"><div class="spinner"></div>Carregando…</div></div>`;
 
   cbState = {lado:"so_na_planilha"};
+  cbAcoes();
   cbCarregar();
+}
+
+/**
+ * As duas acoes que resolvem a maior parte das diferencas.
+ * Rodam pelo painel e nao pelo editor de SQL de proposito: e aqui que
+ * existe sessao, e sem ela nao da para registrar quem fez.
+ */
+async function cbAcoes(){
+  const [c,d] = await Promise.all([
+    sb.rpc("criar_fichas_da_planilha",{p_executar:false}),
+    sb.rpc("desligar_saidas_confirmadas",{p_executar:false})
+  ]);
+  const criar    = (c.data && c.data.criaria)    || 0;
+  const desligar = (d.data && d.data.desligaria) || 0;
+  if(!criar && !desligar){ el("cbAcoes").innerHTML=""; return; }
+
+  el("cbAcoes").innerHTML = `
+    <div class="panel" style="padding:16px 18px;margin-bottom:18px;border-left:3px solid var(--green)">
+      <div style="font-size:14px;font-weight:700;margin-bottom:4px">O que da para resolver agora</div>
+      <div style="font-size:12.5px;color:var(--text-dim);line-height:1.6;margin-bottom:14px">
+        O resto das diferencas tem causa conhecida e nao precisa de acao —
+        troca em processo, conta inativa, ou ausencia na base da corretora.
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        ${criar ? `<button class="cfg-save" onclick="cbCriarTodas(${criar})">
+          Criar ${nf(criar)} ficha(s) que faltam</button>` : ""}
+        ${desligar ? `<button class="btn-rd" onclick="cbDesligar(${desligar})"
+          style="border-color:var(--amber);color:var(--amber)">
+          Desligar ${nf(desligar)} que pediram saida</button>` : ""}
+      </div>
+    </div>`;
+}
+
+async function cbCriarTodas(quantos){
+  const ok = confirm(
+    "Criar " + nf(quantos) + " fichas?\n\n" +
+    "Sao clientes que estao na base da corretora e nao existem no CRM. " +
+    "A ficha nasce com tudo o que a planilha sabe: nome, CPF, telefone, " +
+    "e-mail, barra, patrimonio e perfil.\n\n" +
+    "Contas inativas na corretora ficam de fora.");
+  if(!ok) return;
+  const {data,error} = await sb.rpc("criar_fichas_da_planilha",{p_executar:true});
+  if(error){ toast("Nao deu para criar", error.message, true); return; }
+  toast("Fichas criadas", nf(data.criados) + " clientes entraram no CRM");
+  vConferencia();
+}
+
+async function cbDesligar(quantos){
+  const ok = confirm(
+    "Desligar " + nf(quantos) + " cliente(s)?\n\n" +
+    "Todos pediram saida ha mais de 3 dias E nao estao mais na base da " +
+    "corretora — a prova e dupla.\n\n" +
+    "Eles saem do Radar, da Fila e de todas as contagens, e passam para a " +
+    "aba Sairam. Da para reativar depois, se for engano.");
+  if(!ok) return;
+  const {data,error} = await sb.rpc("desligar_saidas_confirmadas",{p_executar:true});
+  if(error){ toast("Nao deu para desligar", error.message, true); return; }
+  toast("Clientes desligados", nf(data.desligados) + " sairam da carteira");
+  vConferencia();
 }
 
 function cbLado(l, btn){
