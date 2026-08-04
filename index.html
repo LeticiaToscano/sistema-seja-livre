@@ -346,6 +346,9 @@
   .menu-btn{display:none;place-items:center;width:36px;height:36px;border-radius:9px;background:var(--surface);
     border:1px solid var(--border-strong);color:var(--text)}
 </style>
+<!-- leitor de Excel: a planilha de custos vem em .xlsx, e converter para
+     CSV todo mês seria um passo a mais sem motivo -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -395,6 +398,7 @@
       <button class="nav-item" data-view="leads"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" stroke-linecap="round"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6" stroke-linecap="round"/></svg>Leads</button>
 
       <div class="nav-label">Gestão</div>
+      <button class="nav-item" data-view="custos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v20M17 6.5c0-1.9-2.2-3-5-3s-5 1.1-5 3 2.2 2.8 5 3.3 5 1.4 5 3.4-2.2 3.3-5 3.3-5-1.3-5-3.3" stroke-linecap="round"/></svg>Custos</button>
       <button class="nav-item" data-view="importacoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" stroke-linecap="round" stroke-linejoin="round"/></svg>Importações</button>
       <button class="nav-item" data-view="config"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 8h14M5 16h14" stroke-linecap="round"/><circle cx="9" cy="8" r="2.2" fill="var(--bg-2)"/><circle cx="15" cy="16" r="2.2" fill="var(--bg-2)"/></svg>Configurações</button>
       <button class="nav-item" data-view="auditoria"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l7 3v5c0 4-3 7-7 8-4-1-7-4-7-8V6z" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg>Auditoria</button>
@@ -489,6 +493,16 @@ function tagContato(tipo, completa){
   return "";
 }
 
+/**
+ * Etiqueta do Akeloo. Ele não aparece no relatório de plataformas da
+ * Genial — só na planilha de custos. São 150 clientes, e até agora eram
+ * invisíveis para o sistema inteiro.
+ */
+function tagAkeloo(){
+  return `<span class="tag t-green" title="Tem a calculadora de IR Akeloo"
+    style="font-size:10.5px">Akeloo</span>`;
+}
+
 function faixaBadge(faixa, grau){
   faixa = faixa || "sem";
   if(faixa==="sem") return `<span class="faixa sem">${beltSVG("sem")}<span class="fn">Sem faixa</span></span>`;
@@ -571,6 +585,7 @@ const TITLES={
   leads:["COMERCIAL","Leads · falaram no RD e não são clientes"],
   plataformas:["CARTEIRA","Plataformas · o que a carteira contrata e usa"],
   saidas:["COMERCIAL","Saíram da assessoria"],
+  custos:["GESTÃO","Custos por cliente e plataforma"],
   importacoes:["GESTÃO","Importações · os relatórios da corretora"],
   legenda:["SISTEMA","Legenda · o que cada etiqueta significa"],
   diagnostico:["GESTÃO","Diagnóstico"], ia:["GESTÃO","CEO de IA"],
@@ -584,7 +599,7 @@ const RESERVADAS={
   ia:{icon:"ia",desc:"O diagnóstico estratégico da operação em linguagem natural, e o copiloto de IA por assessor — cada um enxergando apenas a própria carteira."},
   integracoes:{icon:"integracoes",desc:"As conexões do sistema — Volume Operado (operação), RD Conversas (atendimento), Gmail/Genial (entrada de clientes) e IA. Ligadas e a ligar."}
 };
-const VIEWS={radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes,auditoria:vAuditoria,diagnostico:vDiagnostico,legenda:vLegenda,leads:vLeads,importacoes:vImportacoes,saidas:vSaidas,plataformas:vPlataformas};
+const VIEWS={radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes,auditoria:vAuditoria,diagnostico:vDiagnostico,legenda:vLegenda,leads:vLeads,importacoes:vImportacoes,saidas:vSaidas,plataformas:vPlataformas,custos:vCustos};
 document.querySelectorAll(".nav-item").forEach(b=>b.addEventListener("click",()=>{
   document.querySelectorAll(".nav-item").forEach(x=>x.classList.remove("active"));
   b.classList.add("active"); el("sidebar").classList.remove("open"); render(b.dataset.view);
@@ -649,7 +664,7 @@ async function carregarFilaFull(){
     : "Quem parou levando mais volume junto.";
   el("filaFull").innerHTML=`<table><thead><tr><th>Cliente</th><th>Faixa</th><th>Barra</th><th>Atividade</th><th>Parou desde</th><th>Sem contato</th><th>Score</th><th></th></tr></thead>
     <tbody>${data.map(c=>`<tr class="${c.faixa==='preta'?'linha-preta':''}" onclick="abrirFicha('${c.id}')">
-      <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}${tagParceiro(c.barra,c.parceiros)}${tagContato(c.tipo_contato)}</div></td>
+      <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}${tagParceiro(c.barra,c.parceiros)}${tagContato(c.tipo_contato)}${c.tem_akeloo?tagAkeloo():""}</div></td>
       <td>${faixaBadge(c.faixa,c.grau)}</td>
       <td class="num">${c.barra||"—"}</td>
       <td class="num">${volDisplay(c.contratos_bmf,c.volume_bovespa)}</td>
@@ -772,7 +787,7 @@ async function carregarFila(){
   if(!data||!data.length){ el("filaAcao").innerHTML='<div class="empty">Nenhum cliente parado no momento.</div>'; return; }
   el("filaAcao").innerHTML=`<table><thead><tr><th>Cliente</th><th>Faixa</th><th>Atividade</th><th>Parou desde</th></tr></thead>
     <tbody>${data.map(c=>`<tr class="${c.faixa==='preta'?'linha-preta':''}" onclick="abrirFicha('${c.id}')">
-      <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}${tagParceiro(c.barra,c.parceiros)}${tagContato(c.tipo_contato)}</div></td>
+      <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}${tagParceiro(c.barra,c.parceiros)}${tagContato(c.tipo_contato)}${c.tem_akeloo?tagAkeloo():""}</div></td>
       <td>${faixaBadge(c.faixa,c.grau)}</td>
       <td class="num">${volDisplay(c.contratos_bmf,c.volume_bovespa)}</td>
       <td class="num">${fmtDesde(c.data_ultima_operacao)}</td></tr>`).join("")}</tbody></table>`;
@@ -942,7 +957,7 @@ async function cliNovoParceiro(){
 async function carregarClientes(){
   const {termo,filtro,page,size}=cliState;
   const from=page*size, to=from+size-1;
-  let q = sb.from("vw_saude_carteira").select("id,nome,sinacor,barra,saude,status_operacao,data_ultima_operacao,contratos_bmf,volume_bovespa,faixa,grau,parceiros,tipo_contato",{count:"exact"}).order("nome").range(from,to);
+  let q = sb.from("vw_saude_carteira").select("id,nome,sinacor,barra,saude,status_operacao,data_ultima_operacao,contratos_bmf,volume_bovespa,faixa,grau,parceiros,tipo_contato,tem_akeloo",{count:"exact"}).order("nome").range(from,to);
   if(termo){ q = q.or(`nome.ilike.%${termo}%,sinacor.ilike.%${termo}%,parceiros.ilike.%${termo}%`); }
   if(filtro!=="todos"){ q = q.eq("status_operacao",filtro); }
   if(cliState.barra!=="todas"){ q = q.eq("barra",cliState.barra); }
@@ -964,7 +979,7 @@ async function carregarClientes(){
     <tbody>${data.map(c=>`<tr class="${c.faixa==='preta'?'linha-preta':''}" onclick="abrirFicha('${c.id}')">
       <td onclick="event.stopPropagation()"><input type="checkbox" data-id="${c.id}"
           ${cliSel.has(c.id)?"checked":""} onclick="cliMarcar('${c.id}',this.checked)"></td>
-      <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}${tagParceiro(c.barra,c.parceiros)}${tagContato(c.tipo_contato)}</div></td>
+      <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}${tagParceiro(c.barra,c.parceiros)}${tagContato(c.tipo_contato)}${c.tem_akeloo?tagAkeloo():""}</div></td>
       <td>${faixaBadge(c.faixa,c.grau)}</td>
       <td class="num">${c.barra||"—"}</td>
       ${mostraParceiro?`<td class="num">${c.parceiros||'<span style="color:var(--text-faint)">sem parceiro</span>'}</td>`:""}
@@ -1144,7 +1159,7 @@ async function carregarDestaques(){
   el("tabelaDest").innerHTML=`<table><thead><tr><th>#</th><th>Cliente</th><th>Faixa</th><th>Barra</th><th>Atividade</th><th>Última op.</th><th>Score</th></tr></thead>
     <tbody>${data.map((c,i)=>`<tr class="${c.faixa==='preta'?'linha-preta':''}" onclick="abrirFicha('${c.id}')">
       <td class="num">${i+1}</td>
-      <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}${tagParceiro(c.barra,c.parceiros)}${tagContato(c.tipo_contato)}</div></td>
+      <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}${tagParceiro(c.barra,c.parceiros)}${tagContato(c.tipo_contato)}${c.tem_akeloo?tagAkeloo():""}</div></td>
       <td>${faixaBadge(c.faixa,c.grau)}</td>
       <td class="num">${c.barra||"—"}</td>
       <td class="num">${volDisplay(c.contratos_bmf,c.volume_bovespa)}</td>
@@ -1386,7 +1401,7 @@ async function carregarExplorar(){
   const de=from+1, ate=from+data.length, totalPags=Math.max(1,Math.ceil((count||0)/size));
   el("exTab").innerHTML=`<table><thead><tr><th>Cliente</th><th>Faixa</th><th>Barra</th><th>Atividade no período</th><th>Operações</th><th>Última op.</th></tr></thead>
     <tbody>${data.map(c=>`<tr class="${c.faixa==='preta'?'linha-preta':''}" onclick="abrirFicha('${c.id}')">
-      <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}${tagParceiro(c.barra,c.parceiros)}${tagContato(c.tipo_contato)}</div></td>
+      <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}${tagParceiro(c.barra,c.parceiros)}${tagContato(c.tipo_contato)}${c.tem_akeloo?tagAkeloo():""}</div></td>
       <td>${faixaBadge(c.faixa,c.grau)}</td>
       <td class="num">${c.barra||"—"}</td>
       <td class="num">${volDisplay(c.contratos_periodo,c.volume_bov_periodo)}</td>
@@ -1507,7 +1522,7 @@ async function carregarClube(){
   el("tabelaClube").innerHTML=`<table><thead><tr><th>#</th><th>Cliente</th><th>Faixa</th><th>Barra</th><th>Atividade</th><th>Última op.</th><th>Score</th></tr></thead>
     <tbody>${data.map((c,i)=>`<tr class="${c.faixa==='preta'?'linha-preta':''}" onclick="abrirFicha('${c.id}')">
       <td class="num">${from+i+1}</td>
-      <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}${tagParceiro(c.barra,c.parceiros)}${tagContato(c.tipo_contato)}</div></td>
+      <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}${tagParceiro(c.barra,c.parceiros)}${tagContato(c.tipo_contato)}${c.tem_akeloo?tagAkeloo():""}</div></td>
       <td>${faixaBadge(c.faixa,c.grau)}</td>
       <td class="num">${c.barra||"—"}</td>
       <td class="num">${volDisplay(c.contratos_bmf,c.volume_bovespa)}</td>
@@ -1771,6 +1786,157 @@ function cfPintar(j){
     </tbody></table></div>`;
 }
 
+// ---------- CUSTOS ----------
+// A primeira vez que dinheiro entra no sistema. A planilha traz, por
+// cliente e por produto, os valores do mês.
+//
+// Os nomes vêm do arquivo de propósito: os valores chegam negativos, o
+// que sugere custo, mas isso não foi confirmado — então a tela não chama
+// de custo o que o arquivo chama de receita.
+
+let cuState = {competencia:null, produto:"todos", so_parados:false};
+
+async function vCustos(){
+  el("content").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
+
+  const {data:comp} = await sb.from("vw_custos_produto")
+    .select("competencia").order("competencia",{ascending:false}).limit(200);
+  const meses = [...new Set((comp||[]).map(c=>c.competencia))];
+
+  if(!meses.length){
+    el("content").innerHTML=`
+      <div class="empty" style="padding:40px;line-height:1.7">
+        Nenhuma planilha de custos importada ainda.<br>
+        Suba o arquivo em <b>Gestão → Importações</b>.
+      </div>`;
+    return;
+  }
+  cuState.competencia = meses[0];
+
+  el("content").innerHTML=`
+    <div class="toolbar" style="margin-bottom:18px;border:1px solid var(--border);border-radius:12px">
+      <select class="search select" id="cuMes" style="flex:0 0 200px" onchange="cuMudou()">
+        ${meses.map(m=>`<option value="${m}">${fmtMesAno(m)}</option>`).join("")}
+      </select>
+      <select class="search select" id="cuProd" style="flex:0 0 300px" onchange="cuMudou()">
+        <option value="todos">Todos os produtos</option>
+      </select>
+      <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:var(--text-dim);white-space:nowrap">
+        <input type="checkbox" id="cuParados" onchange="cuMudou()"> só quem não opera há 60 dias
+      </label>
+    </div>
+    <div id="cuResumo"></div>
+    <div class="sec-title" style="margin-top:26px">Por cliente<span class="rule"></span></div>
+    <div class="panel" id="cuTab"><div class="loading"><div class="spinner"></div>Carregando…</div></div>`;
+
+  cuResumo();
+  cuClientes();
+}
+
+function fmtMesAno(d){
+  const m = ["janeiro","fevereiro","março","abril","maio","junho",
+             "julho","agosto","setembro","outubro","novembro","dezembro"];
+  const p = String(d).split("-");
+  return m[Number(p[1])-1] + " de " + p[0];
+}
+
+function cuMudou(){
+  cuState.competencia = el("cuMes").value;
+  cuState.produto     = el("cuProd").value;
+  cuState.so_parados  = el("cuParados").checked;
+  cuResumo(); cuClientes();
+}
+
+async function cuResumo(){
+  const {data,error} = await sb.from("vw_custos_produto")
+    .select("*").eq("competencia", cuState.competencia).order("custo_da_casa");
+  if(error) return erro(error,"cuResumo");
+
+  const sel = el("cuProd");
+  if(sel && sel.options.length <= 1){
+    sel.innerHTML = '<option value="todos">Todos os produtos</option>' +
+      (data||[]).map(p=>`<option value="${p.descricao}">${p.descricao} (${nf(p.clientes)})</option>`).join("");
+    sel.value = cuState.produto;
+  }
+
+  const custo    = (data||[]).reduce((s,p)=>s + Number(p.custo_da_casa||0), 0);
+  const estornado= (data||[]).reduce((s,p)=>s + Number(p.estornado||0), 0);
+  const casaPaga = (data||[]).reduce((s,p)=>s + Number(p.casa_paga||0), 0);
+  const cliPaga  = (data||[]).reduce((s,p)=>s + Number(p.cliente_paga||0), 0);
+
+  const {data:oc} = await sb.from("vw_custo_ocioso")
+    .select("*").eq("competencia", cuState.competencia).maybeSingle();
+
+  el("cuResumo").innerHTML = `
+    <div class="note" style="border-left-color:var(--blue);margin-bottom:16px">
+      <b>Negativo</b> é o que a casa paga pelo cliente · <b>zero</b> é plataforma que o
+      próprio cliente paga · <b>positivo</b> é estorno no gerencial referente a maio,
+      onde o cliente pode ter pago ou cancelado.
+    </div>
+    <div class="panel" style="padding:0">
+      <div style="padding:16px;border-bottom:1px solid var(--border);display:flex;gap:28px;flex-wrap:wrap">
+        <div><div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px">A casa pagou no mês</div>
+          <div style="font-size:24px;font-weight:800;letter-spacing:-.5px;color:var(--red)">${nfR(custo)}</div>
+          <div style="font-size:11.5px;color:var(--text-faint)">${nf(casaPaga)} linhas</div></div>
+        <div><div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px">O cliente paga</div>
+          <div style="font-size:24px;font-weight:800;letter-spacing:-.5px">${nf(cliPaga)}</div>
+          <div style="font-size:11.5px;color:var(--text-faint)">sem custo para a casa</div></div>
+        ${estornado?`<div><div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px">Estornado</div>
+          <div style="font-size:24px;font-weight:800;letter-spacing:-.5px;color:var(--green)">${nfR(estornado)}</div>
+          <div style="font-size:11.5px;color:var(--text-faint)">referente a maio</div></div>`:""}
+        ${oc?`<div><div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px">Pago por quem não opera</div>
+          <div style="font-size:24px;font-weight:800;letter-spacing:-.5px;color:var(--amber)">${nfR(oc.custo_da_casa)}</div>
+          <div style="font-size:11.5px;color:var(--text-faint)">${nf(oc.clientes_parados)} clientes parados</div></div>`:""}
+      </div>
+      <table><thead><tr>
+        <th>Produto</th><th>Clientes</th><th>A casa paga</th><th>O cliente paga</th>
+        <th>Custo da casa</th><th>Média quando paga</th></tr></thead>
+      <tbody>${(data||[]).map(p=>`<tr style="cursor:pointer" onclick="cuEscolher('${String(p.descricao).replace(/'/g,"")}')">
+        <td>${p.descricao}</td>
+        <td class="num">${nf(p.clientes)}</td>
+        <td class="num">${nf(p.casa_paga)}</td>
+        <td class="num">${nf(p.cliente_paga)}${Number(p.estornos)?` <span style="color:var(--green)" title="estornos">+${nf(p.estornos)}</span>`:""}</td>
+        <td class="num" style="color:${Number(p.custo_da_casa)<0?'var(--red)':'var(--text-faint)'}">${Number(p.custo_da_casa)?nfR(p.custo_da_casa):"—"}</td>
+        <td class="num">${p.media_quando_a_casa_paga?nfR(p.media_quando_a_casa_paga):"—"}</td>
+      </tr>`).join("")}</tbody></table>
+    </div>`;
+}
+
+function cuEscolher(p){
+  el("cuProd").value = p;
+  cuMudou();
+  document.querySelector(".main").scrollTo({top:el("cuTab").offsetTop-120,behavior:"smooth"});
+}
+
+async function cuClientes(){
+  el("cuTab").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
+  let q = sb.from("vw_custos_cliente").select("*",{count:"exact"})
+    .eq("competencia", cuState.competencia);
+  if(cuState.produto !== "todos") q = q.contains("quais", [cuState.produto]);
+  if(cuState.so_parados)          q = q.eq("parado", true);
+
+  const {data,error,count} = await q.order("custo_da_casa").limit(300);
+  if(error) return erro(error,"cuTab");
+  if(!data || !data.length){ el("cuTab").innerHTML='<div class="empty">Ninguém neste filtro.</div>'; return; }
+
+  el("cuTab").innerHTML = `<table><thead><tr>
+      <th>Cliente</th><th>Barra</th><th>Produtos</th><th>Quem paga</th>
+      <th>Custo da casa</th><th>Contratos</th><th>Última op.</th></tr></thead>
+    <tbody>${data.map(c=>`<tr ${c.cliente_id?`onclick="abrirFicha('${c.cliente_id}')"`:'style="cursor:default"'}>
+      <td><div class="cell-name"><span class="mini-av">${ini(c.nome||"?")}</span>${c.nome||"Sinacor "+c.sinacor}
+        ${(c.quais||[]).includes("Akeloo")?tagAkeloo():""}</div></td>
+      <td class="num">${c.barra||"—"}</td>
+      <td class="num" title="${(c.quais||[]).join(", ")}">${nf(c.produtos)}</td>
+      <td><span class="status ${c.quem_paga==="a casa"?"s-critico":c.quem_paga==="estorno"?"s-em_recuperacao":"s-saudavel"}">${c.quem_paga}</span></td>
+      <td class="num" style="color:${Number(c.custo_da_casa)<0?'var(--red)':'var(--text-faint)'}">${Number(c.custo_da_casa)?nfR(c.custo_da_casa):"—"}</td>
+      <td class="num">${c.contratos_bmf?nf(c.contratos_bmf):"—"}</td>
+      <td class="num">${c.data_ultima_operacao?fmtData(c.data_ultima_operacao)
+          :'<span style="color:var(--amber)">nunca operou</span>'}</td>
+    </tr>`).join("")}</tbody></table>
+    <div style="padding:11px 16px;font-size:11px;color:var(--text-faint)">
+      Mostrando ${nf(data.length)} de ${nf(count)} · do valor mais negativo para o menos</div>`;
+}
+
 // ---------- PLATAFORMAS ----------
 // Duas fontes que dizem coisas diferentes:
 //   o relatório PLATAFORMA diz o que o cliente CONTRATOU
@@ -1786,6 +1952,10 @@ async function vPlataformas(){
       dizem onde ele <b>opera</b>. Quando alguém contrata uma ferramenta e não opera
       nela, aparece aqui como <b>não usa</b>.
     </div>
+    <div class="sol-tabs">
+      <button class="sol-tab on" id="plT1" onclick="plAba('geral',this)">Todas as ferramentas</button>
+      <button class="sol-tab" id="plT2" onclick="plAba('akeloo',this)">Akeloo</button>
+    </div>
     <div id="plResumo"><div class="loading"><div class="spinner"></div>Carregando…</div></div>
     <div class="sec-title" style="margin-top:26px">Clientes<span class="rule"></span></div>
     <div class="panel">
@@ -1799,8 +1969,75 @@ async function vPlataformas(){
       </div>
       <div id="plTab"><div class="empty">Escolha uma ferramenta para ver os clientes.</div></div>
     </div>`;
-  plState = {ferramenta:"todas", so_ociosos:false};
+  plState = {ferramenta:"todas", so_ociosos:false, aba:"geral"};
   plResumo();
+}
+
+/**
+ * O Akeloo tem aba própria porque ele não vem do mesmo lugar: não está no
+ * relatório de plataformas da Genial, só na planilha de custos. Até agora
+ * esses 150 clientes eram invisíveis para o sistema.
+ */
+function plAba(a, btn){
+  plState.aba = a;
+  document.querySelectorAll(".sol-tabs .sol-tab").forEach(b=>b.classList.remove("on"));
+  btn.classList.add("on");
+  if(a === "akeloo") plAkeloo(); else { plResumo(); plFiltrar(); }
+}
+
+async function plAkeloo(){
+  el("plResumo").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
+  el("plTab").innerHTML="";
+
+  const {data,error,count} = await sb.from("vw_custos_cliente")
+    .select("*",{count:"exact"})
+    .contains("quais",["Akeloo"])
+    .order("contratos_bmf",{ascending:false,nullsFirst:false})
+    .limit(500);
+
+  if(error) return erro(error,"plResumo");
+  if(!data || !data.length){
+    el("plResumo").innerHTML=`
+      <div class="empty" style="padding:30px;line-height:1.7">
+        Nenhum cliente com Akeloo.<br>
+        O Akeloo só aparece na planilha de custos — suba o arquivo em
+        <b>Gestão → Importações</b>.
+      </div>`;
+    return;
+  }
+
+  const operando = data.filter(c=>!c.parado).length;
+  const semFicha = data.filter(c=>!c.cliente_id).length;
+
+  el("plResumo").innerHTML = `
+    <div class="note" style="border-left-color:var(--green);margin-bottom:16px">
+      O Akeloo é a calculadora de IR da Nelogica. Ele <b>não aparece</b> no relatório de
+      plataformas da Genial — só na planilha de custos, e por isso esses clientes eram
+      invisíveis para o sistema até agora.
+      <br><br>Todos aparecem com valor zero, o que quer dizer que <b>o próprio cliente paga</b>
+      o Akeloo. Não há custo da casa aqui.
+    </div>
+    <div class="panel" style="padding:16px;margin-bottom:18px;display:flex;gap:28px;flex-wrap:wrap">
+      <div><div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px">Clientes com Akeloo</div>
+        <div style="font-size:24px;font-weight:800;letter-spacing:-.5px">${nf(count)}</div></div>
+      <div><div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px">Operando</div>
+        <div style="font-size:24px;font-weight:800;letter-spacing:-.5px;color:var(--green)">${nf(operando)}</div></div>
+      <div><div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px">Parados há 60 dias</div>
+        <div style="font-size:24px;font-weight:800;letter-spacing:-.5px;color:var(--amber)">${nf(data.length-operando)}</div></div>
+      ${semFicha?`<div><div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px">Sem ficha no CRM</div>
+        <div style="font-size:24px;font-weight:800;letter-spacing:-.5px;color:var(--red)">${nf(semFicha)}</div></div>`:""}
+    </div>
+    <div class="panel"><table><thead><tr>
+      <th>Cliente</th><th>Barra</th><th>Contratos</th><th>Última op.</th><th>Outros produtos</th></tr></thead>
+      <tbody>${data.map(c=>`<tr ${c.cliente_id?`onclick="abrirFicha('${c.cliente_id}')"`:'style="cursor:default"'}>
+        <td><div class="cell-name"><span class="mini-av">${ini(c.nome||"?")}</span>${c.nome||"Sinacor "+c.sinacor}
+          ${tagAkeloo()}${!c.cliente_id?'<span class="tag" style="font-size:10px;background:transparent;border:1px dashed var(--red);color:var(--red)">sem ficha</span>':""}</div></td>
+        <td class="num">${c.barra||"—"}</td>
+        <td class="num">${c.contratos_bmf?nf(c.contratos_bmf):"—"}</td>
+        <td class="num">${c.data_ultima_operacao?fmtData(c.data_ultima_operacao)
+            :'<span style="color:var(--amber)">nunca operou</span>'}</td>
+        <td class="num" style="font-size:12px">${(c.quais||[]).filter(q=>q!=="Akeloo").join(", ")||"—"}</td>
+      </tr>`).join("")}</tbody></table></div>`;
 }
 
 async function plResumo(){
@@ -2002,9 +2239,9 @@ async function vImportacoes(){
       <div id="impDrop" style="border:1.5px dashed var(--border-strong);border-radius:14px;margin:16px;
         padding:34px 20px;text-align:center;cursor:pointer;transition:.18s">
         <div style="font-size:15px;font-weight:700;margin-bottom:5px">Arraste os relatórios aqui</div>
-        <div style="font-size:12.5px;color:var(--text-dim)">ou clique para escolher &middot; pode soltar vários de uma vez</div>
+        <div style="font-size:12.5px;color:var(--text-dim)">ou clique para escolher &middot; CSV ou Excel &middot; pode soltar vários de uma vez</div>
       </div>
-      <input type="file" id="impFile" multiple accept=".csv,.txt" style="display:none">
+      <input type="file" id="impFile" multiple accept=".csv,.txt,.xlsx,.xls" style="display:none">
       <div id="impSaida" style="padding:0 16px 16px"></div>
     </div>
 
@@ -2066,13 +2303,28 @@ async function impHistorico(){
 function impReceber(lista){
   [...lista].forEach(f=>{
     const rd = new FileReader();
-    rd.onload = ()=>impProcessar(f.name, rd.result);
-    rd.readAsText(f, "UTF-8");
+    if(/\.xlsx?$/i.test(f.name)){
+      // Excel: converte para CSV com ponto e vírgula e segue o mesmo caminho
+      rd.onload = ()=>{
+        try{
+          const wb = XLSX.read(new Uint8Array(rd.result), {type:"array", cellDates:true});
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const csv = XLSX.utils.sheet_to_csv(ws, {FS:";", dateNF:"yyyy-mm-dd"});
+          impProcessar(f.name, csv);
+        }catch(e){ impCartao(f.name, null, 0, [], "Não consegui ler o Excel: " + e.message); }
+      };
+      rd.readAsArrayBuffer(f);
+    } else {
+      rd.onload = ()=>impProcessar(f.name, rd.result);
+      rd.readAsText(f, "UTF-8");
+    }
   });
 }
 
 async function impProcessar(nome, texto){
-  const linhas = String(texto).replace(/^\uFEFF/,"").split(/\r?\n/).filter(l=>l.trim());
+  // a planilha de custos vem com milhares de linhas vazias no fim
+  const linhas = String(texto).replace(/^\uFEFF/,"").split(/\r?\n/)
+    .filter(l=>l.replace(/;/g,"").trim());
   if(linhas.length < 2){
     impCartao(nome, null, 0, [], "O arquivo não tem linhas de dados.");
     return;
@@ -2090,7 +2342,31 @@ async function impProcessar(nome, texto){
   if(error){ impCartao(nome, null, linhas.length-1, colunas, error.message); return; }
 
   // guarda as linhas para o processamento, quando o formato tiver destino
-  if(data && data.formato === "plataformas"){
+  if(data && data.formato === "custos"){
+    const idx = n => colunas.findIndex(c=>c.trim().toUpperCase() === n);
+    const iS=idx("COD SINACOR CLIENTE SEM DIGITO"), iA=idx("ASSESSOR"),
+          iTP=idx("TIPO PRODUTO"), iP=idx("PRODUTO"), iCPF=idx("CPF/CNPJ"),
+          iN=idx("CLIENTE"), iD=idx("DATA DE RECEITA"), iRG=idx("RECEITA GENIAL (*)"),
+          iRA=idx("REPASSE AAI"), iRAS=idx("REPASSE ASSESSOR"), iVB=idx("VALOR BRUTO AAI"),
+          iIM=idx("IMPOSTO"), iVL=idx("VALOR LIQUIDO AAI"), iCO=idx("COMISSÃO ASSESSOR"),
+          iDE=idx("DESCRICAO");
+    const num = v => {
+      const t = String(v||"").replace(/[R$\s.]/g,"").replace(",",".");
+      const n = Number(t);
+      return isNaN(n) ? null : n;
+    };
+    const itens = linhas.slice(1).map(l=>{
+      const p = l.split(sep).map(x=>x.replace(/^"|"$/g,"").trim());
+      return { sinacor:p[iS], descricao:p[iDE], competencia:p[iD],
+               cpf:p[iCPF], nome:p[iN], barra:p[iA],
+               tipo_produto:p[iTP], produto:p[iP],
+               receita_genial:num(p[iRG]), repasse_aai:num(p[iRA]),
+               repasse_assessor:num(p[iRAS]), valor_bruto_aai:num(p[iVB]),
+               imposto:num(p[iIM]), valor_liquido:num(p[iVL]), comissao:num(p[iCO]) };
+    }).filter(x=>x.sinacor && x.descricao);
+    window.__impCustos = {arquivo:nome, itens:itens};
+    impCartao(nome, data, linhas.length-1, colunas, null, null, null, itens.length);
+  } else if(data && data.formato === "plataformas"){
     const idx = n => colunas.findIndex(c=>new RegExp("^"+n+"$","i").test(c));
     const iC=idx("CD_CONTA_COM_DIGITO"), iD=idx("DATA_INICIO"), iF=idx("NOME_FERRAMENTA"),
           iS=idx("SITUACAO_ADESAO"), iT=idx("TP_PESSOA"), iA=idx("NOME_ASSESSOR_ATUAL");
@@ -2125,6 +2401,20 @@ async function impProcessar(nome, texto){
  * movimento do dia. Cada importação substitui a anterior — quem cancelou
  * uma ferramenta some, em vez de ficar registrado para sempre.
  */
+async function impProcessarCustos(){
+  const lote = window.__impCustos;
+  if(!lote || !lote.itens.length) return;
+  const ok = confirm(
+    "Importar " + lote.itens.length + " linhas de custo?\n\n" +
+    "Só o mês desta planilha é substituído — os meses anteriores continuam, " +
+    "porque a série mês a mês é o que dá valor.");
+  if(!ok) return;
+  const {data,error} = await sb.rpc("receber_custos",{lote:lote});
+  if(error){ toast("Não deu para importar", error.message, true); return; }
+  toast("Custos importados", nf(data.gravadas) + " linhas · " + (data.competencia||""));
+  impHistorico();
+}
+
 async function impProcessarPlataformas(){
   const lote = window.__impPlat;
   if(!lote || !lote.itens.length) return;
@@ -2156,7 +2446,7 @@ async function impProcessarSaidas(){
   impHistorico();
 }
 
-function impCartao(nome, res, linhas, colunas, erroTxt, loteSaida, qtdPlat){
+function impCartao(nome, res, linhas, colunas, erroTxt, loteSaida, qtdPlat, qtdCusto){
   if(loteSaida) window.__impSaidas = loteSaida;
   const reconhecido = res && res.reconhecido;
   const cor = erroTxt ? "var(--red)" : reconhecido ? "var(--green)" : "var(--amber)";
@@ -2177,6 +2467,8 @@ function impCartao(nome, res, linhas, colunas, erroTxt, loteSaida, qtdPlat){
               Processar as ${nf(loteSaida.itens.length)} saída(s)</button>` : ""}
             ${qtdPlat ? `<button class="cfg-save" style="margin-top:12px" onclick="impProcessarPlataformas()">
               Atualizar ${nf(qtdPlat)} adesões</button>` : ""}
+            ${qtdCusto ? `<button class="cfg-save" style="margin-top:12px" onclick="impProcessarCustos()">
+              Importar ${nf(qtdCusto)} linhas de custo</button>` : ""}
           </div>`
        : `<div style="margin-top:8px">
             <span class="tag t-amber">formato ainda não reconhecido</span>
@@ -2920,7 +3212,7 @@ async function dgAbrir(codigo, manterPosicao){
       <th>Cliente</th><th>Faixa</th><th>Barra</th><th>Parceiro</th>
       <th>Atividade</th><th>Sem contato</th><th>Situação</th><th></th></tr></thead>
     <tbody>${data.map(c=>`<tr class="${c.faixa==='preta'?'linha-preta':''}" onclick="abrirFicha('${c.id}')">
-      <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}${tagParceiro(c.barra,c.parceiros)}${tagContato(c.tipo_contato)}</div></td>
+      <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}${tagParceiro(c.barra,c.parceiros)}${tagContato(c.tipo_contato)}${c.tem_akeloo?tagAkeloo():""}</div></td>
       <td>${faixaBadge(c.faixa,c.grau)}</td>
       <td class="num">${c.barra||"—"}</td>
       <td class="num">${c.parceiros||"—"}</td>
@@ -2956,7 +3248,7 @@ async function abrirFicha(id){
   el("drBody").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
   el("drName").textContent=""; el("drSub").textContent=""; el("drStatus").innerHTML=""; el("drActions").innerHTML="";
   const {data:c} = await sb.from("clientes").select("*").eq("id",id).single();
-  const {data:s} = await sb.from("vw_saude_carteira").select("saude,status_operacao,data_ativacao,data_ultima_operacao,contratos_bmf,volume_bovespa,qtd_operacoes,faixa,grau").eq("id",id).maybeSingle();
+  const {data:s} = await sb.from("vw_saude_carteira").select("saude,status_operacao,data_ativacao,data_ultima_operacao,contratos_bmf,volume_bovespa,qtd_operacoes,faixa,grau,tem_akeloo").eq("id",id).maybeSingle();
   if(!c){ el("drBody").innerHTML='<div class="empty">Cliente não encontrado.</div>'; return; }
   fichaAtual = c;
   el("drName").textContent=c.nome;
@@ -2964,7 +3256,8 @@ async function abrirFicha(id){
   el("drStatus").innerHTML = (s?`<span class="status s-${s.saude}">${SAUDE_LABEL[s.saude]||s.saude}</span>`:"")
     + faixaBadge(s?s.faixa:"sem", s?s.grau:0)
     + tagContato(c.data_ultimo_contato ? "pessoal"
-                 : (c.data_ultima_campanha ? "so_campanha" : "nenhum"), true);
+                 : (c.data_ultima_campanha ? "so_campanha" : "nenhum"), true)
+    + (s && s.tem_akeloo ? tagAkeloo() : "");
   el("drActions").innerHTML = btnRD(c.nome);
   const aniv = (c.nasc_dia&&c.nasc_mes)? String(c.nasc_dia).padStart(2,"0")+"/"+String(c.nasc_mes).padStart(2,"0") : "—";
 
@@ -3237,4 +3530,3 @@ boot();
 </script>
 </body>
 </html>
-  
