@@ -1858,12 +1858,19 @@ function cuMudou(){
 }
 
 async function cuResumo(){
-  const {data,error} = await sb.from("vw_custos_produto")
-    .select("*").eq("competencia", cuState.competencia).order("custo_da_casa");
+  // o resumo acompanha o filtro: sem isso a tela dizia "não opera há 60
+  // dias" no seletor e mostrava o mês inteiro nos números
+  const {data,error} = await sb.rpc("fn_custos_resumo",{
+    p_competencia: cuState.competencia,
+    p_situacao:    cuState.situacao,
+    p_contato:     cuState.contato
+  });
   if(error) return erro(error,"cuResumo");
 
+  const filtrado = cuState.situacao !== "todos" || cuState.contato !== "todos";
+
   const sel = el("cuProd");
-  if(sel && sel.options.length <= 1){
+  if(sel && sel.options.length <= 1 && !filtrado){
     sel.innerHTML = '<option value="todos">Todos os produtos</option>' +
       (data||[]).map(p=>`<option value="${p.descricao}">${p.descricao} (${nf(p.clientes)})</option>`).join("");
     sel.value = cuState.produto;
@@ -1874,7 +1881,7 @@ async function cuResumo(){
   const casaPaga = (data||[]).reduce((s,p)=>s + Number(p.casa_paga||0), 0);
   const cliPaga  = (data||[]).reduce((s,p)=>s + Number(p.cliente_paga||0), 0);
 
-  const {data:oc} = await sb.from("vw_custo_ocioso")
+  const {data:oc} = filtrado ? {data:null} : await sb.from("vw_custo_ocioso")
     .select("*").eq("competencia", cuState.competencia).maybeSingle();
 
   el("cuResumo").innerHTML = `
@@ -1885,9 +1892,11 @@ async function cuResumo(){
     </div>
     <div class="panel" style="padding:0">
       <div style="padding:16px;border-bottom:1px solid var(--border);display:flex;gap:28px;flex-wrap:wrap">
-        <div><div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px">A casa pagou no mês</div>
+        <div><div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px">${
+          filtrado ? "A casa paga neste recorte" : "A casa pagou no mês"}</div>
           <div style="font-size:24px;font-weight:800;letter-spacing:-.5px;color:var(--red)">${nfR(custo)}</div>
-          <div style="font-size:11.5px;color:var(--text-faint)">${nf(casaPaga)} linhas</div></div>
+          <div style="font-size:11.5px;color:var(--text-faint)">${nf(casaPaga)} clientes${
+            filtrado ? " · " + nfR(custo*12) + " no ano" : ""}</div></div>
         <div><div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px">O cliente paga</div>
           <div style="font-size:24px;font-weight:800;letter-spacing:-.5px">${nf(cliPaga)}</div>
           <div style="font-size:11.5px;color:var(--text-faint)">sem custo para a casa</div></div>
@@ -1898,6 +1907,9 @@ async function cuResumo(){
           <div style="font-size:24px;font-weight:800;letter-spacing:-.5px;color:var(--amber)">${nfR(oc.custo_da_casa)}</div>
           <div style="font-size:11.5px;color:var(--text-faint)">${nf(oc.clientes_parados)} clientes parados</div></div>`:""}
       </div>
+      ${filtrado ? `<div style="padding:10px 16px;font-size:11.5px;color:var(--amber);
+        border-bottom:1px solid var(--border)">Os números acima e a tabela abaixo mostram
+        <b>apenas os clientes do filtro escolhido</b>, não o mês inteiro.</div>` : ""}
       <table><thead><tr>
         <th>Produto</th><th>Clientes</th><th>A casa paga</th><th>O cliente paga</th>
         <th>Custo da casa</th><th>Média quando paga</th></tr></thead>
