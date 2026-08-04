@@ -411,7 +411,7 @@
       <button class="nav-item" data-view="integracoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 7V4M15 7V4M8 7h8v4a4 4 0 0 1-8 0z" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15v5" stroke-linecap="round"/></svg>Integrações</button>
     </nav>
     <div class="foot">
-      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v04/08 17:53</div></div></div>
+      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v04/08 17:56</div></div></div>
       <button class="btn-logout" id="logoutBtn">Sair</button>
     </div>
   </aside>
@@ -3620,6 +3620,30 @@ async function abrirFicha(id){
     <div class="dr-sec">Evolução de faixa · últimos 3 meses</div>
     <div class="timeline">${timeline}</div>
     <div id="fcPlat"></div>
+
+    <div class="dr-sec">Perfil do cliente</div>
+    <div class="dr-stats">
+      <div class="dr-stat"><div class="l">Patrimônio</div>
+        <div class="v" style="font-size:15px${c.patrimonio?'':';color:var(--text-faint)'}">${
+          c.patrimonio ? nfR(c.patrimonio) : "não informado"}</div></div>
+      <div class="dr-stat"><div class="l">Rendimentos</div>
+        <div class="v" style="font-size:15px${c.rendimentos?'':';color:var(--text-faint)'}">${
+          c.rendimentos ? nfR(c.rendimentos) + "/mês" : "não informado"}</div></div>
+      <div class="dr-stat"><div class="l">Profissão</div>
+        <div class="v" style="font-size:13px${c.profissao?'':';color:var(--text-faint)'}">${
+          c.profissao || "não informada"}</div></div>
+      <div class="dr-stat"><div class="l">Suitability</div>
+        <div class="v" style="font-size:14px">${c.perfil_suitability || "—"}</div></div>
+      <div class="dr-stat"><div class="l">Perfil na corretora</div>
+        <div class="v" style="font-size:14px">${c.perfil || "—"}</div></div>
+      <div class="dr-stat"><div class="l">Estado</div>
+        <div class="v" style="font-size:14px">${c.uf || "—"}</div></div>
+      <div class="dr-stat"><div class="l">Conta na corretora</div>
+        <div class="v" style="font-size:14px${c.situacao_conta==="INATIVA"?';color:var(--amber)':''}">${
+          c.situacao_conta || "—"}</div></div>
+      ${c.visto_em ? `<div class="dr-stat"><div class="l">Visto na base em</div>
+        <div class="v" style="font-size:14px">${fmtData(c.visto_em)}</div></div>` : ""}
+    </div>
 
     <div class="dr-sec">Contato
       <button class="btn-rd" style="float:right;margin-top:-3px" onclick="fcEditar()">Editar cadastro</button>
