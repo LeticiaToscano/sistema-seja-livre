@@ -383,6 +383,7 @@
       <button class="nav-item" data-view="clientes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3.2 3-5 5.5-5s4.9 1.8 5.5 5" stroke-linecap="round"/></svg>Clientes</button>
       <button class="nav-item" data-view="explorar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M16 16l5 5" stroke-linecap="round"/><path d="M8 11h6M11 8v6" stroke-linecap="round"/></svg>Explorar</button>
       <button class="nav-item" data-view="destaques"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l2.5 5 5.5.8-4 3.9 1 5.5L12 16l-5 2.7 1-5.5-4-3.9 5.5-.8z" stroke-linejoin="round"/></svg>Destaques</button>
+      <button class="nav-item" data-view="ranking"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" stroke-linecap="round"/></svg>Ranking do dia</button>
       <button class="nav-item" data-view="clube"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="9" width="18" height="5" rx="1.4"/><path d="M9 9v5M15 9v5"/><path d="M6 17l2.5 3M18 17l-2.5 3" stroke-linecap="round"/></svg>Clube Trader</button>
       <button class="nav-item" data-view="plataformas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8M12 18v3" stroke-linecap="round"/></svg>Plataformas</button>
       <button class="nav-item" data-view="fila"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h10M4 12h10M4 18h7" stroke-linecap="round"/><path d="M17 15l2.2 2.2L23 13" stroke-linecap="round" stroke-linejoin="round"/></svg>Fila de ação</button>
@@ -411,7 +412,7 @@
       <button class="nav-item" data-view="integracoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 7V4M15 7V4M8 7h8v4a4 4 0 0 1-8 0z" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15v5" stroke-linecap="round"/></svg>Integrações</button>
     </nav>
     <div class="foot">
-      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v04/08 20:47</div></div></div>
+      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v05/08 19:07</div></div></div>
       <button class="btn-logout" id="logoutBtn">Sair</button>
     </div>
   </aside>
@@ -584,6 +585,7 @@ const TITLES={
   fluxos:["ATENDIMENTO","Fluxos"], assessores:["ATENDIMENTO","Assessores"],
   config:["GESTÃO","Configurações"], auditoria:["GESTÃO","Auditoria"],
   leads:["COMERCIAL","Leads · falaram no RD e não são clientes"],
+  ranking:["CARTEIRA","Ranking do dia"],
   plataformas:["CARTEIRA","Plataformas · o que a carteira contrata e usa"],
   saidas:["COMERCIAL","Saíram da assessoria"],
   conferencia:["GESTÃO","Conferência · CRM contra a base da corretora"],
@@ -601,7 +603,7 @@ const RESERVADAS={
   ia:{icon:"ia",desc:"O diagnóstico estratégico da operação em linguagem natural, e o copiloto de IA por assessor — cada um enxergando apenas a própria carteira."},
   integracoes:{icon:"integracoes",desc:"As conexões do sistema — Volume Operado (operação), RD Conversas (atendimento), Gmail/Genial (entrada de clientes) e IA. Ligadas e a ligar."}
 };
-const VIEWS={radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes,auditoria:vAuditoria,diagnostico:vDiagnostico,legenda:vLegenda,leads:vLeads,importacoes:vImportacoes,saidas:vSaidas,plataformas:vPlataformas,custos:vCustos,conferencia:vConferencia};
+const VIEWS={radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes,auditoria:vAuditoria,diagnostico:vDiagnostico,legenda:vLegenda,leads:vLeads,importacoes:vImportacoes,saidas:vSaidas,plataformas:vPlataformas,custos:vCustos,conferencia:vConferencia,ranking:vRanking};
 document.querySelectorAll(".nav-item").forEach(b=>b.addEventListener("click",()=>{
   document.querySelectorAll(".nav-item").forEach(x=>x.classList.remove("active"));
   b.classList.add("active"); el("sidebar").classList.remove("open"); render(b.dataset.view);
@@ -1788,6 +1790,74 @@ function cfPintar(j){
     </tbody></table></div>`;
 }
 
+// ---------- RANKING DO DIA ----------
+// Quem mais operou e quem mais foi zerado no último dia com movimento.
+//
+// A variação compara com o dia anterior EM QUE O CLIENTE OPEROU, não com
+// o dia de calendário — senão toda segunda-feira daria variação infinita.
+//
+// O alerta de +300% (quadruplicou) serve para os dois lados: pode ser
+// cliente esquentando, pode ser erro numa ordem. Por isso é alerta.
+
+async function vRanking(){
+  el("content").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
+
+  const [op, ze] = await Promise.all([
+    sb.from("vw_ranking_dia").select("*").order("contratos",{ascending:false}).limit(15),
+    sb.from("vw_ranking_zeragem").select("*").order("contratos",{ascending:false}).limit(15)
+  ]);
+  if(op.error) return erro(op.error,"content");
+
+  const dia = (op.data||[])[0]?.data;
+  const saltos = (op.data||[]).filter(r=>r.salto).length;
+
+  el("content").innerHTML = `
+    <div class="note" style="border-left-color:var(--green);margin-bottom:18px">
+      Movimento de <b>${dia?fmtData(dia):"—"}</b>, o último dia com operações importadas.
+      A variação compara com o <b>dia anterior em que o cliente operou</b>, não com o dia
+      de calendário.${saltos?` <b style="color:var(--amber)">${saltos} cliente(s) quadruplicaram
+      ou mais</b> — vale olhar antes de comemorar: pode ser erro numa ordem.`:""}
+    </div>
+
+    <div class="sec-title">Quem mais operou<span class="rule"></span></div>
+    <div class="panel" style="margin-bottom:26px">${rkTabela(op.data, "operou")}</div>
+
+    <div class="sec-title">Quem mais foi zerado<span class="rule"></span></div>
+    <div class="note" style="margin:14px 0">
+      Zeragem é a mesa encerrando posição do cliente. Volume alto aqui não é o mesmo que
+      operar bem — é posição que precisou ser fechada.
+    </div>
+    <div class="panel">${rkTabela(ze.data, "zerado")}</div>`;
+}
+
+function rkTabela(dados, tipo){
+  if(!dados || !dados.length) return '<div class="empty">Nenhum movimento neste dia.</div>';
+  const zer = tipo === "zerado";
+  return `<table><thead><tr>
+      <th style="width:34px">#</th><th>Cliente</th><th>Barra</th><th>Faixa</th>
+      <th>${zer?"Zerado":"Contratos"}</th>
+      ${zer?"<th>Operou no dia</th>":"<th>Negócios</th>"}
+      <th>Dia anterior</th><th>Variação</th></tr></thead>
+    <tbody>${dados.map((r,i)=>`<tr ${r.cliente_id?`onclick="abrirFicha('${r.cliente_id}')"`:'style="cursor:default"'}>
+      <td class="num" style="color:var(--text-faint);font-weight:700">${i+1}</td>
+      <td><div class="cell-name"><span class="mini-av">${ini(r.nome)}</span>${r.nome}
+        ${r.salto?`<span class="tag t-amber" title="Quadruplicou ou mais em relação ao dia anterior que operou">+${nf(r.variacao_pct)}%</span>`:""}
+        ${tagParceiro(r.barra, r.parceiros)}</div></td>
+      <td class="num">${r.barra||"—"}</td>
+      <td>${faixaBadge(r.faixa, r.grau)}</td>
+      <td class="num" style="font-weight:700">${nf(r.contratos)}</td>
+      ${zer
+        ? `<td class="num">${r.operou_no_dia?nf(r.operou_no_dia):'<span style="color:var(--text-faint)">—</span>'}</td>`
+        : `<td class="num">${nf(r.negocios)}</td>`}
+      <td class="num">${r.contratos_antes!=null
+          ? nf(r.contratos_antes) + ` <span style="color:var(--text-faint);font-size:11px">${fmtData(r.dia_antes)}</span>`
+          : '<span style="color:var(--text-faint)">primeiro dia</span>'}</td>
+      <td class="num">${r.variacao_pct==null ? "—"
+          : `<span style="color:${r.variacao_pct>=300?'var(--amber)':r.variacao_pct>0?'var(--green)':'var(--red)'}">${
+              r.variacao_pct>0?"+":""}${nf(r.variacao_pct)}%</span>`}</td>
+    </tr>`).join("")}</tbody></table>`;
+}
+
 // ---------- CONFERÊNCIA COM A BASE DA CORRETORA ----------
 // O Diversificador é a base inteira da corretora. Comparando com o CRM,
 // as diferenças aparecem nos dois sentidos — e cada uma quer dizer uma
@@ -1945,8 +2015,10 @@ function cbMotivo(m){
     "troca em processo":              ["s-saudavel",      "troca em processo"],
     "saida em processo":              ["s-saudavel",      "saida em processo"],
     "aberto ha pouco":                ["s-saudavel",      "aberto ha pouco"],
+    "troca demorando":                ["s-negligenciado", "troca demorando"],
+    "troca que nao entrou":           ["s-em_recuperacao","troca que nao entrou"],
+    "abriu e nao entrou na base":     ["s-em_recuperacao","abriu e nao entrou"],
     "pediu saida":                    ["s-em_recuperacao","pediu saida"],
-    "troca antiga que nao entrou":    ["s-em_recuperacao","troca antiga"],
     "nao consta na base da corretora":["s-critico",       "nao consta na corretora"]
   }[m] || ["s-nunca_operou", m || "—"];
   return `<span class="status ${cor[0]}" title="${m||""}">${cor[1]}</span>`;
@@ -1956,11 +2028,13 @@ function cbMotivo(m){
 const CB_EXPLICA = {
   "falta criar a ficha":            "Cliente da corretora sem ficha no CRM. Criar.",
   "conta inativa na corretora":     "Conta inativa na Genial — nao vira ficha de proposito.",
-  "troca em processo":              "Pediu troca nos ultimos 90 dias. Tem 72h para cancelar; so esperar.",
+  "troca em processo":              "Pediu troca ha ate 7 dias. Sao 72h para cancelar mais a folga de efetivacao; so esperar.",
   "saida em processo":              "Pediu saida ha menos de 3 dias. Ainda pode cancelar.",
-  "aberto ha pouco":                "Conta aberta nos ultimos 90 dias, ainda entrando na base.",
+  "aberto ha pouco":                "Conta aberta ha ate 7 dias, ainda entrando na base.",
+  "troca demorando":                "Pediu troca ha 8 a 30 dias e ainda nao chegou. Passou do prazo normal — vale perguntar.",
+  "troca que nao entrou":           "Pediu troca ha mais de 30 dias e nunca chegou. O pedido nao virou cliente; a ficha esta sobrando.",
+  "abriu e nao entrou na base":     "Abriu conta ha mais de 7 dias e nao aparece na base da corretora.",
   "pediu saida":                    "Pediu saida ha mais de 3 dias e sumiu da base. Desligar.",
-  "troca antiga que nao entrou":    "Pediu troca ha mais de 90 dias e nunca chegou.",
   "nao consta na base da corretora":"Ficha completa, muitos operando, e a Genial nao tem. Pergunta em aberto."
 };
 
@@ -2720,7 +2794,16 @@ async function impProcessar(nome, texto){
   if(error){ impCartao(nome, null, linhas.length-1, colunas, error.message); return; }
 
   // guarda as linhas para o processamento, quando o formato tiver destino
-  if(data && data.formato === "diversificador"){
+  if(data && data.formato === "chegou_na_livre"){
+    const idx = n => colunas.findIndex(c=>c.trim().toUpperCase() === n);
+    const iS=idx("CONTA_SINACOR_SEM_DIGITO"), iA=idx("ASSESSOR_CONTA"), iD=idx("DT_PARTITION");
+    const itens = linhas.slice(1).map(l=>{
+      const p = l.split(sep).map(x=>x.replace(/^"|"$/g,"").trim());
+      return { sinacor:p[iS], barra: iA>=0?p[iA]:null, data: iD>=0?p[iD]:null };
+    }).filter(x=>x.sinacor);
+    window.__impCheg = {arquivo:nome, itens:itens};
+    impCartao(nome, data, linhas.length-1, colunas, null, null, null, null, null, itens.length);
+  } else if(data && data.formato === "diversificador"){
     const idx = n => colunas.findIndex(c=>c.trim().toUpperCase() === n);
     const col = {
       sinacor:idx("CD_CONTA_SEM_DIGITO"), nome:idx("NOME_CLIENTE"), cpf:idx("CPF_CNPJ"),
@@ -2822,6 +2905,22 @@ async function impProcessar(nome, texto){
  * Vai em lotes, com barra de progresso — a importação leva alguns
  * segundos e sem retorno visual parece travada.
  */
+/**
+ * O relatorio de chegadas confirma quem realmente entrou. E ele que
+ * transforma o pedido de troca em cliente — o aviso por e-mail sozinho
+ * nao cria mais ficha, porque 4 em cada 5 pedidos nao se concretizam.
+ */
+async function impProcessarChegadas(){
+  const lote = window.__impCheg;
+  if(!lote || !lote.itens.length) return;
+  const {data,error} = await sb.rpc("receber_chegadas",{lote:lote});
+  if(error){ toast("Nao deu para processar", error.message, true); return; }
+  toast("Entradas confirmadas",
+        nf(data.linhas) + " confirmadas" +
+        (data.fichas_criadas ? " · " + nf(data.fichas_criadas) + " viraram ficha" : ""));
+  impHistorico();
+}
+
 async function impProcessarDiversificador(){
   const lote = window.__impDiv;
   if(!lote || !lote.itens.length) return;
@@ -2919,7 +3018,7 @@ async function impProcessarSaidas(){
   impHistorico();
 }
 
-function impCartao(nome, res, linhas, colunas, erroTxt, loteSaida, qtdPlat, qtdCusto, qtdDiv){
+function impCartao(nome, res, linhas, colunas, erroTxt, loteSaida, qtdPlat, qtdCusto, qtdDiv, qtdCheg){
   if(loteSaida) window.__impSaidas = loteSaida;
   const reconhecido = res && res.reconhecido;
   const cor = erroTxt ? "var(--red)" : reconhecido ? "var(--green)" : "var(--amber)";
@@ -2944,6 +3043,8 @@ function impCartao(nome, res, linhas, colunas, erroTxt, loteSaida, qtdPlat, qtdC
               Importar ${nf(qtdCusto)} linhas de custo</button>` : ""}
             ${qtdDiv ? `<button class="cfg-save" style="margin-top:12px" onclick="impProcessarDiversificador()">
               Atualizar ${nf(qtdDiv)} cadastros</button>` : ""}
+            ${qtdCheg ? `<button class="cfg-save" style="margin-top:12px" onclick="impProcessarChegadas()">
+              Confirmar ${nf(qtdCheg)} entrada(s)</button>` : ""}
           </div>`
        : `<div style="margin-top:8px">
             <span class="tag t-amber">formato ainda não reconhecido</span>
