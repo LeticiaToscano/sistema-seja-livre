@@ -597,6 +597,28 @@
   @media (prefers-reduced-motion:reduce){
     .nav-item svg{ animation:none !important }
   }
+
+  /* Assessores: cards em vez de linhas. Cada um e uma pessoa. */
+  .as-grade{
+    display:grid; gap:14px; margin-top:16px;
+    grid-template-columns:repeat(auto-fill, minmax(258px, 1fr));
+  }
+  .as-card{
+    background:var(--panel); border:1px solid var(--border); border-radius:14px;
+    padding:16px 17px; cursor:pointer; transition:.16s;
+  }
+  .as-card:hover{
+    border-color:var(--border-strong);
+    transform:translateY(-2px);
+    box-shadow:0 8px 22px rgba(0,0,0,.28);
+  }
+  .as-barra{
+    height:3px; border-radius:3px; background:rgba(255,255,255,.06); overflow:hidden;
+  }
+  .as-barra span{
+    display:block; height:100%; border-radius:3px;
+    background:linear-gradient(90deg, var(--green), rgba(46,229,157,.35));
+  }
 </style>
 <!-- leitor de Excel: a planilha de custos vem em .xlsx, e converter para
      CSV todo mês seria um passo a mais sem motivo -->
@@ -664,7 +686,7 @@
       <button class="nav-item" data-view="integracoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 7V4M15 7V4M8 7h8v4a4 4 0 0 1-8 0z" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15v5" stroke-linecap="round"/></svg>Integrações</button>
     </nav>
     <div class="foot">
-      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v05/08 20:43</div></div></div>
+      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v05/08 20:50</div></div></div>
       <button class="btn-logout" id="logoutBtn">Sair</button>
     </div>
   </aside>
@@ -2043,11 +2065,12 @@ function cfPintar(j){
 
 // ---------- ASSESSORES ----------
 // Atendimento aqui e por FILA, nao por carteira: quase metade dos
-// clientes passou por mais de um assessor. Entao a tela mede COBERTURA —
+// clientes passou por mais de um assessor. A tela mede COBERTURA —
 // quantos cada um atendeu e com que frequencia — e nao posse.
 //
-// A fonte e o `employee` do atendimento no RD: quem de fato conversou,
-// nao a barra do cadastro.
+// Cards em vez de tabela porque cada um e uma pessoa, nao uma linha. E
+// clicar abre a pagina inteira daquele assessor, nao uma gaveta: quando
+// se olha o trabalho de alguem, vale a tela toda.
 
 let asOrdem = "clientes";
 
@@ -2061,26 +2084,22 @@ async function vAssessores(){
     return;
   }
 
-  const ativos = data.filter(a=>a.ativo);
-  const totalCli = data.reduce((s,a)=>s+Number(a.clientes||0),0);
-  const total30  = data.reduce((s,a)=>s+Number(a.atendimentos_30d||0),0);
+  const ativos  = data.filter(a=>a.ativo);
+  const total30 = data.reduce((s,a)=>s+Number(a.atendimentos_30d||0),0);
+  const maior   = Math.max(...data.map(a=>Number(a.clientes||0)));
 
   el("content").innerHTML = `
     <div class="note" style="border-left-color:var(--blue);margin-bottom:18px">
       Atendimento na Seja Livre é por <b>fila</b>, não por carteira — quase metade dos
-      clientes já falou com mais de um assessor. Por isso esta tela mede <b>cobertura</b>:
-      quantos cada um atendeu e com que frequência. Ela não diz de quem é o cliente,
-      porque na maioria dos casos essa resposta não existe.
+      clientes já falou com mais de um assessor. Por isso esta tela mede <b>cobertura</b>,
+      não posse: ela diz quem encostou em quem, não de quem é o cliente.
     </div>
 
     <div class="panel" style="padding:16px;margin-bottom:18px;display:flex;gap:30px;flex-wrap:wrap">
-      <div><div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px">Atendendo nos últimos 30 dias</div>
+      <div><div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px">Atendendo no mês</div>
         <div style="font-size:24px;font-weight:800">${nf(ativos.length)} <span style="font-size:14px;font-weight:500;color:var(--text-dim)">de ${nf(data.length)}</span></div></div>
       <div><div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px">Atendimentos no mês</div>
         <div style="font-size:24px;font-weight:800">${nf(total30)}</div></div>
-      <div><div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px">Clientes tocados</div>
-        <div style="font-size:24px;font-weight:800">${nf(totalCli)}</div>
-        <div style="font-size:11.5px;color:var(--text-faint)">somando repetições entre assessores</div></div>
     </div>
 
     <div class="sol-tabs">
@@ -2089,55 +2108,92 @@ async function vAssessores(){
       <button class="sol-tab ${asOrdem==="no_diagnostico"?"on":""}" onclick="asOrdenar('no_diagnostico')">Por fila em aberto</button>
     </div>
 
-    <div class="panel"><table><thead><tr>
-      <th>Assessor</th><th>Clientes</th><th>Atendimentos</th><th>Por cliente</th>
-      <th>No mês</th><th>Na semana</th><th>Fila em aberto</th><th>Último</th></tr></thead>
-    <tbody>${data.map(a=>`<tr onclick="asAbrir('${String(a.assessor).replace(/'/g,"")}')">
-      <td><div class="cell-name"><span class="mini-av">${ini(a.assessor)}</span>${a.assessor}
-        ${!a.ativo?'<span class="tag" style="font-size:10px;background:transparent;border:1px dashed var(--text-faint);color:var(--text-faint)">parado</span>':""}</div></td>
-      <td class="num" style="font-weight:700">${nf(a.clientes)}</td>
-      <td class="num">${nf(a.atendimentos)}</td>
-      <td class="num">${a.atendimentos_por_cliente||"—"}</td>
-      <td class="num">${a.atendimentos_30d?nf(a.atendimentos_30d):'<span style="color:var(--text-faint)">—</span>'}</td>
-      <td class="num">${a.clientes_7d?nf(a.clientes_7d):'<span style="color:var(--text-faint)">—</span>'}</td>
-      <td class="num">${a.no_diagnostico?`<span style="color:var(--amber)">${nf(a.no_diagnostico)}</span>`:"—"}</td>
-      <td class="num">${fmtData(a.ultimo)} <span style="font-size:11px;color:var(--text-faint)">${
-        a.dias_sem_atender>0?"há "+nf(a.dias_sem_atender)+"d":"hoje"}</span></td>
-    </tr>`).join("")}</tbody></table>
-    <div style="padding:11px 16px;font-size:11px;color:var(--text-faint);line-height:1.6">
-      <b>Fila em aberto</b> é quanto dos clientes que ele atendeu ainda aparece no Diagnóstico
-      sem tratativa. Como o mesmo cliente pode ter falado com vários, ele conta para todos —
-      não é uma divisão de trabalho, é um retrato de quem encostou em quem.</div></div>`;
+    <div class="as-grade">
+      ${data.map(a=>asCard(a, maior)).join("")}
+    </div>`;
 }
 
 function asOrdenar(campo){ asOrdem = campo; vAssessores(); }
 
-/** Os clientes que aquele assessor atendeu, do mais recente ao mais antigo. */
-async function asAbrir(assessor){
-  el("overlay").classList.add("open"); el("drawer").classList.add("open");
-  el("drName").textContent = assessor;
-  el("drSub").textContent = "clientes que passaram por ele";
-  el("drStatus").innerHTML = ""; el("drActions").innerHTML = "";
-  el("drBody").innerHTML = '<div class="loading"><div class="spinner"></div>Carregando…</div>';
-
-  const {data,error} = await sb.rpc("fn_clientes_do_assessor",{p_assessor:assessor});
-  if(error){ el("drBody").innerHTML='<div class="empty">'+error.message+'</div>'; return; }
-  if(!data || !data.length){ el("drBody").innerHTML='<div class="empty">Nenhum cliente.</div>'; return; }
-
-  const sozinho = data.filter(c=>Number(c.outros_assessores)===0).length;
-  el("drBody").innerHTML = `
-    <div class="dr-stats">
-      <div class="dr-stat"><div class="l">Clientes atendidos</div><div class="v">${nf(data.length)}</div></div>
-      <div class="dr-stat"><div class="l">Só ele atendeu</div><div class="v">${nf(sozinho)}</div>
-        <div style="font-size:11px;color:var(--text-faint)">os outros passaram por mais gente</div></div>
-      <div class="dr-stat"><div class="l">Nos últimos 30 dias</div>
-        <div class="v">${nf(data.filter(c=>c.dias<=30).length)}</div></div>
+/** A previa de cada um: o essencial em cinco segundos de olhada. */
+function asCard(a, maior){
+  const larg = maior ? Math.max(4, Math.round(100*Number(a.clientes||0)/maior)) : 0;
+  return `<div class="as-card" onclick="asFicha('${String(a.assessor).replace(/'/g,"")}')">
+    <div style="display:flex;gap:11px;align-items:center;margin-bottom:14px">
+      <span class="mini-av" style="width:36px;height:36px;font-size:13px;flex:0 0 36px">${ini(a.assessor)}</span>
+      <div style="min-width:0">
+        <div style="font-weight:800;font-size:14.5px;letter-spacing:-.2px;white-space:nowrap;
+          overflow:hidden;text-overflow:ellipsis">${a.assessor}</div>
+        <div style="font-size:11.5px;color:${a.ativo?'var(--green)':'var(--text-faint)'}">
+          ${a.ativo ? "atendendo" : "parado"} · ${a.dias_sem_atender>0?"há "+nf(a.dias_sem_atender)+" dias":"hoje"}
+        </div>
+      </div>
     </div>
-    <div class="dr-sec">Quem ele atendeu</div>
-    <div class="panel" style="padding:0"><table><thead><tr>
+
+    <div style="display:flex;gap:18px;margin-bottom:12px">
+      <div><div style="font-size:22px;font-weight:800;letter-spacing:-.5px;line-height:1">${nf(a.clientes)}</div>
+        <div style="font-size:10.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.4px">clientes</div></div>
+      <div><div style="font-size:22px;font-weight:800;letter-spacing:-.5px;line-height:1;color:${
+        a.atendimentos_30d?'var(--text)':'var(--text-faint)'}">${nf(a.atendimentos_30d||0)}</div>
+        <div style="font-size:10.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.4px">no mês</div></div>
+      <div><div style="font-size:22px;font-weight:800;letter-spacing:-.5px;line-height:1;color:${
+        a.no_diagnostico?'var(--amber)':'var(--text-faint)'}">${nf(a.no_diagnostico||0)}</div>
+        <div style="font-size:10.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.4px">na fila</div></div>
+    </div>
+
+    <div class="as-barra"><span style="width:${larg}%"></span></div>
+    <div style="font-size:11px;color:var(--text-faint);margin-top:7px">
+      ${nf(a.atendimentos)} atendimentos · ${a.atendimentos_por_cliente||"—"} por cliente
+    </div>
+  </div>`;
+}
+
+/** A pagina inteira de um assessor. */
+async function asFicha(assessor){
+  el("crumb").textContent = "ATENDIMENTO";
+  el("pageTitle").textContent = assessor;
+  el("content").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
+
+  const [q, r] = await Promise.all([
+    sb.from("vw_assessores").select("*").eq("assessor", assessor).maybeSingle(),
+    sb.rpc("fn_clientes_do_assessor",{p_assessor:assessor})
+  ]);
+  if(r.error) return erro(r.error,"content");
+  const a = q.data || {};
+  const cli = r.data || [];
+  const sozinho = cli.filter(c=>Number(c.outros_assessores)===0).length;
+  const em30    = cli.filter(c=>c.dias<=30).length;
+
+  el("content").innerHTML = `
+    <button class="btn-rd" style="margin-bottom:16px" onclick="vAssessores()">← todos os assessores</button>
+
+    <div class="panel" style="padding:20px 22px;margin-bottom:20px;display:flex;gap:32px;flex-wrap:wrap;align-items:center">
+      <span class="mini-av" style="width:52px;height:52px;font-size:18px;flex:0 0 52px">${ini(assessor)}</span>
+      <div>
+        <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px">Clientes atendidos</div>
+        <div style="font-size:26px;font-weight:800">${nf(cli.length)}</div></div>
+      <div>
+        <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px">Só ele atendeu</div>
+        <div style="font-size:26px;font-weight:800">${nf(sozinho)}</div>
+        <div style="font-size:11px;color:var(--text-faint)">os demais passaram por mais gente</div></div>
+      <div>
+        <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px">Nos últimos 30 dias</div>
+        <div style="font-size:26px;font-weight:800">${nf(em30)}</div></div>
+      <div>
+        <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px">Fila em aberto</div>
+        <div style="font-size:26px;font-weight:800;color:${a.no_diagnostico?'var(--amber)':'var(--text-faint)'}">${nf(a.no_diagnostico||0)}</div>
+        <div style="font-size:11px;color:var(--text-faint)">no Diagnóstico, sem tratativa</div></div>
+      <div>
+        <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px">Atende desde</div>
+        <div style="font-size:18px;font-weight:700">${a.primeiro?fmtData(a.primeiro):"—"}</div>
+        <div style="font-size:11px;color:var(--text-faint)">último em ${a.ultimo?fmtData(a.ultimo):"—"}</div></div>
+    </div>
+
+    <div class="sec-title">Quem ele atendeu<span class="rule"></span></div>
+    <div class="panel"><table><thead><tr>
       <th>Cliente</th><th>Barra</th><th>Faixa</th><th>Vezes</th>
       <th>Último</th><th>Também falaram</th></tr></thead>
-    <tbody>${data.slice(0,300).map(c=>`<tr ${c.cliente_id?`onclick="abrirFicha('${c.cliente_id}')"`:'style="cursor:default"'}>
+    <tbody>${cli.slice(0,400).map(c=>`<tr ${c.cliente_id?`onclick="abrirFicha('${c.cliente_id}')"`:'style="cursor:default"'}>
       <td><div class="cell-name"><span class="mini-av">${ini(c.nome||"?")}</span>${c.nome||"—"}</div></td>
       <td class="num">${c.barra||"—"}</td>
       <td>${faixaBadge(c.faixa||"sem", c.grau||0)}</td>
@@ -2147,8 +2203,8 @@ async function asAbrir(assessor){
           ? `<span style="color:var(--text-dim)">+${nf(c.outros_assessores)}</span>`
           : '<span style="color:var(--green)">só ele</span>'}</td>
     </tr>`).join("")}</tbody></table>
-    ${data.length>300?`<div style="padding:11px 16px;font-size:11px;color:var(--text-faint)">
-      Mostrando 300 de ${nf(data.length)}</div>`:""}</div>`;
+    ${cli.length>400?`<div style="padding:11px 16px;font-size:11px;color:var(--text-faint)">
+      Mostrando 400 de ${nf(cli.length)}</div>`:""}</div>`;
 }
 
 // ---------- RANKING DO DIA ----------
@@ -4667,3 +4723,4 @@ boot();
 </script>
 </body>
 </html>
+  
