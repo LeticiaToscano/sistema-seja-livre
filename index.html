@@ -412,7 +412,7 @@
       <button class="nav-item" data-view="integracoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 7V4M15 7V4M8 7h8v4a4 4 0 0 1-8 0z" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15v5" stroke-linecap="round"/></svg>Integrações</button>
     </nav>
     <div class="foot">
-      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v05/08 19:07</div></div></div>
+      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v05/08 19:38</div></div></div>
       <button class="btn-logout" id="logoutBtn">Sair</button>
     </div>
   </aside>
@@ -1799,12 +1799,21 @@ function cfPintar(j){
 // O alerta de +300% (quadruplicou) serve para os dois lados: pode ser
 // cliente esquentando, pode ser erro numa ordem. Por isso é alerta.
 
+let rkOrdemZer = "contratos";
+
 async function vRanking(){
   el("content").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
 
   const [op, ze] = await Promise.all([
     sb.from("vw_ranking_dia").select("*").order("contratos",{ascending:false}).limit(15),
-    sb.from("vw_ranking_zeragem").select("*").order("contratos",{ascending:false}).limit(15)
+    // Ordenar so pelo percentual enche a lista de casos de 1 ou 2
+    // contratos, todos em 100%. O volume desempata: entre dois clientes
+    // que tiveram o dia inteiro zerado, o de 40 contratos importa mais
+    // que o de 1.
+    sb.from("vw_ranking_zeragem").select("*")
+      .order(rkOrdemZer,{ascending:false,nullsFirst:false})
+      .order("contratos",{ascending:false})
+      .limit(15)
   ]);
   if(op.error) return erro(op.error,"content");
 
@@ -1826,8 +1835,24 @@ async function vRanking(){
     <div class="note" style="margin:14px 0">
       Zeragem é a mesa encerrando posição do cliente. Volume alto aqui não é o mesmo que
       operar bem — é posição que precisou ser fechada.
+      <br><br><b>Os dois recortes dizem coisas diferentes:</b> por volume aparece quem tem
+      mais contratos zerados; por proporção aparece quem teve a maior parte do dia
+      encerrada — que pode ser pouca coisa em número e muito em significado.
+    </div>
+    <div class="sol-tabs" style="margin-bottom:12px">
+      <button class="sol-tab ${rkOrdemZer==="contratos"?"on":""}"
+        onclick="rkOrdenar('contratos')">Por volume zerado</button>
+      <button class="sol-tab ${rkOrdemZer==="pct_do_dia_zerado"?"on":""}"
+        onclick="rkOrdenar('pct_do_dia_zerado')">Por proporção do dia</button>
+      <span style="font-size:11.5px;color:var(--text-faint);margin-left:12px;align-self:center">
+        empate na proporção: o maior volume vem primeiro</span>
     </div>
     <div class="panel">${rkTabela(ze.data, "zerado")}</div>`;
+}
+
+function rkOrdenar(campo){
+  rkOrdemZer = campo;
+  vRanking();
 }
 
 function rkTabela(dados, tipo){
@@ -1836,7 +1861,7 @@ function rkTabela(dados, tipo){
   return `<table><thead><tr>
       <th style="width:34px">#</th><th>Cliente</th><th>Barra</th><th>Faixa</th>
       <th>${zer?"Zerado":"Contratos"}</th>
-      ${zer?"<th>Operou no dia</th>":"<th>Negócios</th>"}
+      ${zer?"<th>Operou no dia</th><th>% do dia</th>":"<th>Negócios</th>"}
       <th>Dia anterior</th><th>Variação</th></tr></thead>
     <tbody>${dados.map((r,i)=>`<tr ${r.cliente_id?`onclick="abrirFicha('${r.cliente_id}')"`:'style="cursor:default"'}>
       <td class="num" style="color:var(--text-faint);font-weight:700">${i+1}</td>
@@ -1847,7 +1872,10 @@ function rkTabela(dados, tipo){
       <td>${faixaBadge(r.faixa, r.grau)}</td>
       <td class="num" style="font-weight:700">${nf(r.contratos)}</td>
       ${zer
-        ? `<td class="num">${r.operou_no_dia?nf(r.operou_no_dia):'<span style="color:var(--text-faint)">—</span>'}</td>`
+        ? `<td class="num">${r.operou_no_dia?nf(r.operou_no_dia):'<span style="color:var(--text-faint)">—</span>'}</td>
+           <td class="num">${r.pct_do_dia_zerado==null ? "—"
+             : `<span style="font-weight:700;color:${r.pct_do_dia_zerado>=100?'var(--red)':
+                  r.pct_do_dia_zerado>=50?'var(--amber)':'var(--text)'}">${nf(r.pct_do_dia_zerado)}%</span>`}</td>`
         : `<td class="num">${nf(r.negocios)}</td>`}
       <td class="num">${r.contratos_antes!=null
           ? nf(r.contratos_antes) + ` <span style="color:var(--text-faint);font-size:11px">${fmtData(r.dia_antes)}</span>`
