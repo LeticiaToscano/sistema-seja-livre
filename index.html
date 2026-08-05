@@ -345,6 +345,33 @@
   }
   .menu-btn{display:none;place-items:center;width:36px;height:36px;border-radius:9px;background:var(--surface);
     border:1px solid var(--border-strong);color:var(--text)}
+
+  /* O Ranking do dia e a tela que muda todo dia — o item do menu se
+     mexe para lembrar que ha coisa nova la. As barrinhas do icone
+     sobem e descem em tempos diferentes, como um grafico vivo. */
+  .nav-item[data-view="ranking"]{ color:#3dffb0 }
+  .nav-item[data-view="ranking"] svg{ overflow:visible }
+  .nav-item[data-view="ranking"] .rk-b{
+    transform-origin:center bottom;
+    animation:rkPulso 1.8s ease-in-out infinite;
+  }
+  .nav-item[data-view="ranking"] .rk-b:nth-of-type(2){ animation-delay:.25s }
+  .nav-item[data-view="ranking"] .rk-b:nth-of-type(3){ animation-delay:.5s }
+  @keyframes rkPulso{
+    0%,100%{ transform:scaleY(.55) }
+    50%    { transform:scaleY(1) }
+  }
+  .nav-item[data-view="ranking"]:hover,
+  .nav-item[data-view="ranking"].active{
+    color:#3dffb0;
+    text-shadow:0 0 10px rgba(61,255,176,.55);
+  }
+  .nav-item[data-view="ranking"].active svg{
+    filter:drop-shadow(0 0 6px rgba(61,255,176,.7));
+  }
+  @media (prefers-reduced-motion:reduce){
+    .nav-item[data-view="ranking"] .rk-b{ animation:none }
+  }
 </style>
 <!-- leitor de Excel: a planilha de custos vem em .xlsx, e converter para
      CSV todo mês seria um passo a mais sem motivo -->
@@ -383,7 +410,7 @@
       <button class="nav-item" data-view="clientes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3.2 3-5 5.5-5s4.9 1.8 5.5 5" stroke-linecap="round"/></svg>Clientes</button>
       <button class="nav-item" data-view="explorar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M16 16l5 5" stroke-linecap="round"/><path d="M8 11h6M11 8v6" stroke-linecap="round"/></svg>Explorar</button>
       <button class="nav-item" data-view="destaques"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l2.5 5 5.5.8-4 3.9 1 5.5L12 16l-5 2.7 1-5.5-4-3.9 5.5-.8z" stroke-linejoin="round"/></svg>Destaques</button>
-      <button class="nav-item" data-view="ranking"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" stroke-linecap="round"/></svg>Ranking do dia</button>
+      <button class="nav-item" data-view="ranking"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 21H2" stroke-linecap="round"/><path class="rk-b" d="M5 21V12" stroke-linecap="round"/><path class="rk-b" d="M12 21V5" stroke-linecap="round"/><path class="rk-b" d="M19 21v-6" stroke-linecap="round"/></svg>Ranking do dia</button>
       <button class="nav-item" data-view="clube"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="9" width="18" height="5" rx="1.4"/><path d="M9 9v5M15 9v5"/><path d="M6 17l2.5 3M18 17l-2.5 3" stroke-linecap="round"/></svg>Clube Trader</button>
       <button class="nav-item" data-view="plataformas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8M12 18v3" stroke-linecap="round"/></svg>Plataformas</button>
       <button class="nav-item" data-view="fila"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h10M4 12h10M4 18h7" stroke-linecap="round"/><path d="M17 15l2.2 2.2L23 13" stroke-linecap="round" stroke-linejoin="round"/></svg>Fila de ação</button>
@@ -412,7 +439,7 @@
       <button class="nav-item" data-view="integracoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 7V4M15 7V4M8 7h8v4a4 4 0 0 1-8 0z" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15v5" stroke-linecap="round"/></svg>Integrações</button>
     </nav>
     <div class="foot">
-      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v05/08 19:38</div></div></div>
+      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v05/08 19:48</div></div></div>
       <button class="btn-logout" id="logoutBtn">Sair</button>
     </div>
   </aside>
@@ -1850,6 +1877,80 @@ async function vRanking(){
     <div class="panel">${rkTabela(ze.data, "zerado")}</div>`;
 }
 
+/**
+ * A ficha de operacoes: o dia a dia do cliente, com hoje e ontem em
+ * destaque. Diferente da ficha normal, que fala do relacionamento —
+ * esta fala so do que ele operou.
+ */
+async function rkAbrir(sinacor, nome, clienteId){
+  el("overlay").classList.add("open");
+  el("drawer").classList.add("open");
+  el("drName").textContent = nome;
+  el("drSub").textContent = "Sinacor " + sinacor + " · operações dos últimos 30 dias";
+  el("drStatus").innerHTML = "";
+  el("drActions").innerHTML = clienteId
+    ? `<button class="btn-rd" onclick="abrirFicha('${clienteId}')">Abrir a ficha do cliente</button>`
+    : "";
+  el("drBody").innerHTML = '<div class="loading"><div class="spinner"></div>Carregando…</div>';
+
+  const {data,error} = await sb.rpc("fn_operacoes_cliente",{p_sinacor:sinacor, p_dias:30});
+  if(error){ el("drBody").innerHTML = '<div class="empty">'+error.message+'</div>'; return; }
+  if(!data || !data.length){
+    el("drBody").innerHTML = '<div class="empty">Nenhuma operação nos últimos 30 dias.</div>';
+    return;
+  }
+
+  const ult = data[0], ant = data[1];
+  const varia = (ant && Number(ant.contratos_bmf) > 0)
+    ? Math.round(100*(Number(ult.contratos_bmf) - Number(ant.contratos_bmf))/Number(ant.contratos_bmf))
+    : null;
+  const soma = c => data.reduce((s,r)=>s + Number(r[c]||0), 0);
+
+  el("drBody").innerHTML = `
+    <div class="dr-sec">Os dois últimos dias</div>
+    <div class="dr-stats">
+      <div class="dr-stat"><div class="l">${fmtData(ult.data)}</div>
+        <div class="v">${nf(ult.contratos_bmf||0)}</div>
+        <div style="font-size:11px;color:var(--text-faint)">contratos</div></div>
+      ${ant?`<div class="dr-stat"><div class="l">${fmtData(ant.data)}</div>
+        <div class="v">${nf(ant.contratos_bmf||0)}</div>
+        <div style="font-size:11px;color:var(--text-faint)">o dia anterior que operou</div></div>`:""}
+      ${varia!=null?`<div class="dr-stat"><div class="l">Variação</div>
+        <div class="v" style="color:${varia>=300?'var(--amber)':varia>0?'var(--green)':'var(--red)'}">${
+          varia>0?"+":""}${nf(varia)}%</div>
+        ${varia>=300?'<div style="font-size:11px;color:var(--amber)">quadruplicou ou mais</div>':""}</div>`:""}
+      <div class="dr-stat"><div class="l">Zerado no último dia</div>
+        <div class="v" style="font-size:17px${ult.pct_zerado>=50?';color:var(--amber)':''}">${
+          ult.zerado?nf(ult.zerado)+(ult.pct_zerado!=null?` · ${ult.pct_zerado}%`:""):"nada"}</div></div>
+    </div>
+
+    <div class="dr-sec">Nos últimos 30 dias</div>
+    <div class="dr-stats">
+      <div class="dr-stat"><div class="l">Dias operados</div><div class="v">${nf(data.length)}</div></div>
+      <div class="dr-stat"><div class="l">Contratos</div><div class="v">${nf(soma("contratos_bmf"))}</div></div>
+      <div class="dr-stat"><div class="l">Zerado</div><div class="v">${nf(soma("zerado"))}</div></div>
+      <div class="dr-stat"><div class="l">Onde opera</div>
+        <div class="v" style="font-size:14px">${ult.plataforma||"—"}</div></div>
+    </div>
+
+    <div class="dr-sec">Dia a dia</div>
+    <div class="panel" style="padding:0">
+      <table><thead><tr>
+        <th>Dia</th><th>Contratos</th><th>Bovespa</th><th>Negócios</th>
+        <th>Zerado</th><th>% do dia</th><th>Ativos</th></tr></thead>
+      <tbody>${data.map(r=>`<tr style="cursor:default">
+        <td class="num">${fmtData(r.data)}</td>
+        <td class="num" style="font-weight:700">${r.contratos_bmf?nf(r.contratos_bmf):"—"}</td>
+        <td class="num">${r.volume_bovespa?nfR(r.volume_bovespa):"—"}</td>
+        <td class="num">${r.negocios?nf(r.negocios):"—"}</td>
+        <td class="num">${r.zerado?nf(r.zerado):"—"}</td>
+        <td class="num">${r.pct_zerado==null?"—":
+          `<span style="color:${r.pct_zerado>=100?'var(--red)':r.pct_zerado>=50?'var(--amber)':'var(--text-dim)'}">${r.pct_zerado}%</span>`}</td>
+        <td class="num" style="font-size:11.5px;color:var(--text-dim)">${r.ativos||"—"}</td>
+      </tr>`).join("")}</tbody></table>
+    </div>`;
+}
+
 function rkOrdenar(campo){
   rkOrdemZer = campo;
   vRanking();
@@ -1863,7 +1964,7 @@ function rkTabela(dados, tipo){
       <th>${zer?"Zerado":"Contratos"}</th>
       ${zer?"<th>Operou no dia</th><th>% do dia</th>":"<th>Negócios</th>"}
       <th>Dia anterior</th><th>Variação</th></tr></thead>
-    <tbody>${dados.map((r,i)=>`<tr ${r.cliente_id?`onclick="abrirFicha('${r.cliente_id}')"`:'style="cursor:default"'}>
+    <tbody>${dados.map((r,i)=>`<tr onclick="rkAbrir('${r.sinacor}','${String(r.nome).replace(/'/g,"")}','${r.cliente_id||""}')">
       <td class="num" style="color:var(--text-faint);font-weight:700">${i+1}</td>
       <td><div class="cell-name"><span class="mini-av">${ini(r.nome)}</span>${r.nome}
         ${r.salto?`<span class="tag t-amber" title="Quadruplicou ou mais em relação ao dia anterior que operou">+${nf(r.variacao_pct)}%</span>`:""}
