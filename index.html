@@ -664,7 +664,7 @@
       <button class="nav-item" data-view="integracoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 7V4M15 7V4M8 7h8v4a4 4 0 0 1-8 0z" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15v5" stroke-linecap="round"/></svg>Integrações</button>
     </nav>
     <div class="foot">
-      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v05/08 20:38</div></div></div>
+      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v05/08 20:43</div></div></div>
       <button class="btn-logout" id="logoutBtn">Sair</button>
     </div>
   </aside>
@@ -849,13 +849,12 @@ const TITLES={
 };
 const RESERVADAS={
   fluxos:{icon:"fluxos",desc:"As réguas de atendimento automatizadas — boas-vindas, ativação, manutenção, reengajamento e aniversário. Toda automação roda primeiro em modo sombra (simula sem enviar) antes de ir ao ar, em lotes controlados."},
-  assessores:{icon:"assessores",desc:"Desempenho e carteira por assessor — ativações, retenção, aderência e tamanho de carteira. Depende de definir o vínculo cliente–assessor (a explorar)."},
   config:{icon:"config",desc:"Ajuste das réguas do sistema — dias para considerar que um cliente 'parou de operar', janela de contato frio, e os pesos do score (volume, frequência, recência), com simulador."},
   auditoria:{icon:"auditoria",desc:"O registro de tudo que o sistema faz — importações, disparos, mudanças de regra, acessos. A base de confiança e rastreabilidade da operação."},
   ia:{icon:"ia",desc:"O diagnóstico estratégico da operação em linguagem natural, e o copiloto de IA por assessor — cada um enxergando apenas a própria carteira."},
   integracoes:{icon:"integracoes",desc:"As conexões do sistema — Volume Operado (operação), RD Conversas (atendimento), Gmail/Genial (entrada de clientes) e IA. Ligadas e a ligar."}
 };
-const VIEWS={radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes,auditoria:vAuditoria,diagnostico:vDiagnostico,legenda:vLegenda,leads:vLeads,importacoes:vImportacoes,saidas:vSaidas,plataformas:vPlataformas,custos:vCustos,conferencia:vConferencia,ranking:vRanking};
+const VIEWS={radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes,auditoria:vAuditoria,diagnostico:vDiagnostico,legenda:vLegenda,leads:vLeads,importacoes:vImportacoes,saidas:vSaidas,plataformas:vPlataformas,custos:vCustos,conferencia:vConferencia,ranking:vRanking,assessores:vAssessores};
 document.querySelectorAll(".nav-item").forEach(b=>b.addEventListener("click",()=>{
   document.querySelectorAll(".nav-item").forEach(x=>x.classList.remove("active"));
   b.classList.add("active"); el("sidebar").classList.remove("open"); render(b.dataset.view);
@@ -2040,6 +2039,116 @@ function cfPintar(j){
           <td><span class="status ${dif?'s-negligenciado':'s-saudavel'}">
             ${dif?nf(dif)+' fora':'confere'}</span></td></tr>`; }).join("")}
     </tbody></table></div>`;
+}
+
+// ---------- ASSESSORES ----------
+// Atendimento aqui e por FILA, nao por carteira: quase metade dos
+// clientes passou por mais de um assessor. Entao a tela mede COBERTURA —
+// quantos cada um atendeu e com que frequencia — e nao posse.
+//
+// A fonte e o `employee` do atendimento no RD: quem de fato conversou,
+// nao a barra do cadastro.
+
+let asOrdem = "clientes";
+
+async function vAssessores(){
+  el("content").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
+  const {data,error} = await sb.from("vw_assessores").select("*")
+    .order(asOrdem,{ascending:false,nullsFirst:false});
+  if(error) return erro(error,"content");
+  if(!data || !data.length){
+    el("content").innerHTML='<div class="empty">Nenhum atendimento registrado no RD.</div>';
+    return;
+  }
+
+  const ativos = data.filter(a=>a.ativo);
+  const totalCli = data.reduce((s,a)=>s+Number(a.clientes||0),0);
+  const total30  = data.reduce((s,a)=>s+Number(a.atendimentos_30d||0),0);
+
+  el("content").innerHTML = `
+    <div class="note" style="border-left-color:var(--blue);margin-bottom:18px">
+      Atendimento na Seja Livre é por <b>fila</b>, não por carteira — quase metade dos
+      clientes já falou com mais de um assessor. Por isso esta tela mede <b>cobertura</b>:
+      quantos cada um atendeu e com que frequência. Ela não diz de quem é o cliente,
+      porque na maioria dos casos essa resposta não existe.
+    </div>
+
+    <div class="panel" style="padding:16px;margin-bottom:18px;display:flex;gap:30px;flex-wrap:wrap">
+      <div><div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px">Atendendo nos últimos 30 dias</div>
+        <div style="font-size:24px;font-weight:800">${nf(ativos.length)} <span style="font-size:14px;font-weight:500;color:var(--text-dim)">de ${nf(data.length)}</span></div></div>
+      <div><div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px">Atendimentos no mês</div>
+        <div style="font-size:24px;font-weight:800">${nf(total30)}</div></div>
+      <div><div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px">Clientes tocados</div>
+        <div style="font-size:24px;font-weight:800">${nf(totalCli)}</div>
+        <div style="font-size:11.5px;color:var(--text-faint)">somando repetições entre assessores</div></div>
+    </div>
+
+    <div class="sol-tabs">
+      <button class="sol-tab ${asOrdem==="clientes"?"on":""}" onclick="asOrdenar('clientes')">Por clientes atendidos</button>
+      <button class="sol-tab ${asOrdem==="atendimentos_30d"?"on":""}" onclick="asOrdenar('atendimentos_30d')">Por movimento no mês</button>
+      <button class="sol-tab ${asOrdem==="no_diagnostico"?"on":""}" onclick="asOrdenar('no_diagnostico')">Por fila em aberto</button>
+    </div>
+
+    <div class="panel"><table><thead><tr>
+      <th>Assessor</th><th>Clientes</th><th>Atendimentos</th><th>Por cliente</th>
+      <th>No mês</th><th>Na semana</th><th>Fila em aberto</th><th>Último</th></tr></thead>
+    <tbody>${data.map(a=>`<tr onclick="asAbrir('${String(a.assessor).replace(/'/g,"")}')">
+      <td><div class="cell-name"><span class="mini-av">${ini(a.assessor)}</span>${a.assessor}
+        ${!a.ativo?'<span class="tag" style="font-size:10px;background:transparent;border:1px dashed var(--text-faint);color:var(--text-faint)">parado</span>':""}</div></td>
+      <td class="num" style="font-weight:700">${nf(a.clientes)}</td>
+      <td class="num">${nf(a.atendimentos)}</td>
+      <td class="num">${a.atendimentos_por_cliente||"—"}</td>
+      <td class="num">${a.atendimentos_30d?nf(a.atendimentos_30d):'<span style="color:var(--text-faint)">—</span>'}</td>
+      <td class="num">${a.clientes_7d?nf(a.clientes_7d):'<span style="color:var(--text-faint)">—</span>'}</td>
+      <td class="num">${a.no_diagnostico?`<span style="color:var(--amber)">${nf(a.no_diagnostico)}</span>`:"—"}</td>
+      <td class="num">${fmtData(a.ultimo)} <span style="font-size:11px;color:var(--text-faint)">${
+        a.dias_sem_atender>0?"há "+nf(a.dias_sem_atender)+"d":"hoje"}</span></td>
+    </tr>`).join("")}</tbody></table>
+    <div style="padding:11px 16px;font-size:11px;color:var(--text-faint);line-height:1.6">
+      <b>Fila em aberto</b> é quanto dos clientes que ele atendeu ainda aparece no Diagnóstico
+      sem tratativa. Como o mesmo cliente pode ter falado com vários, ele conta para todos —
+      não é uma divisão de trabalho, é um retrato de quem encostou em quem.</div></div>`;
+}
+
+function asOrdenar(campo){ asOrdem = campo; vAssessores(); }
+
+/** Os clientes que aquele assessor atendeu, do mais recente ao mais antigo. */
+async function asAbrir(assessor){
+  el("overlay").classList.add("open"); el("drawer").classList.add("open");
+  el("drName").textContent = assessor;
+  el("drSub").textContent = "clientes que passaram por ele";
+  el("drStatus").innerHTML = ""; el("drActions").innerHTML = "";
+  el("drBody").innerHTML = '<div class="loading"><div class="spinner"></div>Carregando…</div>';
+
+  const {data,error} = await sb.rpc("fn_clientes_do_assessor",{p_assessor:assessor});
+  if(error){ el("drBody").innerHTML='<div class="empty">'+error.message+'</div>'; return; }
+  if(!data || !data.length){ el("drBody").innerHTML='<div class="empty">Nenhum cliente.</div>'; return; }
+
+  const sozinho = data.filter(c=>Number(c.outros_assessores)===0).length;
+  el("drBody").innerHTML = `
+    <div class="dr-stats">
+      <div class="dr-stat"><div class="l">Clientes atendidos</div><div class="v">${nf(data.length)}</div></div>
+      <div class="dr-stat"><div class="l">Só ele atendeu</div><div class="v">${nf(sozinho)}</div>
+        <div style="font-size:11px;color:var(--text-faint)">os outros passaram por mais gente</div></div>
+      <div class="dr-stat"><div class="l">Nos últimos 30 dias</div>
+        <div class="v">${nf(data.filter(c=>c.dias<=30).length)}</div></div>
+    </div>
+    <div class="dr-sec">Quem ele atendeu</div>
+    <div class="panel" style="padding:0"><table><thead><tr>
+      <th>Cliente</th><th>Barra</th><th>Faixa</th><th>Vezes</th>
+      <th>Último</th><th>Também falaram</th></tr></thead>
+    <tbody>${data.slice(0,300).map(c=>`<tr ${c.cliente_id?`onclick="abrirFicha('${c.cliente_id}')"`:'style="cursor:default"'}>
+      <td><div class="cell-name"><span class="mini-av">${ini(c.nome||"?")}</span>${c.nome||"—"}</div></td>
+      <td class="num">${c.barra||"—"}</td>
+      <td>${faixaBadge(c.faixa||"sem", c.grau||0)}</td>
+      <td class="num">${nf(c.atendimentos)}</td>
+      <td class="num">${fmtData(c.ultimo)} <span style="font-size:11px;color:var(--text-faint)">há ${nf(c.dias)}d</span></td>
+      <td class="num">${Number(c.outros_assessores)>0
+          ? `<span style="color:var(--text-dim)">+${nf(c.outros_assessores)}</span>`
+          : '<span style="color:var(--green)">só ele</span>'}</td>
+    </tr>`).join("")}</tbody></table>
+    ${data.length>300?`<div style="padding:11px 16px;font-size:11px;color:var(--text-faint)">
+      Mostrando 300 de ${nf(data.length)}</div>`:""}</div>`;
 }
 
 // ---------- RANKING DO DIA ----------
