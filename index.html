@@ -439,7 +439,7 @@
       <button class="nav-item" data-view="integracoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 7V4M15 7V4M8 7h8v4a4 4 0 0 1-8 0z" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15v5" stroke-linecap="round"/></svg>Integrações</button>
     </nav>
     <div class="foot">
-      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v05/08 19:48</div></div></div>
+      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v05/08 20:25</div></div></div>
       <button class="btn-logout" id="logoutBtn">Sair</button>
     </div>
   </aside>
@@ -1848,11 +1848,31 @@ async function vRanking(){
   const saltos = (op.data||[]).filter(r=>r.salto).length;
 
   el("content").innerHTML = `
-    <div class="note" style="border-left-color:var(--green);margin-bottom:18px">
-      Movimento de <b>${dia?fmtData(dia):"—"}</b>, o último dia com operações importadas.
-      A variação compara com o <b>dia anterior em que o cliente operou</b>, não com o dia
-      de calendário.${saltos?` <b style="color:var(--amber)">${saltos} cliente(s) quadruplicaram
-      ou mais</b> — vale olhar antes de comemorar: pode ser erro numa ordem.`:""}
+    <div class="panel" style="padding:22px 24px;margin-bottom:18px;
+      border-left:3px solid #3dffb0;display:flex;gap:34px;align-items:center;flex-wrap:wrap">
+      <div>
+        <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;
+          letter-spacing:1px;margin-bottom:2px">Movimento do dia</div>
+        <div style="font-size:30px;font-weight:800;letter-spacing:-.8px;color:#3dffb0;
+          line-height:1.1">${dia?fmtData(dia):"—"}</div>
+        <div style="font-size:12.5px;color:var(--text-dim);margin-top:3px">${
+          dia?rkDiaSemana(dia):""}${dia?" · "+rkHaQuanto(dia):""}</div>
+      </div>
+      ${saltos?`<div style="border-left:1px solid var(--border);padding-left:26px">
+        <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:1px">Saltos de 300%</div>
+        <div style="font-size:26px;font-weight:800;color:var(--amber)">${nf(saltos)}</div>
+        <div style="font-size:12px;color:var(--text-dim)">quadruplicaram ou mais</div>
+      </div>`:""}
+      <div style="flex:1;min-width:230px">
+        <input class="search" id="rkBusca" placeholder="Buscar cliente por nome ou Sinacor…"
+          oninput="rkBuscar(this.value)" style="width:100%">
+        <div id="rkResultado"></div>
+      </div>
+    </div>
+
+    <div class="note" style="margin-bottom:18px">
+      A variação compara com o <b>dia anterior em que o cliente operou</b>, não com o dia de
+      calendário.${saltos?" Quem quadruplicou aparece com etiqueta âmbar — vale olhar antes de comemorar: pode ser erro numa ordem.":""}
     </div>
 
     <div class="sec-title">Quem mais operou<span class="rule"></span></div>
@@ -1907,7 +1927,7 @@ async function rkAbrir(sinacor, nome, clienteId){
   const soma = c => data.reduce((s,r)=>s + Number(r[c]||0), 0);
 
   el("drBody").innerHTML = `
-    <div class="dr-sec">Os dois últimos dias</div>
+    <div class="dr-sec">Os dois últimos dias em que operou</div>
     <div class="dr-stats">
       <div class="dr-stat"><div class="l">${fmtData(ult.data)}</div>
         <div class="v">${nf(ult.contratos_bmf||0)}</div>
@@ -1949,6 +1969,57 @@ async function rkAbrir(sinacor, nome, clienteId){
         <td class="num" style="font-size:11.5px;color:var(--text-dim)">${r.ativos||"—"}</td>
       </tr>`).join("")}</tbody></table>
     </div>`;
+}
+
+/** Segunda, terça… — a data sozinha nao diz se foi dia util. */
+function rkDiaSemana(d){
+  const dias = ["domingo","segunda-feira","terça-feira","quarta-feira",
+                "quinta-feira","sexta-feira","sábado"];
+  return dias[new Date(String(d)+"T00:00:00").getDay()];
+}
+
+/** "de ontem", "de 3 dias atras" — para nao olhar dado velho sem perceber. */
+function rkHaQuanto(d){
+  const dif = Math.round((new Date().setHours(0,0,0,0) -
+                          new Date(String(d)+"T00:00:00")) / 86400000);
+  if(dif <= 0) return "hoje";
+  if(dif === 1) return "de ontem";
+  return "de " + dif + " dias atrás";
+}
+
+/**
+ * Busca fora do top 15. Sem isso, conferir um cliente especifico exigia
+ * abrir o arquivo — foi o que aconteceu quando ela quis checar uma
+ * zeragem que nao estava entre as 15 maiores.
+ */
+let rkTimer = null;
+async function rkBuscar(termo){
+  clearTimeout(rkTimer);
+  const alvo = el("rkResultado");
+  if(!alvo) return;
+  if(!termo || termo.trim().length < 3){ alvo.innerHTML = ""; return; }
+
+  rkTimer = setTimeout(async ()=>{
+    const t = termo.trim();
+    const so_digitos = /^\d+$/.test(t);
+    let q = sb.from("clientes").select("id,sinacor,nome,barra").limit(6);
+    q = so_digitos ? q.like("sinacor", t + "%")
+                   : q.ilike("nome", "%" + t + "%");
+    const {data} = await q;
+    if(!data || !data.length){
+      alvo.innerHTML = `<div style="font-size:12.5px;color:var(--text-faint);margin-top:8px">
+        Ninguém com esse nome ou Sinacor.</div>`;
+      return;
+    }
+    alvo.innerHTML = `<div class="panel" style="margin-top:8px;padding:0">
+      ${data.map(c=>`<div onclick="rkAbrir('${c.sinacor}','${String(c.nome).replace(/'/g,"")}','${c.id}')"
+        style="padding:9px 13px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.04);
+          display:flex;gap:10px;align-items:baseline">
+        <span style="font-weight:700;font-size:13px">${c.nome}</span>
+        <span class="num" style="font-size:11.5px;color:var(--text-faint)">${c.sinacor}</span>
+        <span class="num" style="font-size:11.5px;color:var(--text-dim);margin-left:auto">${c.barra||""}</span>
+      </div>`).join("")}</div>`;
+  }, 300);
 }
 
 function rkOrdenar(campo){
