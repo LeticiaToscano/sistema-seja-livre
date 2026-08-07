@@ -696,6 +696,30 @@
   }
   .as-pat-r{ font-size:16px; font-weight:600; letter-spacing:-.3px; font-variant-numeric:tabular-nums }
   .as-pat-l{ font-size:12px; color:var(--text-faint); margin-left:7px }
+  /* serie mensal grande, com o valor escrito em cada mes */
+  .as-serie{ display:flex; gap:14px; align-items:flex-end }
+  .as-serie-col{ flex:1; display:flex; flex-direction:column; align-items:center; gap:0 }
+  .as-serie-v{
+    font-size:12.5px; font-weight:600; letter-spacing:-.2px; margin-bottom:7px;
+    font-variant-numeric:tabular-nums; white-space:nowrap;
+  }
+  .as-serie-barra{ width:100%; height:132px; display:flex; align-items:flex-end }
+  .as-serie-barra span{
+    width:100%; border-radius:5px 5px 0 0;
+    background:linear-gradient(180deg, rgba(46,229,157,.92), rgba(46,229,157,.18));
+    transition:filter .18s;
+  }
+  .as-serie-col:hover .as-serie-barra span{ filter:brightness(1.25) }
+  .as-serie-m{ font-size:11px; margin-top:9px; color:var(--text-dim) }
+  .as-serie-d{ font-size:12px; font-weight:600; margin-top:3px }
+  .as-serie-c{ font-size:10px; color:var(--text-faint); margin-top:2px }
+
+  .as-mud{ display:flex; gap:16px; flex-wrap:wrap }
+  .as-mud-g{
+    flex:1; min-width:172px; padding:13px 15px; border-radius:12px;
+    border:1px solid rgba(255,255,255,.06);
+    background:rgba(255,255,255,.012);
+  }
 </style>
 <!-- leitor de Excel: a planilha de custos vem em .xlsx, e converter para
      CSV todo mês seria um passo a mais sem motivo -->
@@ -763,7 +787,7 @@
       <button class="nav-item" data-view="integracoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 7V4M15 7V4M8 7h8v4a4 4 0 0 1-8 0z" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15v5" stroke-linecap="round"/></svg>Integrações</button>
     </nav>
     <div class="foot">
-      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v07/08 19:08</div></div></div>
+      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v07/08 19:16</div></div></div>
       <button class="btn-logout" id="logoutBtn">Sair</button>
     </div>
   </aside>
@@ -2282,6 +2306,7 @@ async function asDesenhar(){
 
     ${asCabecalho(a, lista)}
     ${asPatrimonio(pat.data)}
+    ${asSerie(pat.data)}
     ${asPlacar(pl)}
     ${asDiagnostico(d.data)}
 
@@ -2399,6 +2424,115 @@ function asPatrimonio(meses){
       isso é margem em conta: no cliente sozinho oscila muito, somado pela carteira é estável.
     </div>
   </div>`;
+}
+
+/**
+ * O grafico grande, com o valor de cada mes escrito.
+ * O de cima e resumo — este e para olhar demoradamente. E o botao abre o
+ * que a variacao esconde: -1% pode ser todo mundo caindo um pouco, ou um
+ * cliente grande saindo enquanto o resto cresce. Sao situacoes opostas
+ * com o mesmo numero.
+ */
+function asSerie(meses){
+  const md = (meses||[]).filter(m => Number(m.saldo||0) > 0);
+  if(md.length < 2) return "";
+  const max = Math.max(...md.map(m=>Number(m.saldo)));
+
+  return `<div class="panel" style="padding:22px 24px;margin-bottom:16px">
+    <div style="display:flex;align-items:baseline;gap:14px;margin-bottom:20px;flex-wrap:wrap">
+      <div style="font-size:13px;font-weight:700">Mês a mês</div>
+      <div style="font-size:11.5px;color:var(--text-faint);flex:1">
+        saldo somado da carteira no fechamento de cada mês</div>
+      <button class="btn-rd" onclick="asMudanca()">O que mudou no último mês</button>
+    </div>
+
+    <div class="as-serie">
+      ${md.map((m,i)=>{
+        const v = Number(m.saldo);
+        const alt = Math.max(6, Math.round(100*v/max));
+        const ant = i ? Number(md[i-1].saldo) : null;
+        const dif = ant ? Math.round(100*(v-ant)/ant) : null;
+        return `<div class="as-serie-col">
+          <div class="as-serie-v">${nfR(v)}</div>
+          <div class="as-serie-barra"><span style="height:${alt}%"></span></div>
+          <div class="as-serie-m">${fmtMesAno(m.competencia)}</div>
+          <div class="as-serie-d" style="color:${
+            dif==null?'var(--text-faint)':dif>0?'var(--green)':dif<0?'var(--red)':'var(--text-faint)'}">${
+            dif==null?"—":(dif>0?"+":"")+nf(dif)+"%"}</div>
+          <div class="as-serie-c">${nf(m.com_saldo)} com saldo</div>
+        </div>`;
+      }).join("")}
+    </div>
+    <div id="asMud"></div>
+  </div>`;
+}
+
+/**
+ * De onde veio a variacao: quem entrou, quem saiu, quem cresceu e quem
+ * encolheu. Sem isso, uma queda de 1% pode ser lida como carteira
+ * estavel quando na verdade um cliente grande foi embora e os outros
+ * cobriram o buraco.
+ */
+async function asMudanca(){
+  const alvo = el("asMud");
+  if(alvo.dataset.aberto === "1"){ alvo.innerHTML=""; alvo.dataset.aberto="0"; return; }
+  alvo.dataset.aberto = "1";
+  alvo.innerHTML = '<div class="loading"><div class="spinner"></div>Comparando…</div>';
+
+  const {data,error} = await sb.rpc("fn_variacao_patrimonio",
+    {p_assessor: asF.assessor, p_mes: null});
+  if(error){ alvo.innerHTML = '<div class="empty">'+error.message+'</div>'; return; }
+  if(!data || !data.length){ alvo.innerHTML='<div class="empty">Sem dois meses para comparar.</div>'; return; }
+
+  const soma = t => data.filter(c=>c.tipo===t).reduce((s,c)=>s+Number(c.delta||0),0);
+  const qtd  = t => data.filter(c=>c.tipo===t).length;
+  const total = data.reduce((s,c)=>s+Number(c.delta||0),0);
+
+  const grupo = (t, rot, explica) => {
+    const v = soma(t), n = qtd(t);
+    if(!n) return "";
+    return `<div class="as-mud-g">
+      <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:1px;color:var(--text-faint)">${rot}</div>
+      <div style="font-size:20px;font-weight:300;letter-spacing:-.6px;margin:5px 0 3px;
+        color:${v>0?'var(--green)':v<0?'var(--red)':'var(--text)'}">${v>0?"+":""}${nfR(v)}</div>
+      <div style="font-size:11.5px;color:var(--text-dim)">${nf(n)} cliente(s) · ${explica}</div>
+    </div>`;
+  };
+
+  alvo.innerHTML = `
+    <div style="margin-top:22px;padding-top:20px;border-top:1px solid var(--border)">
+      <div style="font-size:13px;font-weight:700;margin-bottom:4px">De onde veio a variação</div>
+      <div style="font-size:11.5px;color:var(--text-faint);margin-bottom:16px;line-height:1.6">
+        O total de <b style="color:${total>0?'var(--green)':'var(--red)'}">${total>0?"+":""}${nfR(total)}</b>
+        é a soma destes quatro movimentos. Uma queda pequena pode esconder um cliente grande
+        saindo enquanto os outros crescem — é isso que o corte abaixo mostra.
+      </div>
+
+      <div class="as-mud">
+        ${grupo("entrou","entraram","não tinham saldo e passaram a ter")}
+        ${grupo("subiu","cresceram","já tinham saldo e aumentaram")}
+        ${grupo("caiu","diminuíram","já tinham saldo e reduziram")}
+        ${grupo("saiu","zeraram","tinham saldo e não têm mais")}
+      </div>
+
+      <div style="font-size:12px;font-weight:700;margin:20px 0 8px">Os que mais pesaram</div>
+      <div class="panel" style="padding:0"><table><thead><tr>
+        <th>Cliente</th><th>Origem</th><th>Antes</th><th>Depois</th><th>Diferença</th><th></th></tr></thead>
+      <tbody>${data.slice(0,25).map(c=>`<tr ${c.cliente_id?`onclick="abrirFicha('${c.cliente_id}')"`:'style="cursor:default"'}>
+        <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}</div></td>
+        <td class="num">${c.origem==="pessoal"?'<span class="tag t-green" style="font-size:10px">pessoal</span>':"barra"}</td>
+        <td class="num" style="color:var(--text-dim)">${nfR(c.antes)}</td>
+        <td class="num">${nfR(c.depois)}</td>
+        <td class="num" style="font-weight:700;color:${
+          Number(c.delta)>0?'var(--green)':'var(--red)'}">${Number(c.delta)>0?"+":""}${nfR(c.delta)}</td>
+        <td><span class="status ${
+          c.tipo==="entrou"?"s-saudavel":c.tipo==="subiu"?"s-saudavel":
+          c.tipo==="saiu"?"s-critico":"s-em_recuperacao"}">${c.tipo}</span></td>
+      </tr>`).join("")}</tbody></table>
+      ${data.length>25?`<div style="padding:11px 16px;font-size:11px;color:var(--text-faint)">
+        Mostrando os 25 de maior efeito, de ${nf(data.length)} clientes com saldo em algum dos dois meses</div>`:""}
+      </div>
+    </div>`;
 }
 
 /**
