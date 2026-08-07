@@ -795,7 +795,7 @@
       <button class="nav-item" data-view="integracoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 7V4M15 7V4M8 7h8v4a4 4 0 0 1-8 0z" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15v5" stroke-linecap="round"/></svg>Integrações</button>
     </nav>
     <div class="foot">
-      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v07/08 21:42</div></div></div>
+      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v07/08 21:51</div></div></div>
       <button class="btn-logout" id="logoutBtn">Sair</button>
     </div>
   </aside>
@@ -2764,12 +2764,18 @@ function asPlacar(pl){
  */
 function asDiagnostico(d){
   if(!d || !d.length) return "";
+  const carteira = asModelo === "carteira";
   return `<div class="panel" style="padding:0;margin-bottom:16px">
-    <div style="padding:16px 18px 5px;font-size:13px;font-weight:700">O que pede atenção na carteira dele</div>
-    <div style="padding:0 18px 13px;font-size:11.5px;color:var(--text-faint);line-height:1.6">
-      Sinais de <b>operação e saldo</b>, não de contato — quem atende por fora do RD não
-      aparece pior só porque a conversa não foi registrada. E numa carteira de investidor
-      <b>não operar não é problema</b>: o que separa investidor de conta morta é o saldo.
+    <div style="padding:16px 18px 5px;font-size:13px;font-weight:700">${
+      carteira ? "O que pede atenção na carteira dele" : "O diagnóstico de quem ele atendeu"}</div>
+    <div style="padding:0 18px 13px;font-size:11.5px;color:var(--text-faint);line-height:1.6">${
+      carteira
+        ? `Sinais de <b>operação e saldo</b>, não de contato — quem atende por fora do RD não
+           aparece pior só porque a conversa não foi registrada. E numa carteira de investidor
+           <b>não operar não é problema</b>: o que separa investidor de conta morta é o saldo.`
+        : `Os clientes que passaram por ele e ainda estão no Diagnóstico sem tratativa. Como a
+           casa atende por fila, o mesmo cliente conta para todos que o atenderam — somar os
+           assessores daria mais que a base.`}
     </div>
     ${d.map(x=>`<div style="display:flex;gap:14px;align-items:flex-start;padding:12px 18px;
         border-top:1px solid rgba(255,255,255,.04)${
@@ -2778,8 +2784,8 @@ function asDiagnostico(d){
         :x.gravidade==="retrato"?"s-nunca_operou":"s-em_recuperacao"}"
         style="flex:0 0 auto;margin-top:2px">${x.gravidade==="retrato"?"retrato":x.gravidade}</span>
       <div style="flex:1">
-        <div style="font-size:13px;font-weight:600;margin-bottom:2px">${x.titulo}</div>
-        <div style="font-size:11.5px;color:var(--text-faint);line-height:1.5">${x.texto}</div>
+        <div style="font-size:13px;font-weight:600${x.texto?";margin-bottom:2px":""}">${x.titulo}</div>
+        ${x.texto?`<div style="font-size:11.5px;color:var(--text-faint);line-height:1.5">${x.texto}</div>`:""}
       </div>
       <span class="num" style="font-weight:700;font-size:17px">${nf(x.clientes)}</span>
     </div>`).join("")}
