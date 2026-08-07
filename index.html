@@ -720,6 +720,14 @@
     border:1px solid rgba(255,255,255,.06);
     background:rgba(255,255,255,.012);
   }
+  .as-mud-b{
+    margin-top:11px; padding:5px 11px; border-radius:8px; cursor:pointer;
+    font-size:11px; letter-spacing:.2px;
+    background:transparent; color:var(--text-dim);
+    border:1px solid rgba(255,255,255,.12);
+    transition:.15s;
+  }
+  .as-mud-b:hover{ color:var(--text); border-color:var(--border-strong) }
 </style>
 <!-- leitor de Excel: a planilha de custos vem em .xlsx, e converter para
      CSV todo mês seria um passo a mais sem motivo -->
@@ -787,7 +795,7 @@
       <button class="nav-item" data-view="integracoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 7V4M15 7V4M8 7h8v4a4 4 0 0 1-8 0z" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15v5" stroke-linecap="round"/></svg>Integrações</button>
     </nav>
     <div class="foot">
-      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v07/08 19:41</div></div></div>
+      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v07/08 19:58</div></div></div>
       <button class="btn-logout" id="logoutBtn">Sair</button>
     </div>
   </aside>
@@ -2268,7 +2276,9 @@ function asCard(a){
 let asF = {};
 
 async function asFicha(assessor){
-  asF = {assessor, de:null, ate:null, origem:"todas", saude:"todas",
+  // "carteira" = barra + contato pessoal. O RD e outra coisa: quem
+  // passou por ele em algum atendimento, quase sempre de outra barra.
+  asF = {assessor, de:null, ate:null, origem:"carteira", saude:"todas",
          operacao:"todas", faixa:"todas", barra:"todas", ordem:"ultimo", periodo:"tudo"};
   asDesenhar();
 }
@@ -2278,7 +2288,7 @@ async function asDesenhar(){
   el("pageTitle").textContent = asF.assessor;
   el("content").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
 
-  const [q, p, d, b, cli, pat, pes] = await Promise.all([
+  const [q, p, d, b, cli, pat, pes, res] = await Promise.all([
     sb.from("vw_assessores").select("*").eq("assessor", asF.assessor).maybeSingle(),
     sb.from("vw_placar_assessor").select("*").eq("assessor", asF.assessor).maybeSingle(),
     sb.rpc("fn_diagnostico_assessor",{p_assessor: asF.assessor}),
@@ -2294,44 +2304,63 @@ async function asDesenhar(){
     // deduzido da lista: com 3.248 clientes do RD e limite de 400, os
     // 60 pessoais nunca apareciam, e o filtro de origem sumia
     sb.from("carteira_pessoal").select("sinacor",{count:"exact",head:true})
-      .eq("assessor", asF.assessor)
+      .eq("assessor", asF.assessor),
+    sb.rpc("fn_resumo_assessor",{p_assessor: asF.assessor})
   ]);
   if(cli.error) return erro(cli.error,"content");
 
   const a = q.data || {}, pl = p.data || {}, lista = cli.data || [];
+  const r = (res.data && res.data[0]) || {};
   const pessoais = pes.count || 0;
 
   el("content").innerHTML = `
     <button class="btn-rd" style="margin-bottom:16px" onclick="vAssessores()">← todos os assessores</button>
 
-    ${asCabecalho(a, lista)}
+    ${asCabecalho(a, r)}
     ${asPatrimonio(pat.data)}
     ${asSerie(pat.data)}
     ${asPlacar(pl)}
     ${asDiagnostico(d.data)}
 
-    <div class="sec-title" style="margin-top:26px">A carteira dele<span class="rule"></span>
+    <div class="sec-title" style="margin-top:26px">${
+        asF.origem === "rd" ? "Passaram por ele no RD" : "A carteira dele"}<span class="rule"></span>
       <button class="btn-rd" onclick="asBaixar()" style="margin-left:12px">Baixar relatório</button>
     </div>
     ${asFiltros(b.data, pessoais)}
+    ${asF.origem === "rd" ? `<div class="note" style="border-left-color:var(--amber);margin-bottom:12px">
+      Estes são os clientes que passaram por ele em algum atendimento do RD — quase todos de
+      outras barras, porque a casa atende por fila. <b>Não entram na carteira dele</b> nem em
+      nenhum número desta página.</div>` : ""}
     <div class="panel" id="asTab">${asTabela(lista)}</div>`;
 }
 
-function asCabecalho(a, lista){
-  const em30 = lista.filter(c=>c.dias_dele<=30).length;
+/**
+ * Os numeros aqui sao da CARTEIRA: barra + contato pessoal.
+ * O que ele atendeu no RD aparece de lado, apagado, porque quase sempre
+ * e cliente de outra barra — a casa atende por fila. Somar isso na
+ * carteira inflava tudo: o Igor tinha 3.248 "clientes" quando a carteira
+ * dele tem pouco mais de cem.
+ */
+function asCabecalho(a, r){
   return `<div class="panel" style="padding:20px 22px;margin-bottom:16px;
       display:flex;gap:34px;flex-wrap:wrap;align-items:center">
     <span class="as-av" style="width:52px;height:52px;font-size:17px;flex:0 0 52px">${ini(a.assessor||"")}</span>
     <div><div class="as-rot">clientes na carteira</div>
-      <div style="font-size:26px;font-weight:300;letter-spacing:-1px">${nf(a.clientes||0)}</div></div>
-    <div><div class="as-rot">atendimentos no mês</div>
-      <div style="font-size:26px;font-weight:300;letter-spacing:-1px">${nf(a.atendimentos_30d||0)}</div></div>
+      <div style="font-size:26px;font-weight:300;letter-spacing:-1px">${nf(r.clientes||0)}</div>
+      <div style="font-size:11px;color:var(--text-faint)">${nf(r.da_barra||0)} da barra · ${nf(r.pessoais||0)} pessoais</div></div>
+    <div><div class="as-rot">operando</div>
+      <div style="font-size:26px;font-weight:300;letter-spacing:-1px;color:var(--green)">${nf(r.operando||0)}</div>
+      <div style="font-size:11px;color:var(--text-faint)">${nf(r.parados||0)} pararam · ${nf(r.nunca_operaram||0)} nunca operaram</div></div>
     <div><div class="as-rot">fila no diagnóstico</div>
       <div style="font-size:26px;font-weight:300;letter-spacing:-1px;color:${
-        a.no_diagnostico?'var(--amber)':'var(--text-faint)'}">${nf(a.no_diagnostico||0)}</div></div>
+        r.no_diagnostico?'var(--amber)':'var(--text-faint)'}">${nf(r.no_diagnostico||0)}</div></div>
     <div><div class="as-rot">atende desde</div>
       <div style="font-size:17px;font-weight:600">${a.primeiro?fmtData(a.primeiro):"—"}</div>
       <div style="font-size:11px;color:var(--text-faint)">último em ${a.ultimo?fmtData(a.ultimo):"—"}</div></div>
+    <div style="margin-left:auto;text-align:right;opacity:.55">
+      <div class="as-rot">passaram por ele no RD</div>
+      <div style="font-size:20px;font-weight:300;letter-spacing:-.6px">${nf(r.atendidos_no_rd||0)}</div>
+      <div style="font-size:10.5px;color:var(--text-faint)">de outras barras · não entra nos números</div></div>
   </div>`;
 }
 
@@ -2486,6 +2515,7 @@ async function asMudanca(){
   if(error){ alvo.innerHTML = '<div class="empty">'+error.message+'</div>'; return; }
   if(!data || !data.length){ alvo.innerHTML='<div class="empty">Sem dois meses para comparar.</div>'; return; }
 
+  window.__asMud = data;
   const soma = t => data.filter(c=>c.tipo===t).reduce((s,c)=>s+Number(c.delta||0),0);
   const qtd  = t => data.filter(c=>c.tipo===t).length;
   const total = data.reduce((s,c)=>s+Number(c.delta||0),0);
@@ -2498,6 +2528,7 @@ async function asMudanca(){
       <div style="font-size:20px;font-weight:300;letter-spacing:-.6px;margin:5px 0 3px;
         color:${v>0?'var(--green)':v<0?'var(--red)':'var(--text)'}">${v>0?"+":""}${nfR(v)}</div>
       <div style="font-size:11.5px;color:var(--text-dim)">${nf(n)} cliente(s) · ${explica}</div>
+      <button class="as-mud-b" onclick="asBaixarGrupo('${t}','${rot}')">baixar os ${nf(n)}</button>
     </div>`;
   };
 
@@ -2594,6 +2625,24 @@ async function asBaixar(){
       c.ultimo_dele, c.dias_dele, c.vezes, c.outros_assessores,
       c.profissao, c.uf
     ]));
+}
+
+/**
+ * So um dos quatro movimentos.
+ * Quando a queda vem de quem zerou, a lista util e a dos que zeraram —
+ * baixar todos junto dilui o que importa.
+ */
+function asBaixarGrupo(tipo, rotulo){
+  const todos = window.__asMud || [];
+  const lista = todos.filter(c => c.tipo === tipo);
+  if(!lista.length){ toast("Nada neste grupo","",true); return; }
+  baixarCSV(
+    rotulo.replace(/\s+/g,"_") + "_" + asF.assessor.replace(/\s+/g,"_").toLowerCase()
+      + "_" + hojeISO() + ".csv",
+    ["nome","sinacor","barra","origem","mes anterior","mes atual","diferenca","variacao %"],
+    lista.map(c => [c.nome, c.sinacor, c.barra,
+      c.origem === "pessoal" ? "contato pessoal" : "barra",
+      c.antes, c.depois, c.delta, c.pct]));
 }
 
 /** A comparacao entre os dois meses, cliente a cliente. */
@@ -2698,8 +2747,10 @@ function asFiltros(barras, pessoais){
         <span style="color:var(--text-faint);font-size:12px">até</span>
         <input type="date" class="search" id="fAte" value="${asF.ate||""}" onchange="asMudou()" style="flex:0 0 150px">
       </span>
-      ${pessoais ? sel("fOrigem", asF.origem, [["todas","RD e contato pessoal"],
-        ["rd","Só pelo RD"],["pessoal","Contato pessoal ("+nf(pessoais)+")"]]) : ""}
+      ${sel("fOrigem", asF.origem, [["carteira","A carteira dele"],
+        ["barra","Só a barra"],
+        ["pessoal","Só contato pessoal"+(pessoais?" ("+nf(pessoais)+")":"")],
+        ["rd","Atendidos no RD — não conta na carteira"]])}
       ${sel("fSaude", asF.saude, [["todas","Qualquer situação"],["saudavel","Saudável"],
         ["negligenciado","Negligenciado"],["critico","Crítico"],
         ["em_recuperacao","Em recuperação"],["nunca_operou","Nunca operou"]])}
@@ -2747,6 +2798,7 @@ function asTabela(lista){
     <tbody>${lista.map(c=>`<tr onclick="abrirFicha('${c.cliente_id}')">
       <td><div class="cell-name"><span class="mini-av">${ini(c.nome||"?")}</span>${c.nome||"—"}
         ${c.origem==="pessoal"?'<span class="tag t-green" style="font-size:10px">contato pessoal</span>':""}
+        ${c.origem==="rd"?'<span class="tag t-amber" style="font-size:10px">só atendimento</span>':""}
         ${tagParceiro(c.barra,c.parceiros)}</div></td>
       <td class="num">${c.barra||"—"}</td>
       <td>${faixaBadge(c.faixa||"sem", c.grau||0)}</td>
