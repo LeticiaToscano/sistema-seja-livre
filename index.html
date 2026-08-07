@@ -733,7 +733,7 @@
       <button class="nav-item" data-view="integracoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 7V4M15 7V4M8 7h8v4a4 4 0 0 1-8 0z" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15v5" stroke-linecap="round"/></svg>Integrações</button>
     </nav>
     <div class="foot">
-      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v07/08 18:42</div></div></div>
+      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v07/08 18:51</div></div></div>
       <button class="btn-logout" id="logoutBtn">Sair</button>
     </div>
   </aside>
@@ -2294,53 +2294,53 @@ function asCabecalho(a, lista){
  */
 function asPatrimonio(meses){
   if(!meses || !meses.length) return "";
-  const ult = meses[meses.length-1], ant = meses[meses.length-2];
-  const varia = (ant && Number(ant.saldo) > 0)
-    ? Math.round(100*(Number(ult.saldo)-Number(ant.saldo))/Number(ant.saldo)) : null;
 
-  const maior = Math.max(...meses.map(m=>Number(m.saldo||0)));
-  const barras = meses.map(m=>{
-    const alt = maior ? Math.max(3, Math.round(100*Number(m.saldo||0)/maior)) : 3;
-    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px"
-        title="${fmtMesAno(m.competencia)} · ${nfR(m.saldo)}">
-      <div style="width:100%;height:52px;display:flex;align-items:flex-end">
-        <div style="width:100%;height:${alt}%;border-radius:3px 3px 0 0;
-          background:linear-gradient(180deg, rgba(46,229,157,.85), rgba(46,229,157,.25))"></div>
+  // mes sem saldo nao entra: o arquivo de 06/06 veio com a coluna
+  // inteira zerada, e uma barra de altura zero ao lado de outra cheia
+  // parece defeito, nao informacao
+  const comDado = meses.filter(m => Number(m.saldo||0) > 0);
+  if(!comDado.length) return "";
+
+  const ult = comDado[comDado.length-1], ant = comDado[comDado.length-2];
+  const varia = ant ? Math.round(100*(Number(ult.saldo)-Number(ant.saldo))/Number(ant.saldo)) : null;
+  const maior = Math.max(...comDado.map(m=>Number(m.saldo)));
+
+  const bloco = (rot, valor, apoio, cor) => `<div style="min-width:150px">
+    <div class="as-rot" style="margin-bottom:7px">${rot}</div>
+    <div style="font-size:27px;font-weight:300;letter-spacing:-1.1px;line-height:1${
+      cor?";color:"+cor:""}">${valor}</div>
+    <div style="font-size:11.5px;color:var(--text-faint);margin-top:5px">${apoio}</div>
+  </div>`;
+
+  const grafico = comDado.length < 2 ? "" : `
+    <div style="min-width:170px">
+      <div class="as-rot" style="margin-bottom:7px">mês a mês</div>
+      <div style="display:flex;gap:6px;align-items:flex-end;height:44px">
+        ${comDado.map(m=>`<div style="flex:1;height:${
+            Math.max(8, Math.round(100*Number(m.saldo)/maior))}%;
+            border-radius:3px 3px 0 0;
+            background:linear-gradient(180deg, rgba(46,229,157,.9), rgba(46,229,157,.3))"
+            title="${fmtMesAno(m.competencia)} · ${nfR(m.saldo)}"></div>`).join("")}
       </div>
-      <div style="font-size:10px;color:var(--text-faint)">${
-        fmtMesAno(m.competencia).slice(0,3)}</div>
+      <div style="display:flex;gap:6px;margin-top:5px">
+        ${comDado.map(m=>`<div style="flex:1;text-align:center;font-size:10px;
+          color:var(--text-faint)">${fmtMesAno(m.competencia).slice(0,3)}</div>`).join("")}
+      </div>
     </div>`;
-  }).join("");
 
   return `<div class="panel" style="padding:20px 22px;margin-bottom:16px">
-    <div style="display:flex;gap:34px;flex-wrap:wrap;align-items:flex-end">
-      <div>
-        <div class="as-rot">na corretora hoje</div>
-        <div style="font-size:30px;font-weight:300;letter-spacing:-1.2px;line-height:1">${nfR(ult.saldo)}</div>
-        <div style="font-size:11.5px;color:var(--text-dim);margin-top:4px">
-          ${nf(ult.com_saldo)} de ${nf(ult.clientes)} clientes com saldo</div>
-      </div>
-      ${varia!=null?`<div>
-        <div class="as-rot">contra ${fmtMesAno(ant.competencia)}</div>
-        <div style="font-size:26px;font-weight:300;letter-spacing:-1px;
-          color:${varia>0?'var(--green)':varia<0?'var(--red)':'var(--text)'}">${
-          varia>0?"+":""}${nf(varia)}%</div>
-        <div style="font-size:11.5px;color:var(--text-faint)">era ${nfR(ant.saldo)}</div>
-      </div>`:`<div>
-        <div class="as-rot">variação</div>
-        <div style="font-size:15px;color:var(--text-faint)">primeiro mês com dado</div>
-      </div>`}
-      <div>
-        <div class="as-rot">cliente típico</div>
-        <div style="font-size:26px;font-weight:300;letter-spacing:-1px">${nfR(ult.mediana)}</div>
-        <div style="font-size:11.5px;color:var(--text-faint)">mediana, não média</div>
-      </div>
-      ${meses.length>1?`<div style="flex:1;min-width:180px">
-        <div class="as-rot" style="margin-bottom:6px">mês a mês</div>
-        <div style="display:flex;gap:5px;align-items:flex-end">${barras}</div>
-      </div>`:""}
+    <div style="display:flex;gap:44px;flex-wrap:wrap;align-items:flex-start">
+      ${bloco("na corretora hoje", nfR(ult.saldo),
+              nf(ult.com_saldo)+" de "+nf(ult.clientes)+" clientes com saldo")}
+      ${varia!=null
+        ? bloco("contra "+fmtMesAno(ant.competencia),
+                (varia>0?"+":"")+nf(varia)+"%", "era "+nfR(ant.saldo),
+                varia>0?"var(--green)":varia<0?"var(--red)":null)
+        : bloco("variação", "—", "só um mês com dado até agora")}
+      ${bloco("cliente típico", nfR(ult.mediana), "mediana, não média")}
+      ${grafico}
     </div>
-    <div style="font-size:11px;color:var(--text-faint);margin-top:14px;line-height:1.6">
+    <div style="font-size:11px;color:var(--text-faint);margin-top:16px;line-height:1.6">
       É o que o cliente tem <b>na corretora</b>, não o patrimônio dele. Numa casa de day trade
       isso é margem em conta: no cliente sozinho oscila muito, mas somado pela carteira é estável.
     </div>
