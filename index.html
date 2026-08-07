@@ -787,7 +787,7 @@
       <button class="nav-item" data-view="integracoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 7V4M15 7V4M8 7h8v4a4 4 0 0 1-8 0z" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15v5" stroke-linecap="round"/></svg>Integrações</button>
     </nav>
     <div class="foot">
-      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v07/08 19:16</div></div></div>
+      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v07/08 19:41</div></div></div>
       <button class="btn-logout" id="logoutBtn">Sair</button>
     </div>
   </aside>
@@ -2310,7 +2310,9 @@ async function asDesenhar(){
     ${asPlacar(pl)}
     ${asDiagnostico(d.data)}
 
-    <div class="sec-title" style="margin-top:26px">A carteira dele<span class="rule"></span></div>
+    <div class="sec-title" style="margin-top:26px">A carteira dele<span class="rule"></span>
+      <button class="btn-rd" onclick="asBaixar()" style="margin-left:12px">Baixar relatório</button>
+    </div>
     ${asFiltros(b.data, pessoais)}
     <div class="panel" id="asTab">${asTabela(lista)}</div>`;
 }
@@ -2515,7 +2517,10 @@ async function asMudanca(){
         ${grupo("saiu","zeraram","tinham saldo e não têm mais")}
       </div>
 
-      <div style="font-size:12px;font-weight:700;margin:20px 0 8px">Os que mais pesaram</div>
+      <div style="display:flex;align-items:baseline;gap:12px;margin:20px 0 8px">
+        <div style="font-size:12px;font-weight:700">Os que mais pesaram</div>
+        <button class="btn-rd" onclick="asBaixarMudanca()">Baixar esta comparação</button>
+      </div>
       <div class="panel" style="padding:0"><table><thead><tr>
         <th>Cliente</th><th>Origem</th><th>Antes</th><th>Depois</th><th>Diferença</th><th></th></tr></thead>
       <tbody>${data.slice(0,25).map(c=>`<tr ${c.cliente_id?`onclick="abrirFicha('${c.cliente_id}')"`:'style="cursor:default"'}>
@@ -2533,6 +2538,79 @@ async function asMudanca(){
         Mostrando os 25 de maior efeito, de ${nf(data.length)} clientes com saldo em algum dos dois meses</div>`:""}
       </div>
     </div>`;
+}
+
+/** Monta e baixa um CSV. Ponto e virgula e BOM, para o Excel brasileiro
+ *  abrir sem pedir nada. */
+function baixarCSV(nome, cabecalho, linhas){
+  const esc = v => {
+    v = (v == null ? "" : String(v));
+    return /[";\r\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v;
+  };
+  const csv = [cabecalho.join(";")]
+    .concat(linhas.map(l => l.map(esc).join(";"))).join("\r\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob(["\ufeff"+csv], {type:"text/csv;charset=utf-8"}));
+  a.download = nome;
+  a.click(); URL.revokeObjectURL(a.href);
+  toast("Relatório gerado", nf(linhas.length) + " linhas");
+}
+
+/**
+ * A carteira inteira, nao so as 400 da tela — e respeitando os filtros
+ * que estiverem ligados. O saldo de cada um entra junto: e o numero que
+ * faz o relatorio valer para uma conversa.
+ */
+async function asBaixar(){
+  toast("Montando o relatório", "buscando a carteira inteira…");
+
+  const [cli, sal] = await Promise.all([
+    sb.rpc("fn_assessor_clientes",{
+      p_assessor: asF.assessor, p_de: asF.de, p_ate: asF.ate,
+      p_origem: asF.origem, p_saude: asF.saude, p_operacao: asF.operacao,
+      p_faixa: asF.faixa, p_barra: asF.barra, p_ordem: asF.ordem, p_limite: 5000
+    }),
+    sb.from("patrimonio_mes").select("sinacor,saldo,competencia")
+      .order("competencia",{ascending:false}).limit(50000)
+  ]);
+  if(cli.error){ toast("Não deu para baixar", cli.error.message, true); return; }
+  const lista = cli.data || [];
+  if(!lista.length){ toast("Nada para baixar","",true); return; }
+
+  // o saldo mais recente de cada cliente
+  const saldo = {};
+  (sal.data||[]).forEach(p => { if(!(p.sinacor in saldo)) saldo[p.sinacor] = p.saldo; });
+
+  baixarCSV(
+    "carteira_" + asF.assessor.replace(/\s+/g,"_").toLowerCase() + "_" + hojeISO() + ".csv",
+    ["nome","sinacor","barra","parceiro","origem","saldo na corretora","situacao",
+     "faixa","contratos BMF","ultima operacao","ele falou em","dias desde",
+     "vezes que atendeu","outros assessores","profissao","estado"],
+    lista.map(c => [
+      c.nome, c.sinacor, c.barra, c.parceiros,
+      c.origem === "pessoal" ? "contato pessoal" : "RD",
+      saldo[c.sinacor] ?? "", SAUDE_LABEL[c.saude] || c.saude,
+      c.faixa, c.contratos_bmf, c.data_ultima_operacao,
+      c.ultimo_dele, c.dias_dele, c.vezes, c.outros_assessores,
+      c.profissao, c.uf
+    ]));
+}
+
+/** A comparacao entre os dois meses, cliente a cliente. */
+async function asBaixarMudanca(){
+  const {data,error} = await sb.rpc("fn_variacao_patrimonio",
+    {p_assessor: asF.assessor, p_mes: null});
+  if(error){ toast("Não deu para baixar", error.message, true); return; }
+  if(!data || !data.length){ toast("Nada para baixar","",true); return; }
+
+  baixarCSV(
+    "variacao_" + asF.assessor.replace(/\s+/g,"_").toLowerCase() + "_" + hojeISO() + ".csv",
+    ["nome","sinacor","barra","origem","mes anterior","mes atual","diferenca","variacao %","o que houve"],
+    data.map(c => [
+      c.nome, c.sinacor, c.barra,
+      c.origem === "pessoal" ? "contato pessoal" : "barra",
+      c.antes, c.depois, c.delta, c.pct, c.tipo
+    ]));
 }
 
 /**
