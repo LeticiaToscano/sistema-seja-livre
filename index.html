@@ -763,7 +763,7 @@
       <button class="nav-item" data-view="integracoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 7V4M15 7V4M8 7h8v4a4 4 0 0 1-8 0z" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15v5" stroke-linecap="round"/></svg>Integrações</button>
     </nav>
     <div class="foot">
-      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v07/08 18:55</div></div></div>
+      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v07/08 19:03</div></div></div>
       <button class="btn-logout" id="logoutBtn">Sair</button>
     </div>
   </aside>
@@ -3768,6 +3768,22 @@ async function impProcessar(nome, texto){
       soma_total:   acha("SOMA_TOTAL","PL TOTAL"),
       dt:           acha("DT_PARTITION","DT_FOTO")
     };
+    // O Excel guarda data como numero de dias desde 30/12/1899. Quando a
+    // planilha nao marca a celula como data, ela chega assim: 46097 e
+    // 16/03/2026. O banco recusa, e a importacao para no meio.
+    const data = v => {
+      const t = String(v||"").trim();
+      if(!t) return null;
+      if(/^\d{4}-\d{2}-\d{2}/.test(t)) return t.slice(0,10);
+      if(/^\d{5}(\.\d+)?$/.test(t)){
+        const d = new Date(Date.UTC(1899,11,30) + Math.floor(Number(t))*86400000);
+        return d.toISOString().slice(0,10);
+      }
+      // 16/03/2026 ou 16-03-2026
+      const m = t.match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})/);
+      if(m) return `${m[3]}-${m[2]}-${m[1]}`;
+      return null;
+    };
     const numero = v => {
       let t = String(v||"").trim();
       if(t === "" || t === "NULL") return null;
@@ -3783,13 +3799,13 @@ async function impProcessar(nome, texto){
                patrimonio:numero(g("patrimonio")), rendimentos:numero(g("rendimentos")),
                uf:g("uf"), perfil:g("perfil"), suitability:g("suitability"),
                sexo:g("sexo"), estado_civil:g("estado_civil"),
-               nascimento:g("nascimento"), habilitacao:g("habilitacao"),
+               nascimento:data(g("nascimento")), habilitacao:data(g("habilitacao")),
                situacao:g("situacao"), tp_pessoa:g("tp_pessoa"),
                soma_total:numero(g("soma_total")) };
     }).filter(x=>x.sinacor);
     // a data pode vir como 2026-01-30 ou 2026-01-30 00:00:00
     const comp = col.dt >= 0
-      ? (linhas[1].split(sep)[col.dt]||"").replace(/^"|"$/g,"").trim().slice(0,10)
+      ? data((linhas[1].split(sep)[col.dt]||"").replace(/^"|"$/g,"").trim())
       : "";
     window.__impDiv = {arquivo:nome, competencia:comp, itens:itens};
     impCartao(nome, data, linhas.length-1, colunas, null, null, null, null, itens.length);
