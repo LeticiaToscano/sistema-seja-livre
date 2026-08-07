@@ -795,7 +795,7 @@
       <button class="nav-item" data-view="integracoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 7V4M15 7V4M8 7h8v4a4 4 0 0 1-8 0z" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15v5" stroke-linecap="round"/></svg>Integrações</button>
     </nav>
     <div class="foot">
-      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v07/08 20:43</div></div></div>
+      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v07/08 21:21</div></div></div>
       <button class="btn-logout" id="logoutBtn">Sair</button>
     </div>
   </aside>
@@ -2273,13 +2273,22 @@ function asCard(a){
  * e opcao de formulario (mediana de exatamente R$ 100.000 para nove dos
  * onze assessores), e a unidade do saldo na corretora ainda nao fechou.
  */
-let asF = {};
+let asF = {}, asModelo = "fila";
 
 async function asFicha(assessor){
+  // O modelo do assessor decide o que a pagina mede. Quem trabalha na
+  // FILA continua medido pelo RD, como sempre foi; quem tem CARTEIRA e
+  // medido pela barra dele mais os de contato pessoal. Medir os dois do
+  // mesmo jeito erra sempre com um deles.
+  const {data:mm} = await sb.from("assessor_modelo").select("modelo")
+    .eq("assessor", assessor).maybeSingle();
+  asModelo = (mm && mm.modelo) || "fila";
   // "carteira" = barra + contato pessoal. O RD e outra coisa: quem
   // passou por ele em algum atendimento, quase sempre de outra barra.
-  asF = {assessor, de:null, ate:null, origem:"carteira", saude:"todas",
-         operacao:"todas", faixa:"todas", barra:"todas", ordem:"ultimo", periodo:"tudo"};
+  asF = {assessor, de:null, ate:null,
+         origem: asModelo === "carteira" ? "carteira" : "rd",
+         saude:"todas", operacao:"todas", faixa:"todas", barra:"todas",
+         ordem:"ultimo", periodo:"tudo"};
   asDesenhar();
 }
 
@@ -2291,7 +2300,9 @@ async function asDesenhar(){
   const [q, p, d, b, cli, pat, pes, res] = await Promise.all([
     sb.from("vw_assessores").select("*").eq("assessor", asF.assessor).maybeSingle(),
     sb.from("vw_placar_assessor").select("*").eq("assessor", asF.assessor).maybeSingle(),
-    sb.rpc("fn_diagnostico_carteira",{p_assessor: asF.assessor}),
+    asModelo === "carteira"
+      ? sb.rpc("fn_diagnostico_carteira",{p_assessor: asF.assessor})
+      : sb.rpc("fn_diagnostico_assessor",{p_assessor: asF.assessor}),
     sb.rpc("fn_barras_do_assessor",{p_assessor: asF.assessor}),
     sb.rpc("fn_assessor_clientes",{
       p_assessor: asF.assessor, p_de: asF.de, p_ate: asF.ate,
@@ -2316,14 +2327,15 @@ async function asDesenhar(){
   el("content").innerHTML = `
     <button class="btn-rd" style="margin-bottom:16px" onclick="vAssessores()">← todos os assessores</button>
 
-    ${asCabecalho(a, r)}
-    ${asPatrimonio(pat.data)}
-    ${asSerie(pat.data)}
+    ${asModelo === "carteira" ? asCabecalho(a, r) : asCabecalhoFila(a)}
+    ${asModelo === "carteira" ? asPatrimonio(pat.data) + asSerie(pat.data) : ""}
     ${asPlacar(pl)}
     ${asDiagnostico(d.data)}
 
     <div class="sec-title" style="margin-top:26px">${
-        asF.origem === "rd" ? "Passaram por ele no RD" : "A carteira dele"}<span class="rule"></span>
+        asModelo !== "carteira" ? "Quem ele atendeu"
+      : asF.origem === "rd"     ? "Passaram por ele no RD"
+      : "A carteira dele"}<span class="rule"></span>
       <button class="btn-rd" onclick="asBaixar()" style="margin-left:12px">${
         asF.origem === "rd"      ? "Baixar os atendidos no RD"
       : asF.origem === "barra"   ? "Baixar a barra"
@@ -2331,11 +2343,32 @@ async function asDesenhar(){
       : "Baixar a carteira ("+nf(r.clientes||0)+")"}</button>
     </div>
     ${asFiltros(b.data, pessoais)}
-    ${asF.origem === "rd" ? `<div class="note" style="border-left-color:var(--amber);margin-bottom:12px">
+    ${asModelo === "carteira" && asF.origem === "rd" ? `<div class="note" style="border-left-color:var(--amber);margin-bottom:12px">
       Estes são os clientes que passaram por ele em algum atendimento do RD — quase todos de
       outras barras, porque a casa atende por fila. <b>Não entram na carteira dele</b> nem em
       nenhum número desta página.</div>` : ""}
     <div class="panel" id="asTab">${asTabela(lista)}</div>`;
+}
+
+/** O cabecalho de quem trabalha na fila: o que ele atendeu e o que
+ *  sobrou para tratar. E como sempre foi. */
+function asCabecalhoFila(a){
+  return `<div class="panel" style="padding:20px 22px;margin-bottom:16px;
+      display:flex;gap:34px;flex-wrap:wrap;align-items:center">
+    <span class="as-av" style="width:52px;height:52px;font-size:17px;flex:0 0 52px">${ini(a.assessor||"")}</span>
+    <div><div class="as-rot">clientes atendidos</div>
+      <div style="font-size:26px;font-weight:300;letter-spacing:-1px">${nf(a.clientes||0)}</div></div>
+    <div><div class="as-rot">atendimentos no mês</div>
+      <div style="font-size:26px;font-weight:300;letter-spacing:-1px">${nf(a.atendimentos_30d||0)}</div></div>
+    <div><div class="as-rot">na semana</div>
+      <div style="font-size:26px;font-weight:300;letter-spacing:-1px">${nf(a.clientes_7d||0)}</div></div>
+    <div><div class="as-rot">fila no diagnóstico</div>
+      <div style="font-size:26px;font-weight:300;letter-spacing:-1px;color:${
+        a.no_diagnostico?'var(--amber)':'var(--text-faint)'}">${nf(a.no_diagnostico||0)}</div></div>
+    <div><div class="as-rot">atende desde</div>
+      <div style="font-size:17px;font-weight:600">${a.primeiro?fmtData(a.primeiro):"—"}</div>
+      <div style="font-size:11px;color:var(--text-faint)">último em ${a.ultimo?fmtData(a.ultimo):"—"}</div></div>
+  </div>`;
 }
 
 /**
@@ -2767,10 +2800,10 @@ function asFiltros(barras, pessoais){
         <span style="color:var(--text-faint);font-size:12px">até</span>
         <input type="date" class="search" id="fAte" value="${asF.ate||""}" onchange="asMudou()" style="flex:0 0 150px">
       </span>
-      ${sel("fOrigem", asF.origem, [["carteira","A carteira dele"],
+      ${asModelo === "carteira" ? sel("fOrigem", asF.origem, [["carteira","A carteira dele"],
         ["barra","Só a barra"],
         ["pessoal","Só contato pessoal"+(pessoais?" ("+nf(pessoais)+")":"")],
-        ["rd","Atendidos no RD — não conta na carteira"]])}
+        ["rd","Atendidos no RD — não conta na carteira"]]) : ""}
       ${sel("fSaude", asF.saude, [["todas","Qualquer situação"],["saudavel","Saudável"],
         ["negligenciado","Negligenciado"],["critico","Crítico"],
         ["em_recuperacao","Em recuperação"],["nunca_operou","Nunca operou"]])}
