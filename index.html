@@ -733,7 +733,7 @@
       <button class="nav-item" data-view="integracoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 7V4M15 7V4M8 7h8v4a4 4 0 0 1-8 0z" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15v5" stroke-linecap="round"/></svg>Integrações</button>
     </nav>
     <div class="foot">
-      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v05/08 22:00</div></div></div>
+      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v07/08 18:42</div></div></div>
       <button class="btn-logout" id="logoutBtn">Sair</button>
     </div>
   </aside>
@@ -2224,7 +2224,7 @@ async function asDesenhar(){
   el("pageTitle").textContent = asF.assessor;
   el("content").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
 
-  const [q, p, d, b, cli] = await Promise.all([
+  const [q, p, d, b, cli, pat, pes] = await Promise.all([
     sb.from("vw_assessores").select("*").eq("assessor", asF.assessor).maybeSingle(),
     sb.from("vw_placar_assessor").select("*").eq("assessor", asF.assessor).maybeSingle(),
     sb.rpc("fn_diagnostico_assessor",{p_assessor: asF.assessor}),
@@ -2233,17 +2233,25 @@ async function asDesenhar(){
       p_assessor: asF.assessor, p_de: asF.de, p_ate: asF.ate,
       p_origem: asF.origem, p_saude: asF.saude, p_operacao: asF.operacao,
       p_faixa: asF.faixa, p_barra: asF.barra, p_ordem: asF.ordem, p_limite: 400
-    })
+    }),
+    sb.from("vw_patrimonio_assessor").select("*")
+      .eq("assessor", asF.assessor).order("competencia"),
+    // quantos ele tem por contato pessoal — perguntado direto, nao
+    // deduzido da lista: com 3.248 clientes do RD e limite de 400, os
+    // 60 pessoais nunca apareciam, e o filtro de origem sumia
+    sb.from("carteira_pessoal").select("sinacor",{count:"exact",head:true})
+      .eq("assessor", asF.assessor)
   ]);
   if(cli.error) return erro(cli.error,"content");
 
   const a = q.data || {}, pl = p.data || {}, lista = cli.data || [];
-  const pessoais = lista.filter(c=>c.origem==="pessoal").length;
+  const pessoais = pes.count || 0;
 
   el("content").innerHTML = `
     <button class="btn-rd" style="margin-bottom:16px" onclick="vAssessores()">← todos os assessores</button>
 
     ${asCabecalho(a, lista)}
+    ${asPatrimonio(pat.data)}
     ${asPlacar(pl)}
     ${asDiagnostico(d.data)}
 
@@ -2267,6 +2275,75 @@ function asCabecalho(a, lista){
     <div><div class="as-rot">atende desde</div>
       <div style="font-size:17px;font-weight:600">${a.primeiro?fmtData(a.primeiro):"—"}</div>
       <div style="font-size:11px;color:var(--text-faint)">último em ${a.ultimo?fmtData(a.ultimo):"—"}</div></div>
+  </div>`;
+}
+
+/**
+ * O saldo que os clientes dele tem NA CORRETORA, mes a mes.
+ *
+ * Vem da barra + os clientes de contato pessoal — nao de quem ele
+ * atendeu no RD, que sao milhares de outras barras.
+ *
+ * A MEDIANA vem junto de proposito: a soma pode ser puxada por dois ou
+ * tres clientes grandes, e e a mediana que diz como e o cliente TIPICO
+ * dele. No Igor, mediana de R$ 52 mil contra R$ 187 da casa — a carteira
+ * inteira esta em outro patamar, nao so o topo.
+ *
+ * E numa casa de day trade isso e margem em conta, nao riqueza: no
+ * cliente individual oscila muito. Somado por carteira, e estavel.
+ */
+function asPatrimonio(meses){
+  if(!meses || !meses.length) return "";
+  const ult = meses[meses.length-1], ant = meses[meses.length-2];
+  const varia = (ant && Number(ant.saldo) > 0)
+    ? Math.round(100*(Number(ult.saldo)-Number(ant.saldo))/Number(ant.saldo)) : null;
+
+  const maior = Math.max(...meses.map(m=>Number(m.saldo||0)));
+  const barras = meses.map(m=>{
+    const alt = maior ? Math.max(3, Math.round(100*Number(m.saldo||0)/maior)) : 3;
+    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px"
+        title="${fmtMesAno(m.competencia)} · ${nfR(m.saldo)}">
+      <div style="width:100%;height:52px;display:flex;align-items:flex-end">
+        <div style="width:100%;height:${alt}%;border-radius:3px 3px 0 0;
+          background:linear-gradient(180deg, rgba(46,229,157,.85), rgba(46,229,157,.25))"></div>
+      </div>
+      <div style="font-size:10px;color:var(--text-faint)">${
+        fmtMesAno(m.competencia).slice(0,3)}</div>
+    </div>`;
+  }).join("");
+
+  return `<div class="panel" style="padding:20px 22px;margin-bottom:16px">
+    <div style="display:flex;gap:34px;flex-wrap:wrap;align-items:flex-end">
+      <div>
+        <div class="as-rot">na corretora hoje</div>
+        <div style="font-size:30px;font-weight:300;letter-spacing:-1.2px;line-height:1">${nfR(ult.saldo)}</div>
+        <div style="font-size:11.5px;color:var(--text-dim);margin-top:4px">
+          ${nf(ult.com_saldo)} de ${nf(ult.clientes)} clientes com saldo</div>
+      </div>
+      ${varia!=null?`<div>
+        <div class="as-rot">contra ${fmtMesAno(ant.competencia)}</div>
+        <div style="font-size:26px;font-weight:300;letter-spacing:-1px;
+          color:${varia>0?'var(--green)':varia<0?'var(--red)':'var(--text)'}">${
+          varia>0?"+":""}${nf(varia)}%</div>
+        <div style="font-size:11.5px;color:var(--text-faint)">era ${nfR(ant.saldo)}</div>
+      </div>`:`<div>
+        <div class="as-rot">variação</div>
+        <div style="font-size:15px;color:var(--text-faint)">primeiro mês com dado</div>
+      </div>`}
+      <div>
+        <div class="as-rot">cliente típico</div>
+        <div style="font-size:26px;font-weight:300;letter-spacing:-1px">${nfR(ult.mediana)}</div>
+        <div style="font-size:11.5px;color:var(--text-faint)">mediana, não média</div>
+      </div>
+      ${meses.length>1?`<div style="flex:1;min-width:180px">
+        <div class="as-rot" style="margin-bottom:6px">mês a mês</div>
+        <div style="display:flex;gap:5px;align-items:flex-end">${barras}</div>
+      </div>`:""}
+    </div>
+    <div style="font-size:11px;color:var(--text-faint);margin-top:14px;line-height:1.6">
+      É o que o cliente tem <b>na corretora</b>, não o patrimônio dele. Numa casa de day trade
+      isso é margem em conta: no cliente sozinho oscila muito, mas somado pela carteira é estável.
+    </div>
   </div>`;
 }
 
@@ -2355,8 +2432,8 @@ function asFiltros(barras, pessoais){
         <span style="color:var(--text-faint);font-size:12px">até</span>
         <input type="date" class="search" id="fAte" value="${asF.ate||""}" onchange="asMudou()" style="flex:0 0 150px">
       </span>
-      ${pessoais || asF.origem!=="todas" ? sel("fOrigem", asF.origem, [["todas","RD e contato pessoal"],
-        ["rd","Só pelo RD"],["pessoal","Só contato pessoal"]]) : ""}
+      ${pessoais ? sel("fOrigem", asF.origem, [["todas","RD e contato pessoal"],
+        ["rd","Só pelo RD"],["pessoal","Contato pessoal ("+nf(pessoais)+")"]]) : ""}
       ${sel("fSaude", asF.saude, [["todas","Qualquer situação"],["saudavel","Saudável"],
         ["negligenciado","Negligenciado"],["critico","Crítico"],
         ["em_recuperacao","Em recuperação"],["nunca_operou","Nunca operou"]])}
@@ -3605,16 +3682,37 @@ async function impProcessar(nome, texto){
     }).filter(x=>x.sinacor);
     window.__impCheg = {arquivo:nome, itens:itens};
     impCartao(nome, data, linhas.length-1, colunas, null, null, null, null, null, itens.length);
-  } else if(data && data.formato === "diversificador"){
-    const idx = n => colunas.findIndex(c=>c.trim().toUpperCase() === n);
+  } else if(data && (data.formato === "diversificador" || data.formato === "diversificador_antigo")){
+    // Os arquivos antigos usam outros nomes para as mesmas colunas. Cada
+    // campo aceita uma lista de apelidos, na ordem de preferencia.
+    const acha = (...nomes) => {
+      for(const n of nomes){
+        const i = colunas.findIndex(c=>c.trim().toUpperCase() === n.toUpperCase());
+        if(i >= 0) return i;
+      }
+      return -1;
+    };
     const col = {
-      sinacor:idx("CD_CONTA_SEM_DIGITO"), nome:idx("NOME_CLIENTE"), cpf:idx("CPF_CNPJ"),
-      barra:idx("ASSESSOR"), telefone:idx("TELEFONE"), email:idx("EMAIL"),
-      profissao:idx("PROFISSAO"), patrimonio:idx("PATRIMONIO"), rendimentos:idx("RENDIMENTOS"),
-      uf:idx("UF"), perfil:idx("PERFIL"), suitability:idx("PERFIL_SUITABILITY"),
-      sexo:idx("SEXO"), estado_civil:idx("ESTADO_CIVIL"), nascimento:idx("DT_NASC"),
-      habilitacao:idx("DATA_HABILITACAO"), situacao:idx("SITUACAO_CONTA"),
-      tp_pessoa:idx("TP_PESSOA"), soma_total:idx("SOMA_TOTAL"), dt:idx("DT_PARTITION")
+      sinacor:      acha("CD_CONTA_SEM_DIGITO","CONTA_SINACOR_SEM_DIGITO"),
+      nome:         acha("NOME_CLIENTE","NOME"),
+      cpf:          acha("CPF_CNPJ","CPF"),
+      barra:        acha("ASSESSOR","ASSESSOR_CONTA"),
+      telefone:     acha("TELEFONE","TELEFONE_CELULAR","TELEFONE CELULAR"),
+      email:        acha("EMAIL"),
+      profissao:    acha("PROFISSAO"),
+      patrimonio:   acha("PATRIMONIO"),
+      rendimentos:  acha("RENDIMENTOS"),
+      uf:           acha("UF","ESTADO"),
+      perfil:       acha("PERFIL"),
+      suitability:  acha("PERFIL_SUITABILITY","SUITABILITY"),
+      sexo:         acha("SEXO"),
+      estado_civil: acha("ESTADO_CIVIL","ESTADO CIVIL"),
+      nascimento:   acha("DT_NASC","NASCIMENTO"),
+      habilitacao:  acha("DATA_HABILITACAO","HABILITACAO"),
+      situacao:     acha("SITUACAO_CONTA","SITUACAO"),
+      tp_pessoa:    acha("TP_PESSOA","TIPO_PESSOA","TIPO PESSOA"),
+      soma_total:   acha("SOMA_TOTAL","PL TOTAL"),
+      dt:           acha("DT_PARTITION","DT_FOTO")
     };
     const numero = v => {
       let t = String(v||"").trim();
@@ -3635,7 +3733,10 @@ async function impProcessar(nome, texto){
                situacao:g("situacao"), tp_pessoa:g("tp_pessoa"),
                soma_total:numero(g("soma_total")) };
     }).filter(x=>x.sinacor);
-    const comp = col.dt >= 0 ? (linhas[1].split(sep)[col.dt]||"").replace(/^"|"$/g,"").trim() : "";
+    // a data pode vir como 2026-01-30 ou 2026-01-30 00:00:00
+    const comp = col.dt >= 0
+      ? (linhas[1].split(sep)[col.dt]||"").replace(/^"|"$/g,"").trim().slice(0,10)
+      : "";
     window.__impDiv = {arquivo:nome, competencia:comp, itens:itens};
     impCartao(nome, data, linhas.length-1, colunas, null, null, null, null, itens.length);
   } else if(data && data.formato === "custos"){
@@ -3752,7 +3853,9 @@ async function impProcessarDiversificador(){
       lote:{ arquivo: lote.arquivo, competencia: lote.competencia, itens: parte }
     });
     if(error){ erro = error.message; break; }
-    rec += data.recebidos || 0; mud += data.mudancas || 0; sem += data.sem_ficha || 0;
+    if(data.so_historico) window.__impSoHistorico = data.competencia;
+    rec += (data.recebidos || data.linhas || 0);
+    mud += data.mudancas || 0; sem += data.sem_ficha || 0;
   }
 
   if(erro){
@@ -3762,6 +3865,18 @@ async function impProcessarDiversificador(){
       <div style="font-size:12.5px;color:var(--text-dim);margin-top:6px">
         ${nf(rec)} clientes já foram atualizados. Rodar de novo continua de onde parou,
         porque a atualização é por Sinacor.</div>`;
+    return;
+  }
+
+  if(window.__impSoHistorico){
+    barra.innerHTML = `<div style="font-weight:700;margin-bottom:8px">Histórico de patrimônio atualizado</div>
+      <div style="font-size:13.5px;color:var(--text-dim);line-height:1.7">
+        ${nf(rec)} clientes de <b>${window.__impSoHistorico}</b><br>
+        O arquivo é mais antigo que a base atual, então entrou só no histórico —
+        o cadastro dos clientes não foi tocado.
+      </div>`;
+    window.__impSoHistorico = null;
+    impHistorico();
     return;
   }
 
