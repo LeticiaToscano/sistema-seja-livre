@@ -666,6 +666,36 @@
     font-size:10px; text-transform:uppercase; letter-spacing:1.4px;
     color:var(--text-faint); margin-top:7px;
   }
+  /* ---------------------------------------------------------------
+     Patrimonio do assessor
+     Um numero grande sozinho e um dado; com a linha do tempo atras dele
+     vira uma historia. Por isso o grafico e area de fundo, nao coluna.
+  --------------------------------------------------------------- */
+  .as-pat{
+    position:relative; overflow:hidden;
+    padding:24px 26px 20px; margin-bottom:16px; border-radius:18px;
+    border:1px solid rgba(255,255,255,.075);
+    background:linear-gradient(180deg, rgba(255,255,255,.028), rgba(255,255,255,.006));
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.07);
+  }
+  .as-pat-luz{
+    position:absolute; inset:-40% 50% auto -20%; height:200%;
+    background:radial-gradient(50% 50% at 30% 30%, rgba(46,229,157,.09), transparent 70%);
+    pointer-events:none;
+  }
+  .as-pat-num{
+    font-size:46px; font-weight:200; letter-spacing:-2.4px; line-height:1;
+    font-variant-numeric:tabular-nums;
+    background:linear-gradient(180deg, #ffffff 30%, rgba(255,255,255,.62));
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .as-pat-rodape{
+    display:flex; gap:34px; flex-wrap:wrap; position:relative;
+    margin-top:20px; padding-top:16px;
+    border-top:1px solid rgba(255,255,255,.06);
+  }
+  .as-pat-r{ font-size:16px; font-weight:600; letter-spacing:-.3px; font-variant-numeric:tabular-nums }
+  .as-pat-l{ font-size:12px; color:var(--text-faint); margin-left:7px }
 </style>
 <!-- leitor de Excel: a planilha de custos vem em .xlsx, e converter para
      CSV todo mês seria um passo a mais sem motivo -->
@@ -733,7 +763,7 @@
       <button class="nav-item" data-view="integracoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 7V4M15 7V4M8 7h8v4a4 4 0 0 1-8 0z" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15v5" stroke-linecap="round"/></svg>Integrações</button>
     </nav>
     <div class="foot">
-      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v07/08 18:51</div></div></div>
+      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v07/08 18:55</div></div></div>
       <button class="btn-logout" id="logoutBtn">Sair</button>
     </div>
   </aside>
@@ -2296,53 +2326,77 @@ function asPatrimonio(meses){
   if(!meses || !meses.length) return "";
 
   // mes sem saldo nao entra: o arquivo de 06/06 veio com a coluna
-  // inteira zerada, e uma barra de altura zero ao lado de outra cheia
-  // parece defeito, nao informacao
-  const comDado = meses.filter(m => Number(m.saldo||0) > 0);
-  if(!comDado.length) return "";
+  // inteira zerada, e uma barra de altura zero parece defeito
+  const md = meses.filter(m => Number(m.saldo||0) > 0);
+  if(!md.length) return "";
 
-  const ult = comDado[comDado.length-1], ant = comDado[comDado.length-2];
+  const ult = md[md.length-1], ant = md[md.length-2];
   const varia = ant ? Math.round(100*(Number(ult.saldo)-Number(ant.saldo))/Number(ant.saldo)) : null;
-  const maior = Math.max(...comDado.map(m=>Number(m.saldo)));
 
-  const bloco = (rot, valor, apoio, cor) => `<div style="min-width:150px">
-    <div class="as-rot" style="margin-bottom:7px">${rot}</div>
-    <div style="font-size:27px;font-weight:300;letter-spacing:-1.1px;line-height:1${
-      cor?";color:"+cor:""}">${valor}</div>
-    <div style="font-size:11.5px;color:var(--text-faint);margin-top:5px">${apoio}</div>
-  </div>`;
+  // ---- a area do grafico, desenhada em SVG ----
+  // Um numero grande sozinho e um dado; com a linha do tempo atras dele
+  // vira uma historia. Por isso o grafico e fundo, nao coluna ao lado.
+  let arte = "";
+  if(md.length >= 2){
+    const v = md.map(m=>Number(m.saldo));
+    const max = Math.max(...v), min = Math.min(...v);
+    const faixa = (max - min) || max || 1;
+    const L = 260, A = 74;
+    const px = i => (i/(v.length-1))*L;
+    const py = x => A - 8 - ((x-min)/faixa)*(A-20);
+    const linha = v.map((x,i)=>`${i?"L":"M"}${px(i).toFixed(1)},${py(x).toFixed(1)}`).join(" ");
+    const area  = `${linha} L${L},${A} L0,${A} Z`;
+    arte = `<svg viewBox="0 0 ${L} ${A}" style="width:100%;height:74px;display:block" preserveAspectRatio="none">
+        <defs><linearGradient id="asGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stop-color="rgba(46,229,157,.34)"/>
+          <stop offset="100%" stop-color="rgba(46,229,157,0)"/>
+        </linearGradient></defs>
+        <path d="${area}"  fill="url(#asGrad)"/>
+        <path d="${linha}" fill="none" stroke="rgba(46,229,157,.9)" stroke-width="1.6"
+              stroke-linejoin="round" stroke-linecap="round"/>
+        ${v.map((x,i)=>`<circle cx="${px(i).toFixed(1)}" cy="${py(x).toFixed(1)}" r="${
+          i===v.length-1?"3":"2"}" fill="${i===v.length-1?"#2ee59d":"rgba(46,229,157,.5)"}"/>`).join("")}
+      </svg>
+      <div style="display:flex;margin-top:4px">${md.map(m=>
+        `<div style="flex:1;text-align:center;font-size:9.5px;letter-spacing:.6px;
+          text-transform:uppercase;color:var(--text-faint)">${
+          fmtMesAno(m.competencia).slice(0,3)}</div>`).join("")}</div>`;
+  }
 
-  const grafico = comDado.length < 2 ? "" : `
-    <div style="min-width:170px">
-      <div class="as-rot" style="margin-bottom:7px">mês a mês</div>
-      <div style="display:flex;gap:6px;align-items:flex-end;height:44px">
-        ${comDado.map(m=>`<div style="flex:1;height:${
-            Math.max(8, Math.round(100*Number(m.saldo)/maior))}%;
-            border-radius:3px 3px 0 0;
-            background:linear-gradient(180deg, rgba(46,229,157,.9), rgba(46,229,157,.3))"
-            title="${fmtMesAno(m.competencia)} · ${nfR(m.saldo)}"></div>`).join("")}
+  const seta = varia==null ? "" : (varia > 0 ? "↑" : varia < 0 ? "↓" : "→");
+  const cor  = varia==null ? "var(--text-faint)"
+             : varia > 0 ? "var(--green)" : varia < 0 ? "var(--red)" : "var(--text-dim)";
+
+  return `<div class="as-pat">
+    <div class="as-pat-luz"></div>
+
+    <div style="display:flex;gap:38px;align-items:flex-start;flex-wrap:wrap;position:relative">
+      <div style="flex:1;min-width:260px">
+        <div class="as-rot" style="margin-bottom:10px">patrimônio na corretora</div>
+        <div class="as-pat-num">${nfR(ult.saldo)}</div>
+        <div style="display:flex;align-items:center;gap:9px;margin-top:11px">
+          <span style="color:${cor};font-size:14.5px;font-weight:600;letter-spacing:-.2px">
+            ${seta} ${varia==null ? "primeiro mês" : (varia>0?"+":"")+nf(varia)+"%"}</span>
+          <span style="font-size:12.5px;color:var(--text-faint)">${
+            ant ? "contra "+fmtMesAno(ant.competencia)+", que fechou em "+nfR(ant.saldo)
+                : "ainda sem mês anterior para comparar"}</span>
+        </div>
       </div>
-      <div style="display:flex;gap:6px;margin-top:5px">
-        ${comDado.map(m=>`<div style="flex:1;text-align:center;font-size:10px;
-          color:var(--text-faint)">${fmtMesAno(m.competencia).slice(0,3)}</div>`).join("")}
-      </div>
-    </div>`;
-
-  return `<div class="panel" style="padding:20px 22px;margin-bottom:16px">
-    <div style="display:flex;gap:44px;flex-wrap:wrap;align-items:flex-start">
-      ${bloco("na corretora hoje", nfR(ult.saldo),
-              nf(ult.com_saldo)+" de "+nf(ult.clientes)+" clientes com saldo")}
-      ${varia!=null
-        ? bloco("contra "+fmtMesAno(ant.competencia),
-                (varia>0?"+":"")+nf(varia)+"%", "era "+nfR(ant.saldo),
-                varia>0?"var(--green)":varia<0?"var(--red)":null)
-        : bloco("variação", "—", "só um mês com dado até agora")}
-      ${bloco("cliente típico", nfR(ult.mediana), "mediana, não média")}
-      ${grafico}
+      ${arte ? `<div style="flex:0 0 260px;min-width:210px">${arte}</div>` : ""}
     </div>
-    <div style="font-size:11px;color:var(--text-faint);margin-top:16px;line-height:1.6">
+
+    <div class="as-pat-rodape">
+      <div><span class="as-pat-r">${nf(ult.com_saldo)}</span>
+        <span class="as-pat-l">de ${nf(ult.clientes)} clientes com saldo</span></div>
+      <div><span class="as-pat-r">${nfR(ult.mediana)}</span>
+        <span class="as-pat-l">no cliente típico — mediana, não média</span></div>
+      <div><span class="as-pat-r">${nfR(Math.round(Number(ult.saldo)/Math.max(1,Number(ult.com_saldo))))}</span>
+        <span class="as-pat-l">por cliente com saldo, na média</span></div>
+    </div>
+
+    <div style="font-size:10.5px;color:var(--text-faint);margin-top:14px;line-height:1.6;position:relative">
       É o que o cliente tem <b>na corretora</b>, não o patrimônio dele. Numa casa de day trade
-      isso é margem em conta: no cliente sozinho oscila muito, mas somado pela carteira é estável.
+      isso é margem em conta: no cliente sozinho oscila muito, somado pela carteira é estável.
     </div>
   </div>`;
 }
