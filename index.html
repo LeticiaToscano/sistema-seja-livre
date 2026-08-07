@@ -795,7 +795,7 @@
       <button class="nav-item" data-view="integracoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 7V4M15 7V4M8 7h8v4a4 4 0 0 1-8 0z" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15v5" stroke-linecap="round"/></svg>Integrações</button>
     </nav>
     <div class="foot">
-      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v07/08 21:21</div></div></div>
+      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v07/08 21:42</div></div></div>
       <button class="btn-logout" id="logoutBtn">Sair</button>
     </div>
   </aside>
@@ -2299,7 +2299,7 @@ async function asDesenhar(){
 
   const [q, p, d, b, cli, pat, pes, res] = await Promise.all([
     sb.from("vw_assessores").select("*").eq("assessor", asF.assessor).maybeSingle(),
-    sb.from("vw_placar_assessor").select("*").eq("assessor", asF.assessor).maybeSingle(),
+    sb.rpc("fn_placar_assessor",{p_assessor: asF.assessor, p_de: asF.de, p_ate: asF.ate}),
     asModelo === "carteira"
       ? sb.rpc("fn_diagnostico_carteira",{p_assessor: asF.assessor})
       : sb.rpc("fn_diagnostico_assessor",{p_assessor: asF.assessor}),
@@ -2316,16 +2316,21 @@ async function asDesenhar(){
     // 60 pessoais nunca apareciam, e o filtro de origem sumia
     sb.from("carteira_pessoal").select("sinacor",{count:"exact",head:true})
       .eq("assessor", asF.assessor),
-    sb.rpc("fn_resumo_assessor",{p_assessor: asF.assessor})
+    sb.rpc("fn_resumo_assessor",{p_assessor: asF.assessor, p_de: asF.de, p_ate: asF.ate})
   ]);
   if(cli.error) return erro(cli.error,"content");
 
-  const a = q.data || {}, pl = p.data || {}, lista = cli.data || [];
+  const a = q.data || {}, pl = (p.data && p.data[0]) || {}, lista = cli.data || [];
   const r = (res.data && res.data[0]) || {};
   const pessoais = pes.count || 0;
 
   el("content").innerHTML = `
-    <button class="btn-rd" style="margin-bottom:16px" onclick="vAssessores()">← todos os assessores</button>
+    <div style="display:flex;gap:12px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
+      <button class="btn-rd" onclick="vAssessores()">← todos os assessores</button>
+      <div style="flex:1"></div>
+      <span style="font-size:11.5px;color:var(--text-faint)">período:</span>
+      ${asSelPeriodo()}
+    </div>
 
     ${asModelo === "carteira" ? asCabecalho(a, r) : asCabecalhoFila(a)}
     ${asModelo === "carteira" ? asPatrimonio(pat.data) + asSerie(pat.data) : ""}
@@ -2708,18 +2713,19 @@ async function asBaixarMudanca(){
  */
 function asPlacar(pl){
   if(!pl || !pl.assessor) return "";
-  const eixo = (rot, pegou, deu, pct, ajuda) => {
+  const eixo = (rot, pegou, deu, pct, legenda) => {
     pegou = Number(pegou||0);
     const poucos = pegou < 20;
-    return `<div style="flex:1;min-width:150px">
-      <div class="as-rot" title="${ajuda}">${rot}</div>
-      <div style="font-size:26px;font-weight:300;letter-spacing:-1px;color:${
+    return `<div style="flex:1;min-width:210px">
+      <div class="as-rot">${rot}</div>
+      <div style="font-size:26px;font-weight:300;letter-spacing:-1px;margin:4px 0 2px;color:${
         poucos?'var(--text-faint)':'var(--text)'}">${
         pegou===0 ? "—" : poucos ? nf(deu)+"/"+nf(pegou) : pct+"%"}</div>
       <div style="font-size:11px;color:var(--text-faint)">${
-        pegou===0 ? "nenhum caso"
-        : poucos ? "poucos casos para uma taxa"
+        pegou===0 ? "nenhum caso no período"
+        : poucos ? "poucos casos para virar taxa"
         : nf(deu)+" de "+nf(pegou)+" casos"}</div>
+      <div style="font-size:11.5px;color:var(--text-dim);margin-top:8px;line-height:1.55">${legenda}</div>
     </div>`;
   };
   return `<div class="panel" style="padding:18px 22px;margin-bottom:16px">
@@ -2730,11 +2736,14 @@ function asPlacar(pl){
     </div>
     <div style="display:flex;gap:26px;flex-wrap:wrap">
       ${eixo("retenção", pl.retencao_pegou, pl.retencao_ficou, pl.pct_retencao,
-             "Pediram saída e ele atendeu na janela de 7 dias — quantos ficaram")}
+        "<b>Pediram para sair</b> e ele falou com eles nos 7 dias ao redor do pedido. "+
+        "A taxa é quantos <b>continuaram na casa</b>.")}
       ${eixo("reativação", pl.reativacao_pegou, pl.reativacao_voltou, pl.pct_reativacao,
-             "Pararam de operar e ele atendeu durante a parada — quantos voltaram")}
+        "<b>Estavam parados</b> há mais de 60 dias e ele falou com eles durante a parada. "+
+        "A taxa é quantos <b>voltaram a operar</b>.")}
       ${eixo("ativação", pl.ativacao_pegou, pl.ativacao_operou, pl.pct_ativacao,
-             "Abriram conta e ele atendeu na janela — quantos chegaram a operar")}
+        "<b>Abriram conta</b> e ele falou com eles no primeiro mês. "+
+        "A taxa é quantos <b>chegaram a operar</b> alguma vez.")}
     </div>
     <div style="font-size:11px;color:var(--text-faint);margin-top:14px;line-height:1.6">
       A captação está fora por enquanto: a medição dava 98% a 100% para todo mundo,
@@ -2777,6 +2786,22 @@ function asDiagnostico(d){
   </div>`;
 }
 
+/** O periodo vale para a pagina inteira: placar, atendimentos e lista. */
+function asSelPeriodo(){
+  const op = [["tudo","Todo o período"],["hoje","Hoje"],["7","Últimos 7 dias"],
+              ["30","Últimos 30 dias"],["mes","Este mês"],["mespassado","Mês passado"],
+              ["90","Últimos 90 dias"],["ano","Este ano"],["livre","Escolher datas…"]];
+  return `<select class="search select" id="fPeriodo" style="flex:0 0 190px"
+      onchange="asMudou()">
+      ${op.map(([v,r])=>`<option value="${v}" ${v===asF.periodo?"selected":""}>${r}</option>`).join("")}
+    </select>
+    <span id="fDatas" style="display:${asF.periodo==="livre"?"inline-flex":"none"};gap:7px;align-items:center">
+      <input type="date" class="search" id="fDe"  value="${asF.de||""}"  onchange="asMudou()" style="flex:0 0 148px">
+      <span style="color:var(--text-faint);font-size:12px">até</span>
+      <input type="date" class="search" id="fAte" value="${asF.ate||""}" onchange="asMudou()" style="flex:0 0 148px">
+    </span>`;
+}
+
 function asFiltros(barras, pessoais){
   const sel = (id, atual, opcoes) => `<select class="search select" id="${id}"
       style="flex:0 0 auto;min-width:150px" onchange="asMudou()">
@@ -2792,14 +2817,6 @@ function asFiltros(barras, pessoais){
 
     <div class="toolbar" style="border:1px solid var(--border);border-radius:12px;margin-bottom:12px;
       flex-wrap:wrap;gap:9px">
-      ${sel("fPeriodo", asF.periodo, [["tudo","Todo o período"],["hoje","Hoje"],
-        ["7","Últimos 7 dias"],["30","Últimos 30 dias"],["mes","Este mês"],
-        ["mespassado","Mês passado"],["livre","Escolher datas…"]])}
-      <span id="fDatas" style="display:${asF.periodo==="livre"?"flex":"none"};gap:7px;align-items:center">
-        <input type="date" class="search" id="fDe"  value="${asF.de||""}"  onchange="asMudou()" style="flex:0 0 150px">
-        <span style="color:var(--text-faint);font-size:12px">até</span>
-        <input type="date" class="search" id="fAte" value="${asF.ate||""}" onchange="asMudou()" style="flex:0 0 150px">
-      </span>
       ${asModelo === "carteira" ? sel("fOrigem", asF.origem, [["carteira","A carteira dele"],
         ["barra","Só a barra"],
         ["pessoal","Só contato pessoal"+(pessoais?" ("+nf(pessoais)+")":"")],
@@ -2834,6 +2851,10 @@ function asMudou(){
   } else if(p === "mespassado"){
     asF.de  = iso(new Date(hoje.getFullYear(), hoje.getMonth()-1, 1));
     asF.ate = iso(new Date(hoje.getFullYear(), hoje.getMonth(), 0));
+  } else if(p === "90"){
+    asF.de = iso(new Date(hoje.getTime() - 90*86400000)); asF.ate = iso(hoje);
+  } else if(p === "ano"){
+    asF.de = iso(new Date(hoje.getFullYear(), 0, 1)); asF.ate = iso(hoje);
   }
   if(el("fOrigem"))   asF.origem   = el("fOrigem").value;
   asF.saude    = el("fSaude").value;
