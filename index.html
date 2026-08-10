@@ -795,7 +795,7 @@
       <button class="nav-item" data-view="integracoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 7V4M15 7V4M8 7h8v4a4 4 0 0 1-8 0z" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15v5" stroke-linecap="round"/></svg>Integrações</button>
     </nav>
     <div class="foot">
-      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v07/08 22:00</div></div></div>
+      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v10/08 20:46</div></div></div>
       <button class="btn-logout" id="logoutBtn">Sair</button>
     </div>
   </aside>
@@ -2743,7 +2743,7 @@ function asPlacar(pl){
     <div style="display:flex;gap:26px;flex-wrap:wrap">
       ${eixo("retenção", pl.retencao_pegou, pl.retencao_ficou, pl.pct_retencao,
         "<b>Pediram para sair</b> e ele falou com eles <b>depois do pedido</b>, dentro das 72h de cancelamento. "+
-        "A taxa é quantos <b>continuaram na casa</b>.")}
+        "A taxa é quantos <b>ficaram e voltaram a operar</b>. Conta só quem <b>tem faixa no Clube</b>: quem nunca operou volume não tinha o que ser retido.")}
       ${eixo("reativação", pl.reativacao_pegou, pl.reativacao_voltou, pl.pct_reativacao,
         "<b>Estavam parados</b> há mais de 60 dias e ele falou com eles durante a parada. "+
         "A taxa é quantos <b>voltaram a operar</b>.")}
@@ -5474,4 +5474,3 @@ boot();
 </script>
 </body>
 </html>
-  
