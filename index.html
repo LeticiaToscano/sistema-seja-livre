@@ -1384,7 +1384,6 @@ async function carregarClientes(){
     const achados = data || [];
     cliState.total = achados.length;
     cliPagina = achados;
-    el("paginacao").innerHTML = "";
     if(!achados.length){
       el("tabelaClientes").innerHTML =
         '<div class="empty">Ninguém com esse nome, Sinacor, CPF ou telefone.</div>';
