@@ -795,7 +795,7 @@
       <button class="nav-item" data-view="integracoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 7V4M15 7V4M8 7h8v4a4 4 0 0 1-8 0z" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15v5" stroke-linecap="round"/></svg>Integrações</button>
     </nav>
     <div class="foot">
-      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v11/08 14:47</div></div></div>
+      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v11/08 14:50</div></div></div>
       <button class="btn-logout" id="logoutBtn">Sair</button>
     </div>
   </aside>
@@ -890,18 +890,24 @@ function tagAkeloo(){
 
 /**
  * Monta a busca a partir do que a pessoa digitou.
- * CPF entra com ou sem pontuacao: 123.456.789-00 e 12345678900 acham a
- * mesma pessoa. Como o CPF no banco esta so com digitos, a pontuacao e
- * tirada antes.
+ *
+ * So procura nos campos que quem chamou passou. A versao anterior
+ * acrescentava `cpf` sozinha, e quebrava contra qualquer view que nao
+ * tenha essa coluna — foi o "column vw_saude_carteira.cpf does not
+ * exist". Busca por CPF agora e trabalho da fn_buscar_cliente, que le da
+ * tabela `clientes`, onde o CPF existe.
+ *
+ * Numero digitado com pontuacao tambem procura so pelos digitos, para
+ * 123.456.789-00 achar o que esta gravado como 12345678900.
  */
 function buscaOu(termo, campos){
   const t = String(termo||"").trim();
   if(!t) return null;
   const so = t.replace(/\D/g,"");
   const partes = campos.map(c=>`${c}.ilike.%${t}%`);
-  // 11 digitos e CPF; 14 e CNPJ
-  if(so.length >= 8 && so !== t) partes.push(`cpf.ilike.%${so}%`);
-  if(/^\d+$/.test(t))           partes.push(`cpf.ilike.%${t}%`);
+  if(so && so !== t && so.length >= 3){
+    campos.forEach(c=>partes.push(`${c}.ilike.%${so}%`));
+  }
   return partes.join(",");
 }
 
@@ -1371,7 +1377,7 @@ async function carregarClientes(){
   // QUALQUER barra e QUALQUER situacao, inclusive quem foi desligado e a
   // barra excluida. A lista normal le da vw_saude_carteira, que so tem
   // ativos — por isso a busca por CPF nem funcionava ali.
-  if(termo && termo.trim().length >= 3){
+  if(termo && termo.trim().length >= 2){
     const {data,error} = await sb.rpc("fn_buscar_cliente",
       {p_termo: termo.trim(), p_limite: 200});
     if(error) return erro(error,"tabelaClientes");
