@@ -795,7 +795,7 @@
       <button class="nav-item" data-view="integracoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 7V4M15 7V4M8 7h8v4a4 4 0 0 1-8 0z" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15v5" stroke-linecap="round"/></svg>Integrações</button>
     </nav>
     <div class="foot">
-      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v10/08 21:48</div></div></div>
+      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v11/08 14:47</div></div></div>
       <button class="btn-logout" id="logoutBtn">Sair</button>
     </div>
   </aside>
@@ -903,6 +903,13 @@ function buscaOu(termo, campos){
   if(so.length >= 8 && so !== t) partes.push(`cpf.ilike.%${so}%`);
   if(/^\d+$/.test(t))           partes.push(`cpf.ilike.%${t}%`);
   return partes.join(",");
+}
+
+/** 12345678900 -> 123.456.789-00; o que nao tiver 11 digitos volta como veio */
+function fmtCPF(v){
+  const d = String(v||"").replace(/\D/g,"");
+  if(d.length !== 11) return v || "—";
+  return d.slice(0,3)+"."+d.slice(3,6)+"."+d.slice(6,9)+"-"+d.slice(9);
 }
 
 function faixaBadge(faixa, grau){
@@ -1359,6 +1366,59 @@ async function cliNovoParceiro(){
 }
 async function carregarClientes(){
   const {termo,filtro,page,size}=cliState;
+
+  // Com termo de busca, procura na tabela de clientes direto: acha em
+  // QUALQUER barra e QUALQUER situacao, inclusive quem foi desligado e a
+  // barra excluida. A lista normal le da vw_saude_carteira, que so tem
+  // ativos — por isso a busca por CPF nem funcionava ali.
+  if(termo && termo.trim().length >= 3){
+    const {data,error} = await sb.rpc("fn_buscar_cliente",
+      {p_termo: termo.trim(), p_limite: 200});
+    if(error) return erro(error,"tabelaClientes");
+    const achados = data || [];
+    cliState.total = achados.length;
+    cliPagina = achados;
+    el("paginacao").innerHTML = "";
+    if(!achados.length){
+      el("tabelaClientes").innerHTML =
+        '<div class="empty">Ninguém com esse nome, Sinacor, CPF ou telefone.</div>';
+      return;
+    }
+    const fora = achados.filter(c => !(c.status === "ativo" && c.segmento === "seja_livre")).length;
+    el("tabelaClientes").innerHTML = `
+      <div class="note" style="margin:0 0 12px">
+        ${nf(achados.length)} resultado(s) — a busca olha <b>todas as barras e todas as
+        situações</b>, inclusive quem foi desligado.${
+        fora ? ` <b style="color:var(--amber)">${nf(fora)} fora da carteira ativa.</b>` : ""}
+      </div>
+      <table><thead><tr>
+        <th>Cliente</th><th>Sinacor</th><th>CPF</th><th>Barra</th>
+        <th>Faixa</th><th>Situação</th><th>Contratos</th><th>Última op.</th></tr></thead>
+      <tbody>${achados.map(c=>`<tr class="${c.faixa==='preta'?'linha-preta':''}"
+          onclick="abrirFicha('${c.id}')">
+        <td><div class="cell-name"><span class="mini-av">${ini(c.nome||"?")}</span>${c.nome||"—"}
+          ${tagParceiro(c.barra,c.parceiros)}</div></td>
+        <td class="num">${c.sinacor||"—"}</td>
+        <td class="num" style="font-size:12px">${fmtCPF(c.cpf)}</td>
+        <td class="num">${c.barra||"—"}</td>
+        <td>${faixaBadge(c.faixa||"sem", c.grau||0)}</td>
+        <td>${
+          c.status !== "ativo"
+            ? '<span class="tag" style="background:transparent;border:1px dashed var(--red);color:var(--red);font-size:10px">desligado</span>'
+          : c.segmento !== "seja_livre"
+            ? `<span class="tag" style="background:transparent;border:1px dashed var(--text-faint);color:var(--text-faint);font-size:10px">${c.segmento||"outro segmento"}</span>`
+          : c.saude
+            ? `<span class="status s-${c.saude}">${SAUDE_LABEL[c.saude]||c.saude}</span>`
+            : '<span style="color:var(--text-faint)">—</span>'}
+          ${!c.na_base_corretora
+            ? '<span class="tag t-amber" style="font-size:10px" title="Não consta na base da corretora">fora da base</span>' : ""}</td>
+        <td class="num">${c.contratos_bmf?nf(c.contratos_bmf):"—"}</td>
+        <td class="num">${c.data_ultima_operacao?fmtData(c.data_ultima_operacao):"—"}</td>
+      </tr>`).join("")}</tbody></table>`;
+    setTimeout(cliPintarAcoes, 0);
+    return;
+  }
+
   const from=page*size, to=from+size-1;
   let q = sb.from("vw_saude_carteira").select("id,nome,sinacor,barra,saude,status_operacao,data_ultima_operacao,contratos_bmf,volume_bovespa,faixa,grau,parceiros,tipo_contato,tem_akeloo",{count:"exact"}).order("nome").range(from,to);
   if(termo){ q = q.or(buscaOu(termo, ["nome","sinacor","parceiros"])); }
@@ -2943,9 +3003,9 @@ async function vRanking(){
           dia?rkDiaSemana(dia):""}${dia?" · "+rkHaQuanto(dia):""}</div>
       </div>
       ${saltos?`<div style="border-left:1px solid var(--border);padding-left:26px">
-        <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:1px">Saltos de 300%</div>
+        <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:1px">Saltaram no dia</div>
         <div style="font-size:26px;font-weight:800;color:var(--amber)">${nf(saltos)}</div>
-        <div style="font-size:12px;color:var(--text-dim)">quadruplicaram ou mais</div>
+        <div style="font-size:12px;color:var(--text-dim)">por proporção ou por volume</div>
       </div>`:""}
       <div style="flex:1;min-width:230px">
         <input class="search" id="rkBusca" placeholder="Buscar cliente por nome ou Sinacor…"
@@ -2956,7 +3016,10 @@ async function vRanking(){
 
     <div class="note" style="margin-bottom:18px">
       A variação compara com o <b>dia anterior em que o cliente operou</b>, não com o dia de
-      calendário.${saltos?" Quem quadruplicou aparece com etiqueta âmbar — vale olhar antes de comemorar: pode ser erro numa ordem.":""}
+      calendário.${saltos?` O alerta âmbar tem <b>dois caminhos</b>: quem <b>quadruplicou e fechou com mil contratos ou mais</b>,
+      e quem <b>cresceu mais de cinco mil contratos</b> num dia, qualquer que seja o percentual.
+      Um pega o cliente pequeno que acordou; o outro pega o grande que acelerou — e o segundo passava
+      despercebido, porque crescer de 4.800 para 15.000 é "só" 213%.`:""}
     </div>
 
     <div class="sec-title">Quem mais operou<span class="rule"></span></div>
@@ -3121,7 +3184,13 @@ function rkTabela(dados, tipo){
     <tbody>${dados.map((r,i)=>`<tr onclick="rkAbrir('${r.sinacor}','${String(r.nome).replace(/'/g,"")}','${r.cliente_id||""}')">
       <td class="num" style="color:var(--text-faint);font-weight:700">${i+1}</td>
       <td><div class="cell-name"><span class="mini-av">${ini(r.nome)}</span>${r.nome}
-        ${r.salto?`<span class="tag t-amber" title="Quadruplicou ou mais em relação ao dia anterior que operou">+${nf(r.variacao_pct)}%</span>`:""}
+        ${r.salto?`<span class="tag t-amber" title="${
+          r.tipo_salto === "absoluto" ? "Cresceu mais de 5.000 contratos em relação ao dia anterior que operou"
+          : r.tipo_salto === "os dois" ? "Quadruplicou e cresceu mais de 5.000 contratos"
+          : "Quadruplicou ou mais, com pelo menos mil contratos no dia"}">${
+          r.tipo_salto === "absoluto"
+            ? "+" + nf(Number(r.contratos) - Number(r.contratos_antes)) + " ct"
+            : "+" + nf(r.variacao_pct) + "%"}</span>`:""}
         ${tagParceiro(r.barra, r.parceiros)}</div></td>
       <td class="num">${r.barra||"—"}</td>
       <td>${faixaBadge(r.faixa, r.grau)}</td>
