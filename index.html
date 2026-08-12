@@ -768,6 +768,7 @@
       <button class="nav-item" data-view="destaques"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l2.5 5 5.5.8-4 3.9 1 5.5L12 16l-5 2.7 1-5.5-4-3.9 5.5-.8z" stroke-linejoin="round"/></svg>Destaques</button>
       <button class="nav-item" data-view="ranking"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 21H2" stroke-linecap="round"/><path class="rk-b" d="M5 21V12" stroke-linecap="round"/><path class="rk-b" d="M12 21V5" stroke-linecap="round"/><path class="rk-b" d="M19 21v-6" stroke-linecap="round"/></svg>Ranking do dia</button>
       <button class="nav-item" data-view="clube"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7.5 3.5h9L21 9.5 12 20.5 3 9.5l4.5-6z" stroke-linejoin="round"/><path d="M3 9.5h18" stroke-width="1.2"/><path d="M9.3 9.5 12 20.5l2.7-11" stroke-width="1.1" opacity=".7"/><path d="m7.5 3.5 1.8 6M16.5 3.5l-1.8 6" stroke-width="1.1" opacity=".7"/><path class="cl-faisca" d="M12 3.5v6" stroke-width="1.1" opacity=".5"/></svg><span class="cl-txt">Clube Trader</span></button>
+      <button class="nav-item" data-view="multiconta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="8" width="12" height="9" rx="2"/><path d="M8 8V6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2" stroke-linecap="round"/></svg>Mesmo CPF</button>
       <button class="nav-item" data-view="plataformas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8M12 18v3" stroke-linecap="round"/></svg>Plataformas</button>
       <button class="nav-item" data-view="fila"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h10M4 12h10M4 18h7" stroke-linecap="round"/><path d="M17 15l2.2 2.2L23 13" stroke-linecap="round" stroke-linejoin="round"/></svg>Fila de ação</button>
       <button class="nav-item" data-view="aniversariantes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20h16v-8H4z"/><path d="M4 14c2 0 2-1.3 4-1.3s2 1.3 4 1.3 2-1.3 4-1.3 2 1.3 4 1.3" stroke-linecap="round"/><path d="M12 8V5" stroke-linecap="round"/></svg>Aniversariantes</button>
@@ -993,6 +994,7 @@ async function mostrarApp(session){
 const TITLES={
   radar:["CARTEIRA","Radar de retenção"], clientes:["CARTEIRA","Clientes"], explorar:["CARTEIRA","Explorar"], destaques:["CARTEIRA","Destaques"],
   clube:["CARTEIRA","Clube Trader"],
+  multiconta:["CARTEIRA","Mesmo CPF · clientes com mais de uma conta"],
   fila:["CARTEIRA","Fila de ação"], aniversariantes:["CARTEIRA","Aniversariantes"],
   solicitacoes:["CARTEIRA","Solicitações"],
   fluxos:["ATENDIMENTO","Fluxos"], assessores:["ATENDIMENTO","Assessores"],
@@ -1015,7 +1017,7 @@ const RESERVADAS={
   ia:{icon:"ia",desc:"O diagnóstico estratégico da operação em linguagem natural, e o copiloto de IA por assessor — cada um enxergando apenas a própria carteira."},
   integracoes:{icon:"integracoes",desc:"As conexões do sistema — Volume Operado (operação), RD Conversas (atendimento), Gmail/Genial (entrada de clientes) e IA. Ligadas e a ligar."}
 };
-const VIEWS={radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes,auditoria:vAuditoria,diagnostico:vDiagnostico,legenda:vLegenda,leads:vLeads,importacoes:vImportacoes,saidas:vSaidas,plataformas:vPlataformas,custos:vCustos,conferencia:vConferencia,ranking:vRanking,assessores:vAssessores};
+const VIEWS={radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,multiconta:vMulticonta,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes,auditoria:vAuditoria,diagnostico:vDiagnostico,legenda:vLegenda,leads:vLeads,importacoes:vImportacoes,saidas:vSaidas,plataformas:vPlataformas,custos:vCustos,conferencia:vConferencia,ranking:vRanking,assessores:vAssessores};
 document.querySelectorAll(".nav-item").forEach(b=>b.addEventListener("click",()=>{
   document.querySelectorAll(".nav-item").forEach(x=>x.classList.remove("active"));
   b.classList.add("active"); el("sidebar").classList.remove("open"); render(b.dataset.view);
@@ -5538,6 +5540,68 @@ el("overlay").addEventListener("click",fecharFicha);
 document.addEventListener("keydown",e=>{ if(e.key==="Escape") fecharFicha(); });
 el("menuBtn").addEventListener("click",()=>el("sidebar").classList.toggle("open"));
 
+// ---------- MESMO CPF ----------
+// Um cliente, varias contas Sinacor. Cada conta opera por si, e a faixa do
+// Clube e calculada em cima de cada conta separada. Esta tela mostra quanto
+// o cliente opera somando tudo, e quem subiria de faixa se as contas fossem
+// vistas como uma so. E leitura: nao muda o Clube, o Radar nem as fichas.
+
+async function vMulticonta(){
+  el("content").innerHTML='<div class="loading"><div class="spinner"></div>Carregando...</div>';
+  const {data,error} = await sb.from("vw_cpf_multiconta").select("*")
+    .order("contratos_juntos",{ascending:false,nullsFirst:false});
+  if(error) return erro(error,"content");
+  const linhas = data || [];
+  if(!linhas.length){
+    el("content").innerHTML='<div class="empty">Ninguem com mais de uma conta no mesmo CPF.</div>';
+    return;
+  }
+  const sobem = linhas.filter(x => x.faixa_junto !== x.faixa_sozinho).length;
+  const contas = linhas.reduce((a,x)=>a+(x.qtd_contas||0),0);
+
+  el("content").innerHTML = `
+    <div class="note" style="margin:0 0 16px">
+      Clientes com <b>mais de uma conta Sinacor no mesmo CPF</b>. Cada conta opera
+      separada, e e assim que a faixa do Clube e calculada hoje &mdash; conta por conta.
+      Aqui aparece <b>quanto o cliente opera somando todas</b>.
+      <br><br>Nada nesta tela altera o sistema: Clube, Radar e fichas seguem iguais.
+      E uma leitura a mais.
+    </div>
+
+    <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
+      <div class="kpi"><div class="k-label">CPFs com mais de uma conta</div>
+        <div class="k-val">${nf(linhas.length)}</div><div class="k-sub">mesmo CPF, contas diferentes</div></div>
+      <div class="kpi"><div class="k-label">Contas envolvidas</div>
+        <div class="k-val">${nf(contas)}</div><div class="k-sub">somadas nesses CPFs</div></div>
+      <div class="kpi"><div class="k-label">Subiriam de faixa</div>
+        <div class="k-val" style="color:${sobem?"var(--amber)":"var(--text-faint)"}">${nf(sobem)}</div><div class="k-sub">se as contas fossem uma so</div></div>
+    </div>
+
+    <div class="panel">
+      <table><thead><tr>
+        <th>Cliente</th><th>CPF</th><th>Contas</th><th>Barras</th>
+        <th>Faixa hoje</th><th>Maior conta</th><th>Somando tudo</th><th>Faixa somada</th>
+      </tr></thead>
+      <tbody>${linhas.map(c=>{
+        const sobe = c.faixa_junto !== c.faixa_sozinho;
+        return `<tr style="cursor:default">
+          <td><div class="cell-name"><span class="mini-av">${ini(c.nome||"?")}</span>${c.nome||"\u2014"}</div></td>
+          <td class="num" style="font-size:12px">${fmtCPF(c.cpf)}</td>
+          <td class="num" style="font-weight:700">${nf(c.qtd_contas)}</td>
+          <td class="num" style="font-size:12px">${c.barras||"\u2014"}</td>
+          <td>${faixaBadge(c.faixa_sozinho||"sem", 0)}</td>
+          <td class="num">${c.contratos_maior_conta?nf(c.contratos_maior_conta):"\u2014"}</td>
+          <td class="num" style="font-weight:700">${c.contratos_juntos?nf(c.contratos_juntos):"\u2014"}</td>
+          <td>${faixaBadge(c.faixa_junto||"sem", c.grau_junto||0)}${
+            sobe?' <span class="tag t-amber" style="font-size:10px">sobe</span>':""}</td>
+        </tr>`;
+      }).join("")}</tbody></table>
+      <div style="padding:11px 16px;font-size:11px;color:var(--text-faint)">
+        ${nf(linhas.length)} CPF(s) &middot; contratos de BM&amp;F na mesma regua do Clube
+      </div>
+    </div>`;
+}
+
 // ---------- erro ----------
 function erro(e,alvo){
   const html=`<div class="empty">Não foi possível carregar os dados.<br><span style="font-size:11px;color:var(--text-faint)">${(e.message||e).toString()}</span><br><br>Se você acabou de criar seu acesso, confira se rodou o passo que vincula seu login como administrador.</div>`;
@@ -5548,3 +5612,4 @@ boot();
 </script>
 </body>
 </html>
+        
