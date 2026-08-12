@@ -126,11 +126,24 @@
   .pb-barra .b-tri i{display:block;height:100%;background:var(--green);border-radius:5px}
   .pb-barra .b-pct{font-size:12px;font-weight:700;width:52px;text-align:right}
   .pb-barra .b-qtd{font-size:11px;color:var(--text-faint);width:44px;text-align:right}
-  .pb-prof{display:flex;flex-wrap:wrap;gap:7px}
-  .pb-prof button{background:var(--surface-2);border:1px solid var(--border);border-radius:16px;padding:6px 12px;font-size:11.5px;color:var(--text-dim);font-weight:600}
-  .pb-prof button:hover{border-color:var(--border-strong);color:var(--text)}
-  .pb-prof button.sel{border-color:var(--green);color:var(--green)}
-  .pb-prof button b{color:var(--text-faint);font-weight:700;margin-left:5px}
+  .pb-prof-cab{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+  .pb-busca{flex:1;min-width:190px;position:relative}
+  .pb-busca input{width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:9px;padding:9px 12px 9px 33px;font-size:12.5px;color:var(--text)}
+  .pb-busca input:focus{outline:none;border-color:var(--border-strong)}
+  .pb-busca svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);width:14px;height:14px;stroke:var(--text-faint);fill:none;stroke-width:2}
+  .pb-plista{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px 22px}
+  .pb-p{display:flex;align-items:center;gap:11px;padding:7px 9px;border-radius:8px;cursor:pointer}
+  .pb-p:hover{background:rgba(255,255,255,.04)}
+  .pb-p.sel{background:rgba(46,229,157,.09)}
+  .pb-p .p-nome{flex:1;min-width:0;font-size:12.5px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pb-p.sel .p-nome{color:var(--green);font-weight:600}
+  .pb-p .p-tri{width:74px;flex:0 0 74px;height:7px;background:rgba(255,255,255,.06);border-radius:4px;overflow:hidden}
+  .pb-p .p-tri i{display:block;height:100%;background:var(--green);border-radius:4px;opacity:.85}
+  .pb-p .p-pct{width:46px;text-align:right;font-size:12px;font-weight:700;color:var(--text-dim)}
+  .pb-p .p-qtd{width:40px;text-align:right;font-size:11.5px;color:var(--text-faint)}
+  .pb-mais{margin-top:12px;background:transparent;border:1px solid var(--border);border-radius:9px;padding:8px 15px;font-size:12px;font-weight:600;color:var(--text-dim)}
+  .pb-mais:hover{border-color:var(--border-strong);color:var(--text)}
+  @media(max-width:880px){.pb-plista{grid-template-columns:1fr}}
   .pb-lista{margin-top:22px}
   .pb-lista-cab{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:11px}
   .pb-lista-tit{font-size:13.5px;font-weight:700}
@@ -6032,6 +6045,85 @@ function pbBarras(pares, total, tipo, rotulo){
   }).join("");
 }
 
+
+// Profissao e campo de texto livre da corretora, entao chega em CAIXA ALTA e
+// com nomes longos. Aqui vira Caixa de Frase e ganha barra de proporcao,
+// busca e "ver todas" — 85 valores nao cabem como etiquetas soltas.
+let pbProfBusca = "", pbProfTodas = false;
+
+function pbTitulo(t){
+  const miudas = ["de","da","do","das","dos","e","em","a","o","ou","com","para","no","na"];
+  return String(t||"").toLowerCase().split(/\s+/).map((w,i)=>{
+    const limpo = w.replace(/[^a-zà-ú]/gi,"");
+    if(i>0 && miudas.indexOf(limpo)>=0) return w;
+    return w.charAt(0).toUpperCase()+w.slice(1);
+  }).join(" ");
+}
+
+function pbProfBuscar(v){
+  pbProfBusca = v;
+  const cx = el("pbProfLista");
+  if(cx) cx.innerHTML = pbProfListaHTML();
+}
+function pbProfMais(){
+  pbProfTodas = !pbProfTodas;
+  const cx = el("pbProfLista");
+  if(cx) cx.innerHTML = pbProfListaHTML();
+}
+
+function pbProfPares(){
+  return pbContar(pbBase(), c => c.profissao || "nao informada");
+}
+
+function pbProfListaHTML(){
+  const total = pbBase().length;
+  let pares = pbProfPares();
+  const busca = pbProfBusca.trim().toLowerCase();
+  if(busca) pares = pares.filter(([k]) => k.toLowerCase().indexOf(busca) >= 0);
+  if(!pares.length) return '<div class="pb-sem">Nenhuma profissão com esse texto.</div>';
+  const limite = (busca || pbProfTodas) ? pares.length : 14;
+  const topo = pares[0][1] || 1;
+  const linhas = pares.slice(0,limite).map(([k,n])=>{
+    const sel = pbCorte && pbCorte.tipo==="prof" && pbCorte.valor===k;
+    const nome = pbTitulo(k);
+    return `<div class="pb-p ${sel?"sel":""}" title="${nome}"
+        onclick="pbVer('prof','${String(k).replace(/'/g,"")}','${nome.replace(/'/g,"")}')">
+      <span class="p-nome">${nome}</span>
+      <span class="p-tri"><i style="width:${Math.round(n/topo*100)}%"></i></span>
+      <span class="p-pct">${total?((n/total)*100).toFixed(1):"0,0"}%</span>
+      <span class="p-qtd">${nf(n)}</span>
+    </div>`;
+  }).join("");
+  const resto = pares.length - limite;
+  return `<div class="pb-plista">${linhas}</div>${
+    !busca && resto > 0
+      ? `<button class="pb-mais" onclick="pbProfMais()">Ver as outras ${nf(resto)}</button>`
+      : (!busca && pbProfTodas && pares.length > 14
+        ? '<button class="pb-mais" onclick="pbProfMais()">Mostrar menos</button>' : "")}`;
+}
+
+function pbProfHTML(){
+  const pares = pbProfPares(), total = pbBase().length;
+  const outros = (pares.find(x => /^outr/i.test(x[0])) || [,0])[1];
+  return `<div class="pb-bloco">
+    <div class="pb-prof-cab">
+      <div class="pb-busca">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input type="text" placeholder="Buscar profissão..." value="${pbProfBusca}"
+          oninput="pbProfBuscar(this.value)">
+      </div>
+      <span style="font-size:11.5px;color:var(--text-faint)">${nf(pares.length)} profissões diferentes</span>
+    </div>
+    <div id="pbProfLista">${pbProfListaHTML()}</div>
+    ${outros/Math.max(1,total) > 0.15
+      ? `<div style="margin-top:14px;font-size:11.5px;color:var(--amber);line-height:1.5">
+          &ldquo;Outros&rdquo; responde por ${nf(outros)} pessoas, ${((outros/total)*100).toFixed(0)}% do total —
+          para essa parte da base a profissão não diz nada. Vale cobrar o preenchimento
+          correto no cadastro.</div>`
+      : ""}
+  </div>`;
+}
+
 function pbPintar(){
   const base = pbBase();
   const total = base.length;
@@ -6046,7 +6138,6 @@ function pbPintar(){
   const sexo = pbContar(base, c => pbSexo(c.sexo) || "?");
   const rotSexo = k => k==="M"?"Homens":k==="F"?"Mulheres":"Nao informado";
   const civil = pbContar(base, c => c.estado_civil || "nao informado");
-  const prof  = pbContar(base, c => c.profissao || "nao informada");
   const semUF = base.filter(c => !(c.uf||"").trim()).length;
   const porUF = pbPorUF();
 
@@ -6095,16 +6186,8 @@ function pbPintar(){
         ${pbBarras(civil, total, "civil", null)}</div>
     </div>
 
-    <div class="pb-sec">Profissão &middot; ${nf(prof.length)} diferentes</div>
-    <div class="pb-bloco">
-      <div class="pb-prof">${prof.length
-        ? prof.slice(0,28).map(([k,n])=>{
-            const sel = pbCorte && pbCorte.tipo==="prof" && pbCorte.valor===k;
-            return `<button class="${sel?"sel":""}" onclick="pbVer('prof','${String(k).replace(/'/g,"")}','${String(k).replace(/'/g,"")}')">${k}<b>${nf(n)}</b></button>`;
-          }).join("")
-        : '<div class="pb-sem">Sem dado preenchido.</div>'}</div>
-      ${prof.length>28?`<div style="margin-top:11px;font-size:11px;color:var(--text-faint)">Mostrando as 28 mais comuns de ${nf(prof.length)}.</div>`:""}
-    </div>
+    <div class="pb-sec">Profissão</div>
+    ${pbProfHTML()}
 
     <div class="pb-lista" id="pbLista">${pbListaHTML()}</div>`;
 }
