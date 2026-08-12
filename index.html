@@ -104,13 +104,13 @@
   .pb-rank-l .r-tri i{display:block;height:100%;border-radius:4px}
   .pb-rank-l .r-n{width:42px;text-align:right;font-weight:700;color:var(--text-dim)}
   .pb-reg{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;padding-top:13px;border-top:1px solid var(--border)}
-  .pb-reg button{background:transparent;border:1px solid var(--border);border-radius:10px;padding:7px 11px;text-align:left;min-width:104px}
+  .pb-reg button{background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;text-align:left;min-width:126px}
   .pb-reg button:hover{border-color:var(--border-strong)}
   .pb-reg button.sel{border-color:#fff}
-  .pb-reg .rg-n{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:5px}
-  .pb-reg .rg-n i{width:8px;height:8px;border-radius:2px;display:block}
-  .pb-reg .rg-v{font-size:16px;font-weight:800;margin-top:3px}
-  .pb-reg .rg-p{font-size:10.5px;color:var(--text-faint)}
+  .pb-reg .rg-n{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;display:flex;align-items:center;gap:6px;color:var(--text)}
+  .pb-reg .rg-n i{width:9px;height:9px;border-radius:3px;display:block}
+  .pb-reg .rg-v{font-size:21px;font-weight:800;margin-top:5px;color:#fff;line-height:1.1}
+  .pb-reg .rg-p{font-size:12px;color:var(--text-dim);font-weight:600;margin-top:1px}
   .pb-tip{position:absolute;pointer-events:none;background:#0c0f14;border:1px solid var(--border-strong);border-radius:8px;padding:8px 11px;font-size:11.5px;line-height:1.5;box-shadow:0 8px 22px rgba(0,0,0,.55);opacity:0;transition:opacity .1s;z-index:40;white-space:nowrap}
   .pb-tip.on{opacity:1}
   .pb-tip b{font-size:12.5px}
@@ -5800,14 +5800,23 @@ const PB_REG = {
   N:["Norte","#4aa8ff"], NE:["Nordeste","#ffc93c"], CO:["Centro-Oeste","#b06bff"],
   SE:["Sudeste","#2ee59d"], S:["Sul","#ff6b8a"]
 };
+// Medida NAO usada: "% operando". Todo mundo aqui ja teve faixa, e ter faixa
+// exige operar — entao a conta dava ~100% em todo estado. E o mesmo erro de
+// filtrar por algo que o desfecho causa. As medidas abaixo separam de verdade.
 const PB_MEDIDAS = {
-  clientes:  ["Clientes",   l => l.length],
-  operando:  ["% operando", l => l.length ? Math.round(l.filter(pbOpera).length / l.length * 100) : 0],
-  contratos: ["Contratos",  l => l.reduce((a,c)=>a+(Number(c.contratos_bmf)||0),0)]
+  clientes:  ["Clientes",       l => l.length],
+  contratos: ["Contratos",      l => l.reduce((a,c)=>a+(Number(c.contratos_bmf)||0),0)],
+  porcli:    ["Por cliente",    l => l.length ? Math.round(pbMediana(l.map(c=>Number(c.contratos_bmf)||0))) : 0],
+  alta:      ["% faixa alta",   l => l.length ? Math.round(l.filter(c=>["preta","marrom","roxa"].indexOf(c.faixa_max)>=0).length / l.length * 100) : 0]
 };
+const PB_PCT = {alta:true};
 let pbMedida = "clientes";
 
-// Operando = operou nos ultimos 60 dias, a mesma regua do Radar.
+function pbMediana(v){
+  if(!v.length) return 0;
+  const o = v.slice().sort((a,b)=>a-b);
+  return o[Math.floor(o.length/2)];
+}
 function pbOpera(c){
   if(!c.data_ultima_operacao) return false;
   return (Date.now() - new Date(c.data_ultima_operacao).getTime()) / 86400000 <= 60;
@@ -5855,7 +5864,7 @@ function pbMapaHTML(){
   const val = {};
   Object.keys(PB_UF).forEach(u => { val[u] = porUF[u] ? calc(porUF[u]) : 0; });
   const topo = Math.max(1, ...Object.values(val));
-  const pct = pbMedida === "operando";
+  const pct = !!PB_PCT[pbMedida];
 
   // 1) as formas
   const formas = Object.entries(PB_UF).map(([u,s])=>{
@@ -5915,7 +5924,7 @@ function pbMapaHTML(){
     return `<button class="${sel?"sel":""}" onclick="pbVer('regiao','${r}','${PB_REG[r][0]}')">
       <span class="rg-n"><i style="background:${PB_REG[r][1]}"></i>${PB_REG[r][0]}</span>
       <span class="rg-v">${nf(lista.length)}</span>
-      <span class="rg-p">${total?((lista.length/total)*100).toFixed(1):"0,0"}% do total</span>
+      <span class="rg-p" style="display:block">${total?((lista.length/total)*100).toFixed(1):"0,0"}% do total</span>
     </button>`;
   }).join("");
 
