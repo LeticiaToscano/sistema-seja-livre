@@ -81,24 +81,24 @@
   /* KPIs */
   /* público */
   .pb-sec{font-size:11px;color:var(--text-dim);font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin:26px 0 12px}
-  .pb-grid{display:grid;grid-template-columns:minmax(330px,380px) 1fr;gap:20px;align-items:start}
+  .pb-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;align-items:start;margin-top:18px}
   .pb-mapa-cx{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px 14px;position:relative}
   .pb-medidas{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
   .pb-medidas button{background:transparent;border:1px solid var(--border);border-radius:15px;padding:5px 12px;font-size:11.5px;font-weight:600;color:var(--text-faint)}
   .pb-medidas button:hover{border-color:var(--border-strong);color:var(--text-dim)}
   .pb-medidas button.on{background:var(--surface-2);border-color:var(--border-strong);color:var(--text)}
-  .pb-mapa-cols{display:grid;grid-template-columns:1fr 200px;gap:16px;align-items:start}
+  .pb-mapa-cols{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(230px,1fr);gap:26px;align-items:center}
   .pb-uf{cursor:pointer}
   .pb-uf rect{transition:transform .13s ease, filter .13s ease}
   .pb-uf.vazio{cursor:default}
   .pb-uf.on rect{stroke:#fff;stroke-width:2.4;filter:brightness(1.18)}
   .pb-uf.sel rect{stroke:#fff;stroke-width:2.8}
-  .pb-rank{max-height:392px;overflow-y:auto;padding-right:4px}
-  .pb-rank-l{display:flex;align-items:center;gap:8px;padding:5px 7px;border-radius:6px;cursor:pointer;font-size:11.5px}
+  .pb-rank{max-height:430px;overflow-y:auto;padding-right:6px}
+  .pb-rank-l{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:7px;cursor:pointer;font-size:12.5px}
   .pb-rank-l:hover,.pb-rank-l.on{background:rgba(255,255,255,.05)}
   .pb-rank-l.sel{background:rgba(46,229,157,.1)}
-  .pb-rank-l .r-uf{font-weight:800;width:26px;flex:0 0 26px}
-  .pb-rank-l .r-tri{flex:1;height:6px;background:rgba(255,255,255,.05);border-radius:4px;overflow:hidden}
+  .pb-rank-l .r-uf{font-weight:800;width:30px;flex:0 0 30px}
+  .pb-rank-l .r-tri{flex:1;height:7px;background:rgba(255,255,255,.05);border-radius:4px;overflow:hidden}
   .pb-rank-l .r-tri i{display:block;height:100%;border-radius:4px}
   .pb-rank-l .r-n{width:42px;text-align:right;font-weight:700;color:var(--text-dim)}
   .pb-reg{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;padding-top:13px;border-top:1px solid var(--border)}
@@ -113,8 +113,7 @@
   .pb-tip.on{opacity:1}
   .pb-tip b{font-size:12.5px}
   .pb-tip s{display:block;text-decoration:none;color:var(--text-faint)}
-  @media(max-width:1180px){.pb-grid{grid-template-columns:1fr}.pb-mapa-cols{grid-template-columns:1fr}.pb-rank{max-height:none}}
-  .pb-lado{display:flex;flex-direction:column;gap:18px}
+  @media(max-width:1080px){.pb-grid{grid-template-columns:1fr}.pb-mapa-cols{grid-template-columns:1fr;gap:16px}.pb-rank{max-height:300px}}
   .pb-bloco{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px}
   .pb-bloco h4{font-size:12px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;margin:0 0 13px}
   .pb-barra{display:flex;align-items:center;gap:10px;padding:5px 0;cursor:pointer;border-radius:6px}
@@ -5836,7 +5835,7 @@ function pbMapaHTML(){
   const val = {};
   PB_MAPA.forEach(([uf]) => { val[uf] = porUF[uf] ? calc(porUF[uf]) : 0; });
   const topo = Math.max(1, ...Object.values(val));
-  const L = 44, G = 5;
+  const L = 58, G = 7;
 
   const blocos = PB_MAPA.map(([uf,reg,cx,cy])=>{
     const lista = porUF[uf] || [], n = val[uf];
@@ -5848,13 +5847,13 @@ function pbMapaHTML(){
     return `<g class="pb-uf ${lista.length?"":"vazio"} ${sel?"sel":""}" data-uf="${uf}"
         ${lista.length?`onclick="pbVer('uf','${uf}','${uf}')"
         onmousemove="pbSobre('${uf}',event)" onmouseleave="pbFora()"`:""}>
-      <rect x="${x}" y="${y}" width="${L}" height="${L}" rx="7"
+      <rect x="${x}" y="${y}" width="${L}" height="${L}" rx="9"
         fill="${lista.length?pbHexA(cor,forca):"rgba(255,255,255,.035)"}"
         stroke="${lista.length?pbHexA(cor,.55):"var(--border)"}" stroke-width="1"/>
-      <text x="${x+L/2}" y="${y+19}" text-anchor="middle"
-        style="font-size:12.5px;font-weight:800;fill:${claro?"#08131a":"var(--text)"}">${uf}</text>
-      <text x="${x+L/2}" y="${y+33}" text-anchor="middle"
-        style="font-size:10.5px;font-weight:700;fill:${claro?"rgba(8,19,26,.72)":"var(--text-faint)"}">${
+      <text x="${x+L/2}" y="${y+25}" text-anchor="middle"
+        style="font-size:15px;font-weight:800;fill:${claro?"#08131a":"var(--text)"}">${uf}</text>
+      <text x="${x+L/2}" y="${y+42}" text-anchor="middle"
+        style="font-size:12.5px;font-weight:700;fill:${claro?"rgba(8,19,26,.72)":"var(--text-faint)"}">${
         lista.length ? (pbMedida==="operando" ? n+"%" : nf(n)) : "–"}</text>
     </g>`;
   }).join("");
@@ -6040,17 +6039,16 @@ function pbPintar(){
     <div class="sol-tabs">${chipsFaixa}</div>
 
     <div class="pb-sec">Onde eles estão</div>
-    <div class="pb-grid">
-      ${pbMapaHTML()}
+    ${pbMapaHTML()}
 
-      <div class="pb-lado">
-        <div class="pb-bloco"><h4>Faixa etária</h4>
-          ${pbBarras(idade, total, "idade", rotIdade)}</div>
-        <div class="pb-bloco"><h4>Gênero</h4>
-          ${pbBarras(sexo, total, "sexo", rotSexo)}</div>
-        <div class="pb-bloco"><h4>Estado civil</h4>
-          ${pbBarras(civil, total, "civil", null)}</div>
-      </div>
+    <div class="pb-sec">Quem são</div>
+    <div class="pb-grid">
+      <div class="pb-bloco"><h4>Faixa etária</h4>
+        ${pbBarras(idade, total, "idade", rotIdade)}</div>
+      <div class="pb-bloco"><h4>Gênero</h4>
+        ${pbBarras(sexo, total, "sexo", rotSexo)}</div>
+      <div class="pb-bloco"><h4>Estado civil</h4>
+        ${pbBarras(civil, total, "civil", null)}</div>
     </div>
 
     <div class="pb-sec">Profissão &middot; ${nf(prof.length)} diferentes</div>
@@ -6112,4 +6110,3 @@ boot();
 </script>
 </body>
 </html>
-  
