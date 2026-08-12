@@ -422,6 +422,87 @@
     .kpi-grid{grid-template-columns:1fr 1fr}.radar-grid{grid-template-columns:1fr}
     .menu-btn{display:grid!important}
   }
+
+  /* ==========================================================
+     MOBILE
+     O sistema nasceu para tela grande. Este bloco adapta tudo:
+     menu em gaveta com fundo escurecido, tabelas com rolagem
+     lateral propria (em vez de espremer coluna), grades que
+     viram uma coluna so, e alvos de toque maiores.
+     ========================================================== */
+
+  .sb-fundo{position:fixed;inset:0;background:rgba(0,0,0,.6);opacity:0;pointer-events:none;
+    transition:opacity .25s;z-index:45;backdrop-filter:blur(2px)}
+  .sb-fundo.on{opacity:1;pointer-events:auto}
+
+  @media(max-width:1080px){
+    .content{padding:20px 18px 60px}
+    .topbar{padding:15px 18px}
+    .kpi-grid{grid-template-columns:repeat(2,1fr)!important}
+    .pb-grid{grid-template-columns:1fr}
+    .pb-mapa-cols{grid-template-columns:1fr;gap:14px}
+    .pb-rank{max-height:260px}
+    .pb-plista{grid-template-columns:1fr}
+  }
+
+  @media(max-width:860px){
+    .sidebar{width:260px;z-index:46;box-shadow:0 0 60px rgba(0,0,0,.6)}
+    .topbar{padding:12px 14px;gap:10px}
+    .topbar h1{font-size:15.5px;line-height:1.25}
+    .topbar .crumb{font-size:10px}
+    .content{padding:16px 12px 70px}
+    .menu-btn{width:40px;height:40px}
+
+    /* Tabela larga: rola de lado dentro do painel, sem quebrar a pagina. */
+    .panel{overflow-x:auto;-webkit-overflow-scrolling:touch}
+    .panel > table{min-width:700px}
+    .mc-box{overflow-x:auto}
+    .mc-tab{min-width:640px}
+    th{padding-left:12px;padding-right:12px;font-size:10px}
+    td{padding:10px 12px;font-size:12.5px}
+
+    .sec-title{font-size:11px}
+    .toolbar{flex-wrap:wrap;padding:12px}
+    .toolbar input,.toolbar select{flex:1;min-width:130px}
+    .pager{padding:12px;font-size:12px}
+
+    /* Ficha do cliente vira folha de baixo para cima. */
+    .drawer{width:100%;max-width:100%;max-height:92vh;top:auto;bottom:0;left:0;
+      transform:translateY(100%);border-radius:20px 20px 0 0}
+    .drawer.open{transform:translateY(0)}
+    .dr-head{padding:20px 18px 16px}
+    .dr-close{top:16px;right:16px;width:38px;height:38px}
+    .dr-stats{grid-template-columns:1fr 1fr}
+
+    /* Publico */
+    .pb-svg{max-height:none}
+    .pb-medidas{gap:5px}
+    .pb-medidas button{padding:7px 11px;font-size:11px}
+    .pb-reg{gap:7px}
+    .pb-reg button{flex:1 1 46%;min-width:0}
+    .pb-mapa-cx{padding:13px 12px 12px}
+    .pb-bloco{padding:14px 13px}
+    .pb-barra .b-rot{width:92px;flex:0 0 92px;font-size:11.5px}
+    .pb-lista-cab{gap:8px}
+
+    /* Solicitacoes e afins */
+    .sol-tabs{gap:6px}
+    .sol-tab{padding:8px 12px;font-size:11.5px}
+    .mov-grid{grid-template-columns:1fr}
+    .notif-panel{width:100%;max-width:100%;right:0;border-radius:16px 16px 0 0}
+
+    /* Alvo de toque decente em qualquer botao pequeno. */
+    button{min-height:34px}
+  }
+
+  @media(max-width:520px){
+    .kpi-grid{grid-template-columns:1fr!important}
+    .pb-reg button{flex:1 1 100%}
+    .topbar h1{font-size:14.5px}
+    .content{padding:14px 10px 70px}
+    .dr-stats{grid-template-columns:1fr}
+    .pb-p .p-tri{width:52px;flex:0 0 52px}
+  }
   .menu-btn{display:none;place-items:center;width:36px;height:36px;border-radius:9px;background:var(--surface);
     border:1px solid var(--border-strong);color:var(--text)}
 
@@ -834,6 +915,7 @@
 
 <!-- ==================== APP ==================== -->
 <div id="app" class="hidden">
+  <div class="sb-fundo" id="sbFundo" onclick="fecharMenu()"></div>
   <aside class="sidebar" id="sidebar">
     <div class="brand">
       <div class="mark" style="width:32px;height:32px;border-radius:9px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 15c3-1 5-8 8-8s3 5 8 3" stroke="#04140d" stroke-width="2.4" stroke-linecap="round"/><circle cx="12" cy="7" r="1.6" fill="#04140d"/></svg></div>
@@ -1101,7 +1183,7 @@ const RESERVADAS={
 const VIEWS={radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,multiconta:vMulticonta,publico:vPublico,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes,auditoria:vAuditoria,diagnostico:vDiagnostico,legenda:vLegenda,leads:vLeads,importacoes:vImportacoes,saidas:vSaidas,plataformas:vPlataformas,custos:vCustos,conferencia:vConferencia,ranking:vRanking,assessores:vAssessores};
 document.querySelectorAll(".nav-item").forEach(b=>b.addEventListener("click",()=>{
   document.querySelectorAll(".nav-item").forEach(x=>x.classList.remove("active"));
-  b.classList.add("active"); el("sidebar").classList.remove("open"); render(b.dataset.view);
+  b.classList.add("active"); fecharMenu(); render(b.dataset.view);
 }));
 function render(view){
   el("crumb").textContent=TITLES[view][0]; el("pageTitle").textContent=TITLES[view][1];
@@ -5619,7 +5701,12 @@ function fecharFicha(){ el("overlay").classList.remove("open"); el("drawer").cla
 el("drClose").addEventListener("click",fecharFicha);
 el("overlay").addEventListener("click",fecharFicha);
 document.addEventListener("keydown",e=>{ if(e.key==="Escape") fecharFicha(); });
-el("menuBtn").addEventListener("click",()=>el("sidebar").classList.toggle("open"));
+// Menu em gaveta no celular: o fundo escurece junto e fecha ao toque.
+function abrirMenu(){ el("sidebar").classList.add("open"); el("sbFundo").classList.add("on"); }
+function fecharMenu(){ el("sidebar").classList.remove("open"); el("sbFundo").classList.remove("on"); }
+el("menuBtn").addEventListener("click",()=>{
+  el("sidebar").classList.contains("open") ? fecharMenu() : abrirMenu();
+});
 
 // ---------- MESMO CPF ----------
 // Um cliente, varias contas Sinacor. Cada conta opera por si, e a faixa do
