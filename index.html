@@ -79,6 +79,38 @@
   .content{padding:26px 28px 60px}
 
   /* KPIs */
+  /* público */
+  .pb-sec{font-size:11px;color:var(--text-dim);font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin:26px 0 12px}
+  .pb-grid{display:grid;grid-template-columns:minmax(330px,380px) 1fr;gap:20px;align-items:start}
+  .pb-mapa{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px}
+  .pb-uf{cursor:pointer;transition:opacity .12s}
+  .pb-uf:hover{opacity:.75}
+  .pb-uf.sel rect{stroke:var(--green);stroke-width:2.2}
+  .pb-uf.vazio{cursor:default;opacity:.35}
+  .pb-uf.vazio:hover{opacity:.35}
+  .pb-leg{display:flex;align-items:center;gap:7px;margin-top:12px;font-size:10.5px;color:var(--text-faint)}
+  .pb-leg i{width:20px;height:9px;border-radius:2px;display:block}
+  .pb-lado{display:flex;flex-direction:column;gap:18px}
+  .pb-bloco{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px}
+  .pb-bloco h4{font-size:12px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;margin:0 0 13px}
+  .pb-barra{display:flex;align-items:center;gap:10px;padding:5px 0;cursor:pointer;border-radius:6px}
+  .pb-barra:hover{background:rgba(255,255,255,.03)}
+  .pb-barra.sel{background:rgba(46,229,157,.08)}
+  .pb-barra .b-rot{font-size:12px;width:112px;flex:0 0 112px;color:var(--text-dim)}
+  .pb-barra .b-tri{flex:1;height:9px;background:rgba(255,255,255,.05);border-radius:5px;overflow:hidden}
+  .pb-barra .b-tri i{display:block;height:100%;background:var(--green);border-radius:5px}
+  .pb-barra .b-pct{font-size:12px;font-weight:700;width:52px;text-align:right}
+  .pb-barra .b-qtd{font-size:11px;color:var(--text-faint);width:44px;text-align:right}
+  .pb-prof{display:flex;flex-wrap:wrap;gap:7px}
+  .pb-prof button{background:var(--surface-2);border:1px solid var(--border);border-radius:16px;padding:6px 12px;font-size:11.5px;color:var(--text-dim);font-weight:600}
+  .pb-prof button:hover{border-color:var(--border-strong);color:var(--text)}
+  .pb-prof button.sel{border-color:var(--green);color:var(--green)}
+  .pb-prof button b{color:var(--text-faint);font-weight:700;margin-left:5px}
+  .pb-lista{margin-top:22px}
+  .pb-lista-cab{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:11px}
+  .pb-lista-tit{font-size:13.5px;font-weight:700}
+  .pb-lista-tit span{color:var(--text-faint);font-weight:600}
+  .pb-sem{color:var(--text-faint);font-size:12px;padding:26px;text-align:center}
   .mc-seta{display:inline-block;margin-left:7px;color:var(--text-faint);font-size:10px;transition:transform .15s}
   .mc-seta.aberta{transform:rotate(90deg)}
   .mc-box{background:rgba(255,255,255,.02);border-top:1px solid var(--border);padding:14px 18px 4px}
@@ -777,6 +809,7 @@
       <button class="nav-item" data-view="destaques"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l2.5 5 5.5.8-4 3.9 1 5.5L12 16l-5 2.7 1-5.5-4-3.9 5.5-.8z" stroke-linejoin="round"/></svg>Destaques</button>
       <button class="nav-item" data-view="ranking"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 21H2" stroke-linecap="round"/><path class="rk-b" d="M5 21V12" stroke-linecap="round"/><path class="rk-b" d="M12 21V5" stroke-linecap="round"/><path class="rk-b" d="M19 21v-6" stroke-linecap="round"/></svg>Ranking do dia</button>
       <button class="nav-item" data-view="clube"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7.5 3.5h9L21 9.5 12 20.5 3 9.5l4.5-6z" stroke-linejoin="round"/><path d="M3 9.5h18" stroke-width="1.2"/><path d="M9.3 9.5 12 20.5l2.7-11" stroke-width="1.1" opacity=".7"/><path d="m7.5 3.5 1.8 6M16.5 3.5l-1.8 6" stroke-width="1.1" opacity=".7"/><path class="cl-faisca" d="M12 3.5v6" stroke-width="1.1" opacity=".5"/></svg><span class="cl-txt">Clube Trader</span></button>
+      <button class="nav-item" data-view="publico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11z" stroke-linejoin="round"/><circle cx="12" cy="10" r="2.5"/></svg>Publico</button>
       <button class="nav-item" data-view="multiconta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="8" width="12" height="9" rx="2"/><path d="M8 8V6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2" stroke-linecap="round"/></svg>Mesmo CPF</button>
       <button class="nav-item" data-view="plataformas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8M12 18v3" stroke-linecap="round"/></svg>Plataformas</button>
       <button class="nav-item" data-view="fila"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h10M4 12h10M4 18h7" stroke-linecap="round"/><path d="M17 15l2.2 2.2L23 13" stroke-linecap="round" stroke-linejoin="round"/></svg>Fila de ação</button>
@@ -1004,6 +1037,7 @@ const TITLES={
   radar:["CARTEIRA","Radar de retenção"], clientes:["CARTEIRA","Clientes"], explorar:["CARTEIRA","Explorar"], destaques:["CARTEIRA","Destaques"],
   clube:["CARTEIRA","Clube Trader"],
   multiconta:["CARTEIRA","Mesmo CPF · clientes com mais de uma conta"],
+  publico:["CARTEIRA","Público · quem são os nossos clientes"],
   fila:["CARTEIRA","Fila de ação"], aniversariantes:["CARTEIRA","Aniversariantes"],
   solicitacoes:["CARTEIRA","Solicitações"],
   fluxos:["ATENDIMENTO","Fluxos"], assessores:["ATENDIMENTO","Assessores"],
@@ -1026,7 +1060,7 @@ const RESERVADAS={
   ia:{icon:"ia",desc:"O diagnóstico estratégico da operação em linguagem natural, e o copiloto de IA por assessor — cada um enxergando apenas a própria carteira."},
   integracoes:{icon:"integracoes",desc:"As conexões do sistema — Volume Operado (operação), RD Conversas (atendimento), Gmail/Genial (entrada de clientes) e IA. Ligadas e a ligar."}
 };
-const VIEWS={radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,multiconta:vMulticonta,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes,auditoria:vAuditoria,diagnostico:vDiagnostico,legenda:vLegenda,leads:vLeads,importacoes:vImportacoes,saidas:vSaidas,plataformas:vPlataformas,custos:vCustos,conferencia:vConferencia,ranking:vRanking,assessores:vAssessores};
+const VIEWS={radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,multiconta:vMulticonta,publico:vPublico,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes,auditoria:vAuditoria,diagnostico:vDiagnostico,legenda:vLegenda,leads:vLeads,importacoes:vImportacoes,saidas:vSaidas,plataformas:vPlataformas,custos:vCustos,conferencia:vConferencia,ranking:vRanking,assessores:vAssessores};
 document.querySelectorAll(".nav-item").forEach(b=>b.addEventListener("click",()=>{
   document.querySelectorAll(".nav-item").forEach(x=>x.classList.remove("active"));
   b.classList.add("active"); el("sidebar").classList.remove("open"); render(b.dataset.view);
@@ -5690,6 +5724,259 @@ async function mcAbrir(cpf){
     </div>`;
   mcCache[cpf] = html;
   cel.innerHTML = html;
+}
+
+// ---------- PUBLICO ----------
+// Quem sao os clientes que ja conquistaram faixa alguma vez. Quem nunca teve
+// faixa fica de fora: a leitura aqui e sobre o publico que opera de verdade,
+// nao sobre a base cadastral.
+//
+// Tudo e calculado no navegador a partir de uma unica leitura da vw_publico
+// (sao ~850 linhas). Assim qualquer recorte responde na hora, sem ir ao banco.
+//
+// O mapa e em blocos: cada estado e um quadrado na posicao geografica
+// aproximada. Foi escolha consciente — o contorno real exige as coordenadas
+// dos 27 estados, e um contorno desenhado de memoria sai torto.
+
+const PB_MAPA = [
+  ["RR",3,1],["AP",5,1],
+  ["AM",2,2],["PA",4,2],["MA",5,2],["CE",6,2],["RN",7,2],
+  ["AC",1,3],["RO",2,3],["TO",4,3],["PI",5,3],["PB",7,3],
+  ["MT",3,4],["GO",4,4],["BA",5,4],["PE",6,4],
+  ["MS",3,5],["DF",4,5],["MG",5,5],["AL",6,5],["SE",7,5],
+  ["SP",4,6],["RJ",5,6],["ES",6,6],
+  ["PR",4,7],["SC",4,8],["RS",4,9]
+];
+const PB_IDADE = [
+  ["ate24","Ate 24 anos",  0, 24],
+  ["25a34","25 a 34",     25, 34],
+  ["35a44","35 a 44",     35, 44],
+  ["45a54","45 a 54",     45, 54],
+  ["55a64","55 a 64",     55, 64],
+  ["65m",  "65 ou mais",  65, 200]
+];
+
+let pbTodos = [], pbFaixa = "todas", pbCorte = null;
+
+async function vPublico(){
+  el("content").innerHTML='<div class="loading"><div class="spinner"></div>Carregando o publico...</div>';
+  const {data,error} = await sb.from("vw_publico").select("*").limit(5000);
+  if(error) return erro(error,"content");
+  pbTodos = data || [];
+  pbFaixa = "todas"; pbCorte = null;
+  if(!pbTodos.length){
+    el("content").innerHTML='<div class="empty">Ninguem com faixa no periodo.</div>';
+    return;
+  }
+  pbPintar();
+}
+
+// A faixa escolhida no topo vale para o painel inteiro: mapa, idade, genero,
+// profissao e a lista de baixo.
+function pbBase(){
+  return pbFaixa === "todas" ? pbTodos : pbTodos.filter(c => c.faixa_max === pbFaixa);
+}
+function pbVerFaixa(f){ pbFaixa = f; pbCorte = null; pbPintar(); }
+
+// Um recorte por vez. Clicar no mesmo de novo desliga.
+function pbVer(tipo, valor, rotulo){
+  if(pbCorte && pbCorte.tipo === tipo && pbCorte.valor === valor) pbCorte = null;
+  else pbCorte = {tipo:tipo, valor:valor, rotulo:rotulo};
+  pbPintar();
+  if(pbCorte){
+    const alvo = el("pbLista");
+    if(alvo) alvo.scrollIntoView({behavior:"smooth", block:"nearest"});
+  }
+}
+
+function pbFaixaEtaria(idade){
+  if(idade === null || idade === undefined) return null;
+  const f = PB_IDADE.find(x => idade >= x[2] && idade <= x[3]);
+  return f ? f[0] : null;
+}
+function pbSexo(v){
+  const t = String(v||"").trim().toUpperCase();
+  if(t.startsWith("M")) return "M";
+  if(t.startsWith("F")) return "F";
+  return null;
+}
+
+function pbFiltrados(){
+  const base = pbBase();
+  if(!pbCorte) return base;
+  const {tipo,valor} = pbCorte;
+  if(tipo === "uf")     return base.filter(c => (c.uf||"") === valor);
+  if(tipo === "idade")  return base.filter(c => pbFaixaEtaria(c.idade) === valor);
+  if(tipo === "sexo")   return base.filter(c => (pbSexo(c.sexo) || "?") === valor);
+  if(tipo === "civil")  return base.filter(c => (c.estado_civil||"nao informado") === valor);
+  if(tipo === "prof")   return base.filter(c => (c.profissao||"nao informada") === valor);
+  return base;
+}
+
+// Conta por chave e devolve ja ordenado do maior para o menor.
+function pbContar(lista, chave){
+  const m = {};
+  lista.forEach(c => { const k = chave(c); if(k !== null && k !== undefined) m[k] = (m[k]||0)+1; });
+  return Object.entries(m).sort((a,b)=>b[1]-a[1]);
+}
+
+function pbBarras(pares, total, tipo, rotulo){
+  if(!pares.length) return '<div class="pb-sem">Sem dado preenchido.</div>';
+  const topo = pares[0][1] || 1;
+  return pares.map(([k,n])=>{
+    const sel = pbCorte && pbCorte.tipo===tipo && pbCorte.valor===k;
+    const nome = rotulo ? rotulo(k) : k;
+    return `<div class="pb-barra ${sel?"sel":""}" onclick="pbVer('${tipo}','${String(k).replace(/'/g,"")}','${String(nome).replace(/'/g,"")}')">
+      <span class="b-rot">${nome}</span>
+      <span class="b-tri"><i style="width:${Math.round(n/topo*100)}%"></i></span>
+      <span class="b-pct">${total?((n/total)*100).toFixed(1):"0,0"}%</span>
+      <span class="b-qtd">${nf(n)}</span>
+    </div>`;
+  }).join("");
+}
+
+function pbPintar(){
+  const base = pbBase();
+  const total = base.length;
+
+  // --- mapa ---
+  const porUF = {};
+  base.forEach(c => { const u=(c.uf||"").trim().toUpperCase(); if(u) porUF[u]=(porUF[u]||0)+1; });
+  const maiorUF = Math.max(1, ...Object.values(porUF));
+  const L = 42, G = 5;
+  const mapa = PB_MAPA.map(([uf,cx,cy])=>{
+    const n = porUF[uf] || 0;
+    const x = (cx-1)*(L+G), y = (cy-1)*(L+G);
+    const forca = n ? 0.16 + (n/maiorUF)*0.84 : 0;
+    const sel = pbCorte && pbCorte.tipo==="uf" && pbCorte.valor===uf;
+    return `<g class="pb-uf ${n?"":"vazio"} ${sel?"sel":""}"
+        ${n?`onclick="pbVer('uf','${uf}','${uf}')"`:""}>
+      <title>${uf}: ${nf(n)} cliente(s)</title>
+      <rect x="${x}" y="${y}" width="${L}" height="${L}" rx="6"
+        fill="${n?`rgba(46,229,157,${forca.toFixed(3)})`:"rgba(255,255,255,.04)"}"
+        stroke="var(--border)" stroke-width="1"/>
+      <text x="${x+L/2}" y="${y+17}" text-anchor="middle"
+        style="font-size:12px;font-weight:800;fill:${n&&forca>.55?"#06231a":"var(--text)"}">${uf}</text>
+      <text x="${x+L/2}" y="${y+31}" text-anchor="middle"
+        style="font-size:10.5px;font-weight:600;fill:${n&&forca>.55?"rgba(6,35,26,.75)":"var(--text-faint)"}">${n?nf(n):"–"}</text>
+    </g>`;
+  }).join("");
+  const larg = 7*(L+G)-G, alt = 9*(L+G)-G;
+
+  // --- recortes ---
+  const idade = PB_IDADE.map(f => [f[0], base.filter(c => pbFaixaEtaria(c.idade)===f[0]).length])
+                        .filter(x => x[1] > 0);
+  const rotIdade = k => (PB_IDADE.find(f=>f[0]===k)||[,k])[1];
+  const idades = base.map(c=>c.idade).filter(x=>x!==null&&x!==undefined).sort((a,b)=>a-b);
+  const mediana = idades.length ? idades[Math.floor(idades.length/2)] : null;
+
+  const sexo = pbContar(base, c => pbSexo(c.sexo) || "?");
+  const rotSexo = k => k==="M"?"Homens":k==="F"?"Mulheres":"Nao informado";
+  const civil = pbContar(base, c => c.estado_civil || "nao informado");
+  const prof  = pbContar(base, c => c.profissao || "nao informada");
+  const semUF = base.filter(c => !(c.uf||"").trim()).length;
+
+  // --- faixas ---
+  const chipsFaixa = ["todas"].concat(FAIXA_ORDEM).map(f=>{
+    const n = f==="todas" ? pbTodos.length : pbTodos.filter(c=>c.faixa_max===f).length;
+    if(f!=="todas" && !n) return "";
+    return `<button class="sol-tab ${pbFaixa===f?"on":""}" onclick="pbVerFaixa('${f}')">${
+      f==="todas"?"Todas as faixas":FAIXA_NOME[f]} &middot; ${nf(n)}</button>`;
+  }).join("");
+
+  el("content").innerHTML = `
+    <div class="note" style="margin:0 0 16px">
+      Só entram aqui os clientes que <b>conquistaram faixa em algum momento</b> —
+      quem nunca teve faixa fica de fora. A faixa considerada é a <b>melhor que a
+      pessoa alcançou</b>, não a de agora. O histórico de faixa hoje cobre
+      junho, julho e agosto.
+    </div>
+
+    <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
+      <div class="kpi"><div class="k-label">Clientes com faixa</div>
+        <div class="k-val">${nf(total)}</div><div class="k-sub">${
+          pbFaixa==="todas"?"todas as faixas":FAIXA_NOME[pbFaixa]}</div></div>
+      <div class="kpi"><div class="k-label">Idade mediana</div>
+        <div class="k-val">${mediana!==null?mediana:"–"}</div><div class="k-sub">metade está acima, metade abaixo</div></div>
+      <div class="kpi"><div class="k-label">Mulheres</div>
+        <div class="k-val">${total?(((sexo.find(x=>x[0]==="F")||[,0])[1]/total)*100).toFixed(1):"0,0"}%</div>
+        <div class="k-sub">${nf((sexo.find(x=>x[0]==="F")||[,0])[1])} de ${nf(total)}</div></div>
+      <div class="kpi"><div class="k-label">Estados</div>
+        <div class="k-val">${nf(Object.keys(porUF).length)}</div>
+        <div class="k-sub">${semUF?nf(semUF)+" sem estado":"todos preenchidos"}</div></div>
+    </div>
+
+    <div class="sol-tabs">${chipsFaixa}</div>
+
+    <div class="pb-sec">Onde eles estão</div>
+    <div class="pb-grid">
+      <div class="pb-mapa">
+        <svg viewBox="0 0 ${larg} ${alt}" style="width:100%;height:auto">${mapa}</svg>
+        <div class="pb-leg"><span>menos</span>
+          <i style="background:rgba(46,229,157,.16)"></i>
+          <i style="background:rgba(46,229,157,.45)"></i>
+          <i style="background:rgba(46,229,157,.72)"></i>
+          <i style="background:rgba(46,229,157,1)"></i><span>mais</span>
+          <span style="margin-left:auto">clique num estado</span></div>
+      </div>
+
+      <div class="pb-lado">
+        <div class="pb-bloco"><h4>Faixa etária</h4>
+          ${pbBarras(idade, total, "idade", rotIdade)}</div>
+        <div class="pb-bloco"><h4>Gênero</h4>
+          ${pbBarras(sexo, total, "sexo", rotSexo)}</div>
+        <div class="pb-bloco"><h4>Estado civil</h4>
+          ${pbBarras(civil, total, "civil", null)}</div>
+      </div>
+    </div>
+
+    <div class="pb-sec">Profissão &middot; ${nf(prof.length)} diferentes</div>
+    <div class="pb-bloco">
+      <div class="pb-prof">${prof.length
+        ? prof.slice(0,28).map(([k,n])=>{
+            const sel = pbCorte && pbCorte.tipo==="prof" && pbCorte.valor===k;
+            return `<button class="${sel?"sel":""}" onclick="pbVer('prof','${String(k).replace(/'/g,"")}','${String(k).replace(/'/g,"")}')">${k}<b>${nf(n)}</b></button>`;
+          }).join("")
+        : '<div class="pb-sem">Sem dado preenchido.</div>'}</div>
+      ${prof.length>28?`<div style="margin-top:11px;font-size:11px;color:var(--text-faint)">Mostrando as 28 mais comuns de ${nf(prof.length)}.</div>`:""}
+    </div>
+
+    <div class="pb-lista" id="pbLista">${pbListaHTML()}</div>`;
+}
+
+// A lista de baixo: quem esta dentro do recorte escolhido.
+function pbListaHTML(){
+  if(!pbCorte){
+    return `<div class="pb-bloco pb-sem">
+      Clique num estado do mapa, numa faixa etária, num gênero ou numa profissão
+      para ver quem são essas pessoas.</div>`;
+  }
+  const lista = pbFiltrados().slice().sort((a,b)=>(b.contratos_bmf||0)-(a.contratos_bmf||0));
+  const base = pbBase().length;
+  const rot = {uf:"no estado de",idade:"na faixa",sexo:"",civil:"com estado civil",prof:"na profissão"}[pbCorte.tipo]||"";
+  return `
+    <div class="pb-lista-cab">
+      <div class="pb-lista-tit">${nf(lista.length)} cliente(s) ${rot} <b>${pbCorte.rotulo}</b>
+        <span>&middot; ${base?((lista.length/base)*100).toFixed(1):"0,0"}% do recorte atual</span></div>
+      <button class="sol-tab" onclick="pbVer('${pbCorte.tipo}','${String(pbCorte.valor).replace(/'/g,"")}','')">Fechar</button>
+    </div>
+    <div class="panel"><table><thead><tr>
+      <th>Cliente</th><th>Sinacor</th><th>Barra</th><th>Faixa</th>
+      <th>Idade</th><th>Gênero</th><th>Estado</th><th>Profissão</th>
+      <th>Contratos</th><th>Última op.</th></tr></thead>
+    <tbody>${lista.map(c=>`<tr class="${c.faixa_max==='preta'?'linha-preta':''}"
+        onclick="abrirFicha('${c.id}')">
+      <td><div class="cell-name"><span class="mini-av">${ini(c.nome||"?")}</span>${c.nome||"—"}</div></td>
+      <td class="num">${c.sinacor||"—"}</td>
+      <td class="num">${c.barra||"—"}</td>
+      <td>${faixaBadge(c.faixa_max||"sem", c.grau||0)}</td>
+      <td class="num">${c.idade!==null&&c.idade!==undefined?c.idade:"—"}</td>
+      <td>${pbSexo(c.sexo)==="M"?"Homem":pbSexo(c.sexo)==="F"?"Mulher":"—"}</td>
+      <td class="num">${c.uf||"—"}</td>
+      <td style="font-size:12px">${c.profissao||"—"}</td>
+      <td class="num">${c.contratos_bmf?nf(c.contratos_bmf):"—"}</td>
+      <td class="num">${c.data_ultima_operacao?fmtData(c.data_ultima_operacao):"—"}</td>
+    </tr>`).join("")}</tbody></table></div>`;
 }
 
 // ---------- erro ----------
