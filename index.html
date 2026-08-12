@@ -5555,18 +5555,31 @@ el("menuBtn").addEventListener("click",()=>el("sidebar").classList.toggle("open"
 // o cliente opera somando tudo, e quem subiria de faixa se as contas fossem
 // vistas como uma so. E leitura: nao muda o Clube, o Radar nem as fichas.
 
+let mcTodos = [], mcFiltro = "todos";
+
 async function vMulticonta(){
   el("content").innerHTML='<div class="loading"><div class="spinner"></div>Carregando...</div>';
   const {data,error} = await sb.from("vw_cpf_multiconta").select("*")
     .order("contratos_juntos",{ascending:false,nullsFirst:false});
   if(error) return erro(error,"content");
-  const linhas = data || [];
-  if(!linhas.length){
+  mcTodos = data || [];
+  mcFiltro = "todos";
+  if(!mcTodos.length){
     el("content").innerHTML='<div class="empty">Ninguem com mais de uma conta no mesmo CPF.</div>';
     return;
   }
-  const sobem = linhas.filter(x => x.faixa_junto !== x.faixa_sozinho).length;
-  const contas = linhas.reduce((a,x)=>a+(x.qtd_contas||0),0);
+  mcPintar();
+}
+
+// Troca o filtro sem ir ao banco de novo: a lista ja esta em mcTodos.
+function mcVer(f){ mcFiltro = f; mcPintar(); }
+
+function mcPintar(){
+  const sobem = mcTodos.filter(x => x.faixa_junto !== x.faixa_sozinho).length;
+  const contas = mcTodos.reduce((a,x)=>a+(x.qtd_contas||0),0);
+  const linhas = mcFiltro === "sobem"
+    ? mcTodos.filter(x => x.faixa_junto !== x.faixa_sozinho)
+    : mcTodos;
 
   el("content").innerHTML = `
     <div class="note" style="margin:0 0 16px">
@@ -5586,12 +5599,19 @@ async function vMulticonta(){
         <div class="k-val" style="color:${sobem?"var(--amber)":"var(--text-faint)"}">${nf(sobem)}</div><div class="k-sub">se as contas fossem uma so</div></div>
     </div>
 
+    <div class="sol-tabs">
+      <button class="sol-tab ${mcFiltro==="todos"?"on":""}" onclick="mcVer('todos')">Todos &middot; ${nf(mcTodos.length)}</button>
+      <button class="sol-tab ${mcFiltro==="sobem"?"on":""}" onclick="mcVer('sobem')">So os que sobem de faixa &middot; ${nf(sobem)}</button>
+    </div>
+
     <div class="panel">
       <table><thead><tr>
         <th>Cliente</th><th>CPF</th><th>Contas</th><th>Barras</th>
         <th>Faixa hoje</th><th>Maior conta</th><th>Somando tudo</th><th>Faixa somada</th>
       </tr></thead>
-      <tbody>${linhas.map(c=>{
+      <tbody>${!linhas.length
+        ? '<tr><td colspan="8" style="padding:20px;text-align:center;color:var(--text-faint)">Ninguem sobe de faixa somando as contas.</td></tr>'
+        : linhas.map(c=>{
         const sobe = c.faixa_junto !== c.faixa_sozinho;
         return `<tr id="mc-${c.cpf}" onclick="mcAbrir('${c.cpf}')" title="Ver as contas deste CPF">
           <td><div class="cell-name"><span class="mini-av">${ini(c.nome||"?")}</span>${c.nome||"\u2014"}
