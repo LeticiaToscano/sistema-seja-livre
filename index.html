@@ -4649,6 +4649,73 @@ function impCartao(nome, res, linhas, colunas, erroTxt, loteSaida, qtdPlat, qtdC
 
 let ldState = {tipo:"conversou", termo:"", recentes:false, page:0, size:50, total:0};
 
+
+// ---------- EXPORTAR PARA PLANILHA ----------
+// CSV com ponto-e-virgula e BOM: e o que o Excel em portugues abre com as
+// colunas ja separadas. Virgula e sem BOM sai tudo numa coluna so e com
+// acento quebrado.
+function baixarCSV(nome, colunas, linhas){
+  const esc = v => {
+    if(v === null || v === undefined) return "";
+    const t = String(v).replace(/"/g,'""');
+    return /[";\n\r]/.test(t) ? '"'+t+'"' : t;
+  };
+  const txt = "\ufeff" + [colunas.map(c=>esc(c[0])).join(";")]
+    .concat(linhas.map(l => colunas.map(c => esc(c[1](l))).join(";")))
+    .join("\r\n");
+  const url = URL.createObjectURL(new Blob([txt], {type:"text/csv;charset=utf-8;"}));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = nome + "_" + new Date().toISOString().slice(0,10) + ".csv";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 1000);
+}
+
+// Exporta a lista INTEIRA do filtro atual, nao so a pagina na tela.
+// Busca de mil em mil porque o Supabase corta em mil linhas por chamada.
+async function ldExportar(){
+  const btn = el("ldExp");
+  if(btn){ btn.disabled = true; btn.textContent = "Preparando..."; }
+  try{
+    const tudo = [];
+    for(let p = 0; p < 60; p++){
+      let q = sb.from("vw_leads_rd")
+        .select("nome,telefone_rd,cpf,atendimentos,primeiro_contato,ultimo_contato,ultimo_assessor,criado_no_rd,registros_manuais")
+        .eq("tipo", ldState.tipo);
+      if(ldState.termo) q = q.or(`nome.ilike.%${ldState.termo}%,telefone_rd.ilike.%${ldState.termo}%`);
+      if(ldState.recentes) q = q.gte("ultimo_contato", new Date(Date.now()-90*86400000).toISOString());
+      q = ldState.tipo === "conversou"
+          ? q.order("ultimo_contato",{ascending:false,nullsFirst:false})
+          : q.order("criado_no_rd",{ascending:false,nullsFirst:false});
+      const {data,error} = await q.range(p*1000, p*1000+999);
+      if(error) throw error;
+      if(!data || !data.length) break;
+      tudo.push.apply(tudo, data);
+      if(btn) btn.textContent = "Preparando... " + nf(tudo.length);
+      if(data.length < 1000) break;
+    }
+    if(!tudo.length){ toast("Nada para exportar","Nenhum lead neste filtro."); return; }
+
+    const fone = t => { const d=String(t||"").replace(/\D/g,"");
+      return d.length<10 ? (t||"") : "("+d.slice(0,2)+") "+d.slice(2,d.length-4)+"-"+d.slice(-4); };
+    const dt = v => v ? fmtData(v) : "";
+    const cols = ldState.tipo === "conversou"
+      ? [["Nome no RD", l=>l.nome], ["Telefone", l=>fone(l.telefone_rd)], ["CPF", l=>l.cpf||""],
+         ["Conversas", l=>l.atendimentos||0], ["Primeiro contato", l=>dt(l.primeiro_contato)],
+         ["Ultimo contato", l=>dt(l.ultimo_contato)], ["Quem atendeu", l=>l.ultimo_assessor||""],
+         ["Registros a mao", l=>l.registros_manuais||0]]
+      : [["Nome no RD", l=>l.nome], ["Telefone", l=>fone(l.telefone_rd)], ["CPF", l=>l.cpf||""],
+         ["Entrou no RD", l=>dt(l.criado_no_rd)]];
+
+    baixarCSV("leads_" + (ldState.tipo==="conversou"?"conversaram":"so_importados"), cols, tudo);
+    toast("Pronto", nf(tudo.length) + " lead(s) exportado(s).");
+  }catch(e){
+    toast("Não deu para exportar", (e && e.message) || "Erro ao buscar os leads.");
+  }finally{
+    if(btn){ btn.disabled = false; btn.textContent = "Exportar"; }
+  }
+}
+
 function vLeads(){
   el("content").innerHTML=`
     <div class="note" style="border-left-color:var(--blue);margin-bottom:16px">
@@ -4667,6 +4734,8 @@ function vLeads(){
         <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:var(--text-dim);white-space:nowrap">
           <input type="checkbox" id="ldRecentes"> só os últimos 90 dias
         </label>
+        <button class="sol-tab" id="ldExp" onclick="ldExportar()" style="margin-left:auto;white-space:nowrap"
+          title="Baixa a lista inteira do filtro atual, não só a página na tela">Exportar</button>
       </div>
       <div id="ldTab"><div class="loading"><div class="spinner"></div>Carregando…</div></div>
     </div>`;
