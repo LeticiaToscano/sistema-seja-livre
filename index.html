@@ -82,14 +82,38 @@
   /* público */
   .pb-sec{font-size:11px;color:var(--text-dim);font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin:26px 0 12px}
   .pb-grid{display:grid;grid-template-columns:minmax(330px,380px) 1fr;gap:20px;align-items:start}
-  .pb-mapa{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px}
-  .pb-uf{cursor:pointer;transition:opacity .12s}
-  .pb-uf:hover{opacity:.75}
-  .pb-uf.sel rect{stroke:var(--green);stroke-width:2.2}
-  .pb-uf.vazio{cursor:default;opacity:.35}
-  .pb-uf.vazio:hover{opacity:.35}
-  .pb-leg{display:flex;align-items:center;gap:7px;margin-top:12px;font-size:10.5px;color:var(--text-faint)}
-  .pb-leg i{width:20px;height:9px;border-radius:2px;display:block}
+  .pb-mapa-cx{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px 14px;position:relative}
+  .pb-medidas{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+  .pb-medidas button{background:transparent;border:1px solid var(--border);border-radius:15px;padding:5px 12px;font-size:11.5px;font-weight:600;color:var(--text-faint)}
+  .pb-medidas button:hover{border-color:var(--border-strong);color:var(--text-dim)}
+  .pb-medidas button.on{background:var(--surface-2);border-color:var(--border-strong);color:var(--text)}
+  .pb-mapa-cols{display:grid;grid-template-columns:1fr 200px;gap:16px;align-items:start}
+  .pb-uf{cursor:pointer}
+  .pb-uf rect{transition:transform .13s ease, filter .13s ease}
+  .pb-uf.vazio{cursor:default}
+  .pb-uf.on rect{stroke:#fff;stroke-width:2.4;filter:brightness(1.18)}
+  .pb-uf.sel rect{stroke:#fff;stroke-width:2.8}
+  .pb-rank{max-height:392px;overflow-y:auto;padding-right:4px}
+  .pb-rank-l{display:flex;align-items:center;gap:8px;padding:5px 7px;border-radius:6px;cursor:pointer;font-size:11.5px}
+  .pb-rank-l:hover,.pb-rank-l.on{background:rgba(255,255,255,.05)}
+  .pb-rank-l.sel{background:rgba(46,229,157,.1)}
+  .pb-rank-l .r-uf{font-weight:800;width:26px;flex:0 0 26px}
+  .pb-rank-l .r-tri{flex:1;height:6px;background:rgba(255,255,255,.05);border-radius:4px;overflow:hidden}
+  .pb-rank-l .r-tri i{display:block;height:100%;border-radius:4px}
+  .pb-rank-l .r-n{width:42px;text-align:right;font-weight:700;color:var(--text-dim)}
+  .pb-reg{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;padding-top:13px;border-top:1px solid var(--border)}
+  .pb-reg button{background:transparent;border:1px solid var(--border);border-radius:10px;padding:7px 11px;text-align:left;min-width:104px}
+  .pb-reg button:hover{border-color:var(--border-strong)}
+  .pb-reg button.sel{border-color:#fff}
+  .pb-reg .rg-n{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:5px}
+  .pb-reg .rg-n i{width:8px;height:8px;border-radius:2px;display:block}
+  .pb-reg .rg-v{font-size:16px;font-weight:800;margin-top:3px}
+  .pb-reg .rg-p{font-size:10.5px;color:var(--text-faint)}
+  .pb-tip{position:absolute;pointer-events:none;background:#0c0f14;border:1px solid var(--border-strong);border-radius:8px;padding:8px 11px;font-size:11.5px;line-height:1.5;box-shadow:0 8px 22px rgba(0,0,0,.55);opacity:0;transition:opacity .1s;z-index:40;white-space:nowrap}
+  .pb-tip.on{opacity:1}
+  .pb-tip b{font-size:12.5px}
+  .pb-tip s{display:block;text-decoration:none;color:var(--text-faint)}
+  @media(max-width:1180px){.pb-grid{grid-template-columns:1fr}.pb-mapa-cols{grid-template-columns:1fr}.pb-rank{max-height:none}}
   .pb-lado{display:flex;flex-direction:column;gap:18px}
   .pb-bloco{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px}
   .pb-bloco h4{font-size:12px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;margin:0 0 13px}
@@ -5738,15 +5762,143 @@ async function mcAbrir(cpf){
 // aproximada. Foi escolha consciente — o contorno real exige as coordenadas
 // dos 27 estados, e um contorno desenhado de memoria sai torto.
 
+
+// Cada estado com sua regiao e sua posicao no bloco. A cor sai da regiao,
+// e a intensidade sai da medida escolhida — assim o mapa tem forma mesmo
+// quando os numeros sao parecidos.
+const PB_REG = {
+  N:["Norte","#3aa0ff"], NE:["Nordeste","#f0b429"], CO:["Centro-Oeste","#c77dff"],
+  SE:["Sudeste","#2ee59d"], S:["Sul","#ff6b8a"]
+};
 const PB_MAPA = [
-  ["RR",3,1],["AP",5,1],
-  ["AM",2,2],["PA",4,2],["MA",5,2],["CE",6,2],["RN",7,2],
-  ["AC",1,3],["RO",2,3],["TO",4,3],["PI",5,3],["PB",7,3],
-  ["MT",3,4],["GO",4,4],["BA",5,4],["PE",6,4],
-  ["MS",3,5],["DF",4,5],["MG",5,5],["AL",6,5],["SE",7,5],
-  ["SP",4,6],["RJ",5,6],["ES",6,6],
-  ["PR",4,7],["SC",4,8],["RS",4,9]
+  ["RR","N",3,1],["AP","N",5,1],
+  ["AM","N",2,2],["PA","N",4,2],["MA","NE",5,2],["CE","NE",6,2],["RN","NE",7,2],
+  ["AC","N",1,3],["RO","N",2,3],["TO","N",4,3],["PI","NE",5,3],["PB","NE",7,3],
+  ["MT","CO",3,4],["GO","CO",4,4],["BA","NE",5,4],["PE","NE",6,4],
+  ["MS","CO",3,5],["DF","CO",4,5],["MG","SE",5,5],["AL","NE",6,5],["SE","NE",7,5],
+  ["SP","SE",4,6],["RJ","SE",5,6],["ES","SE",6,6],
+  ["PR","S",4,7],["SC","S",4,8],["RS","S",4,9]
 ];
+const PB_MEDIDAS = {
+  clientes:  ["Clientes",      l => l.length],
+  operando:  ["% operando",    l => l.length ? Math.round(l.filter(pbOpera).length / l.length * 100) : 0],
+  contratos: ["Contratos",     l => l.reduce((a,c)=>a+(Number(c.contratos_bmf)||0),0)]
+};
+let pbMedida = "clientes", pbHover = null;
+
+// Operando = operou nos ultimos 60 dias, a mesma regua do Radar.
+function pbOpera(c){
+  if(!c.data_ultima_operacao) return false;
+  return (Date.now() - new Date(c.data_ultima_operacao).getTime()) / 86400000 <= 60;
+}
+function pbVerMedida(m){ pbMedida = m; pbPintar(); }
+
+function pbHexA(hex, a){
+  const n = parseInt(hex.slice(1),16);
+  return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;
+}
+
+// Acende o estado no mapa e no ranking ao mesmo tempo, e mostra o balao.
+function pbSobre(uf, ev){
+  pbHover = uf;
+  document.querySelectorAll(".pb-uf,.pb-rank-l").forEach(x =>
+    x.classList.toggle("on", x.dataset.uf === uf));
+  const tip = el("pbTip");
+  if(!tip || !uf) return;
+  const dados = pbPorUF()[uf];
+  if(!dados){ tip.classList.remove("on"); return; }
+  const op = dados.filter(pbOpera).length;
+  const ct = dados.reduce((a,c)=>a+(Number(c.contratos_bmf)||0),0);
+  tip.innerHTML = `<b>${uf}</b>
+    <s>${nf(dados.length)} cliente(s) com faixa</s>
+    <s>${nf(op)} operando &middot; ${dados.length?Math.round(op/dados.length*100):0}%</s>
+    <s>${nf(ct)} contratos</s>`;
+  const cx = el("pbMapaCx").getBoundingClientRect();
+  tip.style.left = Math.min(cx.width-170, Math.max(4, ev.clientX - cx.left + 14)) + "px";
+  tip.style.top  = Math.max(4, ev.clientY - cx.top - 12) + "px";
+  tip.classList.add("on");
+}
+function pbFora(){
+  pbHover = null;
+  document.querySelectorAll(".pb-uf,.pb-rank-l").forEach(x => x.classList.remove("on"));
+  const tip = el("pbTip"); if(tip) tip.classList.remove("on");
+}
+
+function pbPorUF(){
+  const m = {};
+  pbBase().forEach(c => { const u=(c.uf||"").trim().toUpperCase(); if(u) (m[u]=m[u]||[]).push(c); });
+  return m;
+}
+
+function pbMapaHTML(){
+  const porUF = pbPorUF();
+  const [rotMed, calc] = PB_MEDIDAS[pbMedida];
+  const val = {};
+  PB_MAPA.forEach(([uf]) => { val[uf] = porUF[uf] ? calc(porUF[uf]) : 0; });
+  const topo = Math.max(1, ...Object.values(val));
+  const L = 44, G = 5;
+
+  const blocos = PB_MAPA.map(([uf,reg,cx,cy])=>{
+    const lista = porUF[uf] || [], n = val[uf];
+    const cor = PB_REG[reg][1];
+    const forca = lista.length ? 0.18 + (n/topo)*0.82 : 0;
+    const x = (cx-1)*(L+G), y = (cy-1)*(L+G);
+    const sel = pbCorte && pbCorte.tipo==="uf" && pbCorte.valor===uf;
+    const claro = forca > 0.5;
+    return `<g class="pb-uf ${lista.length?"":"vazio"} ${sel?"sel":""}" data-uf="${uf}"
+        ${lista.length?`onclick="pbVer('uf','${uf}','${uf}')"
+        onmousemove="pbSobre('${uf}',event)" onmouseleave="pbFora()"`:""}>
+      <rect x="${x}" y="${y}" width="${L}" height="${L}" rx="7"
+        fill="${lista.length?pbHexA(cor,forca):"rgba(255,255,255,.035)"}"
+        stroke="${lista.length?pbHexA(cor,.55):"var(--border)"}" stroke-width="1"/>
+      <text x="${x+L/2}" y="${y+19}" text-anchor="middle"
+        style="font-size:12.5px;font-weight:800;fill:${claro?"#08131a":"var(--text)"}">${uf}</text>
+      <text x="${x+L/2}" y="${y+33}" text-anchor="middle"
+        style="font-size:10.5px;font-weight:700;fill:${claro?"rgba(8,19,26,.72)":"var(--text-faint)"}">${
+        lista.length ? (pbMedida==="operando" ? n+"%" : nf(n)) : "–"}</text>
+    </g>`;
+  }).join("");
+
+  const rank = Object.keys(porUF)
+    .sort((a,b)=>val[b]-val[a])
+    .map(uf=>{
+      const reg = (PB_MAPA.find(m=>m[0]===uf)||[,"SE"])[1];
+      const sel = pbCorte && pbCorte.tipo==="uf" && pbCorte.valor===uf;
+      return `<div class="pb-rank-l ${sel?"sel":""}" data-uf="${uf}"
+          onclick="pbVer('uf','${uf}','${uf}')"
+          onmousemove="pbSobre('${uf}',event)" onmouseleave="pbFora()">
+        <span class="r-uf">${uf}</span>
+        <span class="r-tri"><i style="width:${Math.round(val[uf]/Math.max(1,...Object.values(val))*100)}%;background:${PB_REG[reg][1]}"></i></span>
+        <span class="r-n">${pbMedida==="operando"?val[uf]+"%":nf(val[uf])}</span>
+      </div>`;
+    }).join("");
+
+  const total = pbBase().length;
+  const regs = Object.keys(PB_REG).map(r=>{
+    const ufs = PB_MAPA.filter(m=>m[1]===r).map(m=>m[0]);
+    const lista = ufs.flatMap(u => porUF[u] || []);
+    const sel = pbCorte && pbCorte.tipo==="regiao" && pbCorte.valor===r;
+    return `<button class="${sel?"sel":""}" onclick="pbVer('regiao','${r}','${PB_REG[r][0]}')">
+      <span class="rg-n"><i style="background:${PB_REG[r][1]}"></i>${PB_REG[r][0]}</span>
+      <span class="rg-v">${nf(lista.length)}</span>
+      <span class="rg-p">${total?((lista.length/total)*100).toFixed(1):"0,0"}% do total</span>
+    </button>`;
+  }).join("");
+
+  return `<div class="pb-mapa-cx" id="pbMapaCx">
+    <div class="pb-medidas">${Object.entries(PB_MEDIDAS).map(([k,v])=>
+      `<button class="${pbMedida===k?"on":""}" onclick="pbVerMedida('${k}')">${v[0]}</button>`).join("")}
+      <span style="margin-left:auto;font-size:10.5px;color:var(--text-faint);align-self:center">clique num estado</span>
+    </div>
+    <div class="pb-mapa-cols">
+      <svg viewBox="0 0 ${7*(L+G)-G} ${9*(L+G)-G}" style="width:100%;height:auto">${blocos}</svg>
+      <div class="pb-rank">${rank}</div>
+    </div>
+    <div class="pb-reg">${regs}</div>
+    <div class="pb-tip" id="pbTip"></div>
+  </div>`;
+}
+
 const PB_IDADE = [
   ["ate24","Ate 24 anos",  0, 24],
   ["25a34","25 a 34",     25, 34],
@@ -5806,6 +5958,8 @@ function pbFiltrados(){
   if(!pbCorte) return base;
   const {tipo,valor} = pbCorte;
   if(tipo === "uf")     return base.filter(c => (c.uf||"") === valor);
+  if(tipo === "regiao"){ const ufs = PB_MAPA.filter(m=>m[1]===valor).map(m=>m[0]);
+                         return base.filter(c => ufs.indexOf((c.uf||"").trim().toUpperCase()) >= 0); }
   if(tipo === "idade")  return base.filter(c => pbFaixaEtaria(c.idade) === valor);
   if(tipo === "sexo")   return base.filter(c => (pbSexo(c.sexo) || "?") === valor);
   if(tipo === "civil")  return base.filter(c => (c.estado_civil||"nao informado") === valor);
@@ -5839,30 +5993,6 @@ function pbPintar(){
   const base = pbBase();
   const total = base.length;
 
-  // --- mapa ---
-  const porUF = {};
-  base.forEach(c => { const u=(c.uf||"").trim().toUpperCase(); if(u) porUF[u]=(porUF[u]||0)+1; });
-  const maiorUF = Math.max(1, ...Object.values(porUF));
-  const L = 42, G = 5;
-  const mapa = PB_MAPA.map(([uf,cx,cy])=>{
-    const n = porUF[uf] || 0;
-    const x = (cx-1)*(L+G), y = (cy-1)*(L+G);
-    const forca = n ? 0.16 + (n/maiorUF)*0.84 : 0;
-    const sel = pbCorte && pbCorte.tipo==="uf" && pbCorte.valor===uf;
-    return `<g class="pb-uf ${n?"":"vazio"} ${sel?"sel":""}"
-        ${n?`onclick="pbVer('uf','${uf}','${uf}')"`:""}>
-      <title>${uf}: ${nf(n)} cliente(s)</title>
-      <rect x="${x}" y="${y}" width="${L}" height="${L}" rx="6"
-        fill="${n?`rgba(46,229,157,${forca.toFixed(3)})`:"rgba(255,255,255,.04)"}"
-        stroke="var(--border)" stroke-width="1"/>
-      <text x="${x+L/2}" y="${y+17}" text-anchor="middle"
-        style="font-size:12px;font-weight:800;fill:${n&&forca>.55?"#06231a":"var(--text)"}">${uf}</text>
-      <text x="${x+L/2}" y="${y+31}" text-anchor="middle"
-        style="font-size:10.5px;font-weight:600;fill:${n&&forca>.55?"rgba(6,35,26,.75)":"var(--text-faint)"}">${n?nf(n):"–"}</text>
-    </g>`;
-  }).join("");
-  const larg = 7*(L+G)-G, alt = 9*(L+G)-G;
-
   // --- recortes ---
   const idade = PB_IDADE.map(f => [f[0], base.filter(c => pbFaixaEtaria(c.idade)===f[0]).length])
                         .filter(x => x[1] > 0);
@@ -5875,6 +6005,7 @@ function pbPintar(){
   const civil = pbContar(base, c => c.estado_civil || "nao informado");
   const prof  = pbContar(base, c => c.profissao || "nao informada");
   const semUF = base.filter(c => !(c.uf||"").trim()).length;
+  const porUF = pbPorUF();
 
   // --- faixas ---
   const chipsFaixa = ["todas"].concat(FAIXA_ORDEM).map(f=>{
@@ -5910,15 +6041,7 @@ function pbPintar(){
 
     <div class="pb-sec">Onde eles estão</div>
     <div class="pb-grid">
-      <div class="pb-mapa">
-        <svg viewBox="0 0 ${larg} ${alt}" style="width:100%;height:auto">${mapa}</svg>
-        <div class="pb-leg"><span>menos</span>
-          <i style="background:rgba(46,229,157,.16)"></i>
-          <i style="background:rgba(46,229,157,.45)"></i>
-          <i style="background:rgba(46,229,157,.72)"></i>
-          <i style="background:rgba(46,229,157,1)"></i><span>mais</span>
-          <span style="margin-left:auto">clique num estado</span></div>
-      </div>
+      ${pbMapaHTML()}
 
       <div class="pb-lado">
         <div class="pb-bloco"><h4>Faixa etária</h4>
@@ -5953,7 +6076,7 @@ function pbListaHTML(){
   }
   const lista = pbFiltrados().slice().sort((a,b)=>(b.contratos_bmf||0)-(a.contratos_bmf||0));
   const base = pbBase().length;
-  const rot = {uf:"no estado de",idade:"na faixa",sexo:"",civil:"com estado civil",prof:"na profissão"}[pbCorte.tipo]||"";
+  const rot = {uf:"no estado de",regiao:"na região",idade:"na faixa",sexo:"",civil:"com estado civil",prof:"na profissão"}[pbCorte.tipo]||"";
   return `
     <div class="pb-lista-cab">
       <div class="pb-lista-tit">${nf(lista.length)} cliente(s) ${rot} <b>${pbCorte.rotulo}</b>
@@ -5989,3 +6112,4 @@ boot();
 </script>
 </body>
 </html>
+  
