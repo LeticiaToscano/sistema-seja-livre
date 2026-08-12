@@ -79,6 +79,15 @@
   .content{padding:26px 28px 60px}
 
   /* KPIs */
+  .mc-seta{display:inline-block;margin-left:7px;color:var(--text-faint);font-size:10px;transition:transform .15s}
+  .mc-seta.aberta{transform:rotate(90deg)}
+  .mc-box{background:rgba(255,255,255,.02);border-top:1px solid var(--border);padding:14px 18px 4px}
+  .mc-box-tit{font-size:11px;color:var(--text-dim);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:9px}
+  .mc-tab{width:100%;font-size:12.5px}
+  .mc-tab th{font-size:10.5px;color:var(--text-faint);font-weight:600;text-transform:uppercase;letter-spacing:.4px;padding:5px 9px;border-bottom:1px solid var(--border)}
+  .mc-tab td{padding:7px 9px;border-bottom:1px solid rgba(255,255,255,.04)}
+  .mc-tab tr.mc-soma td{font-weight:800;border-bottom:none;color:var(--text)}
+  .mc-nota{font-size:11px;color:var(--text-faint);padding:9px 0 12px;line-height:1.55}
   .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}
   .kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:17px 18px}
   .kpi .k-label{font-size:11px;color:var(--text-dim);font-weight:600;text-transform:uppercase;letter-spacing:.5px}
@@ -5584,8 +5593,9 @@ async function vMulticonta(){
       </tr></thead>
       <tbody>${linhas.map(c=>{
         const sobe = c.faixa_junto !== c.faixa_sozinho;
-        return `<tr style="cursor:default">
-          <td><div class="cell-name"><span class="mini-av">${ini(c.nome||"?")}</span>${c.nome||"\u2014"}</div></td>
+        return `<tr id="mc-${c.cpf}" onclick="mcAbrir('${c.cpf}')" title="Ver as contas deste CPF">
+          <td><div class="cell-name"><span class="mini-av">${ini(c.nome||"?")}</span>${c.nome||"\u2014"}
+            <span class="mc-seta" id="mc-seta-${c.cpf}">&#9656;</span></div></td>
           <td class="num" style="font-size:12px">${fmtCPF(c.cpf)}</td>
           <td class="num" style="font-weight:700">${nf(c.qtd_contas)}</td>
           <td class="num" style="font-size:12px">${c.barras||"\u2014"}</td>
@@ -5594,12 +5604,72 @@ async function vMulticonta(){
           <td class="num" style="font-weight:700">${c.contratos_juntos?nf(c.contratos_juntos):"\u2014"}</td>
           <td>${faixaBadge(c.faixa_junto||"sem", c.grau_junto||0)}${
             sobe?' <span class="tag t-amber" style="font-size:10px">sobe</span>':""}</td>
-        </tr>`;
+        </tr>
+        <tr class="mc-det" id="mc-det-${c.cpf}" style="display:none"><td colspan="8" style="padding:0"></td></tr>`;
       }).join("")}</tbody></table>
       <div style="padding:11px 16px;font-size:11px;color:var(--text-faint)">
         ${nf(linhas.length)} CPF(s) &middot; contratos de BM&amp;F na mesma regua do Clube
       </div>
     </div>`;
+}
+
+
+// Abre, embaixo da linha, as contas daquele CPF — para mostrar de onde vem a
+// soma. Guarda o que ja buscou, entao reabrir nao consulta o banco de novo.
+const mcCache = {};
+async function mcAbrir(cpf){
+  const tr = el("mc-det-"+cpf), seta = el("mc-seta-"+cpf);
+  if(!tr) return;
+  if(tr.style.display !== "none"){
+    tr.style.display = "none"; if(seta) seta.classList.remove("aberta"); return;
+  }
+  tr.style.display = ""; if(seta) seta.classList.add("aberta");
+  const cel = tr.firstElementChild;
+  if(mcCache[cpf]){ cel.innerHTML = mcCache[cpf]; return; }
+  cel.innerHTML = '<div style="padding:14px 18px;color:var(--text-faint);font-size:12px">Buscando as contas...</div>';
+  const {data,error} = await sb.rpc("fn_contas_cpf",{p_cpf:cpf});
+  if(error){
+    cel.innerHTML = '<div style="padding:14px 18px;color:var(--red);font-size:12px">Nao consegui buscar as contas: '+(error.message||"erro")+'</div>';
+    return;
+  }
+  const contas = data || [];
+  if(!contas.length){
+    cel.innerHTML = '<div style="padding:14px 18px;color:var(--text-faint);font-size:12px">Nenhuma conta encontrada.</div>';
+    return;
+  }
+  const soma = contas.reduce((a,x)=>a+Number(x.ct_mes_melhor||0),0);
+  const html = `
+    <div class="mc-box">
+      <div class="mc-box-tit">As ${nf(contas.length)} contas deste CPF &middot; contratos de BM&amp;F no melhor mes</div>
+      <table class="mc-tab"><thead><tr>
+        <th>Sinacor</th><th>Nome na conta</th><th>Barra</th><th>Situacao</th>
+        <th>Faixa da conta</th><th>No melhor mes</th><th>Melhor mes dela</th><th>Ultima op.</th>
+      </tr></thead><tbody>
+      ${contas.map(k=>`<tr>
+        <td class="num">${k.sinacor||"\u2014"}</td>
+        <td>${k.nome||"\u2014"}</td>
+        <td class="num">${k.barra||"\u2014"}</td>
+        <td>${k.status!=="ativo"
+              ? '<span class="tag" style="background:transparent;border:1px dashed var(--red);color:var(--red);font-size:10px">desligado</span>'
+              : k.segmento!=="seja_livre"
+              ? `<span class="tag" style="background:transparent;border:1px dashed var(--text-faint);color:var(--text-faint);font-size:10px">${k.segmento||"outro"}</span>`
+              : '<span style="color:var(--text-faint);font-size:11px">ativo</span>'}</td>
+        <td>${faixaBadge(k.faixa||"sem", k.grau||0)}</td>
+        <td class="num" style="font-weight:700">${nf(k.ct_mes_melhor)}</td>
+        <td class="num" style="color:var(--text-faint)">${nf(k.ct_maior_mes)}</td>
+        <td class="num">${k.ultima_op?fmtData(k.ultima_op):"\u2014"}</td>
+      </tr>`).join("")}
+      <tr class="mc-soma"><td colspan="5" style="text-align:right">Somando as contas</td>
+        <td class="num">${nf(soma)}</td><td></td><td></td></tr>
+      </tbody></table>
+      <div class="mc-nota">
+        A faixa somada sai da coluna <b>No melhor mes</b>: e o mes em que as contas,
+        juntas, mais operaram. <b>Melhor mes dela</b> e o melhor mes de cada conta
+        sozinha &mdash; e dai que vem a faixa que a conta tem hoje no Clube.
+      </div>
+    </div>`;
+  mcCache[cpf] = html;
+  cel.innerHTML = html;
 }
 
 // ---------- erro ----------
