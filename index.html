@@ -5766,7 +5766,7 @@ async function mcAbrir(cpf){
 // e a intensidade sai da medida escolhida — assim o mapa tem forma mesmo
 // quando os numeros sao parecidos.
 const PB_REG = {
-  N:["Norte","#3aa0ff"], NE:["Nordeste","#f0b429"], CO:["Centro-Oeste","#c77dff"],
+  N:["Norte","#4aa8ff"], NE:["Nordeste","#ffc93c"], CO:["Centro-Oeste","#b06bff"],
   SE:["Sudeste","#2ee59d"], S:["Sul","#ff6b8a"]
 };
 const PB_MAPA = [
@@ -5835,12 +5835,12 @@ function pbMapaHTML(){
   const val = {};
   PB_MAPA.forEach(([uf]) => { val[uf] = porUF[uf] ? calc(porUF[uf]) : 0; });
   const topo = Math.max(1, ...Object.values(val));
-  const L = 58, G = 7;
+  const L = 44, G = 6;
 
   const blocos = PB_MAPA.map(([uf,reg,cx,cy])=>{
     const lista = porUF[uf] || [], n = val[uf];
     const cor = PB_REG[reg][1];
-    const forca = lista.length ? 0.18 + (n/topo)*0.82 : 0;
+    const forca = lista.length ? 0.34 + (n/topo)*0.66 : 0;
     const x = (cx-1)*(L+G), y = (cy-1)*(L+G);
     const sel = pbCorte && pbCorte.tipo==="uf" && pbCorte.valor===uf;
     const claro = forca > 0.5;
@@ -5850,10 +5850,10 @@ function pbMapaHTML(){
       <rect x="${x}" y="${y}" width="${L}" height="${L}" rx="9"
         fill="${lista.length?pbHexA(cor,forca):"rgba(255,255,255,.035)"}"
         stroke="${lista.length?pbHexA(cor,.55):"var(--border)"}" stroke-width="1"/>
-      <text x="${x+L/2}" y="${y+25}" text-anchor="middle"
-        style="font-size:15px;font-weight:800;fill:${claro?"#08131a":"var(--text)"}">${uf}</text>
-      <text x="${x+L/2}" y="${y+42}" text-anchor="middle"
-        style="font-size:12.5px;font-weight:700;fill:${claro?"rgba(8,19,26,.72)":"var(--text-faint)"}">${
+      <text x="${x+L/2}" y="${y+20}" text-anchor="middle"
+        style="font-size:12.5px;font-weight:800;fill:${claro?"#08131a":"#fff"}">${uf}</text>
+      <text x="${x+L/2}" y="${y+34}" text-anchor="middle"
+        style="font-size:11.5px;font-weight:700;fill:${claro?"rgba(8,19,26,.78)":"rgba(255,255,255,.88)"}">${
         lista.length ? (pbMedida==="operando" ? n+"%" : nf(n)) : "–"}</text>
     </g>`;
   }).join("");
@@ -5890,7 +5890,7 @@ function pbMapaHTML(){
       <span style="margin-left:auto;font-size:10.5px;color:var(--text-faint);align-self:center">clique num estado</span>
     </div>
     <div class="pb-mapa-cols">
-      <svg viewBox="0 0 ${7*(L+G)-G} ${9*(L+G)-G}" style="width:100%;height:auto">${blocos}</svg>
+      <svg viewBox="0 0 ${7*(L+G)-G} ${9*(L+G)-G}" style="width:100%;height:auto;max-height:430px;display:block;margin:0 auto">${blocos}</svg>
       <div class="pb-rank">${rank}</div>
     </div>
     <div class="pb-reg">${regs}</div>
