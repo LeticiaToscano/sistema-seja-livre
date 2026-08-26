@@ -4680,8 +4680,9 @@ async function ldExportar(){
     const tudo = [];
     for(let p = 0; p < 60; p++){
       let q = sb.from("vw_leads_rd")
-        .select("nome,telefone_rd,cpf,atendimentos,primeiro_contato,ultimo_contato,ultimo_assessor,criado_no_rd,registros_manuais")
+        .select("nome,telefone_rd,cpf,atendimentos,primeiro_contato,ultimo_contato,ultimo_assessor,criado_no_rd,registros_manuais,parceiro")
         .eq("tipo", ldState.tipo);
+      if(ldState.parceiro) q = q.eq("parceiro", ldState.parceiro);
       if(ldState.termo) q = q.or(`nome.ilike.%${ldState.termo}%,telefone_rd.ilike.%${ldState.termo}%`);
       if(ldState.recentes) q = q.gte("ultimo_contato", new Date(Date.now()-90*86400000).toISOString());
       q = ldState.tipo === "conversou"
@@ -4725,11 +4726,15 @@ function vLeads(){
       trocaram mensagem — não são leads, são números.
     </div>
     <div class="sol-tabs">
-      <button class="sol-tab on" id="ldT1" onclick="ldTipo('conversou',this)">Conversaram</button>
-      <button class="sol-tab" id="ldT2" onclick="ldTipo('so_importado',this)">Só importados</button>
+      <button class="sol-tab on" id="ldT1" onclick="ldTipo('so_importado',this)">Ainda sem contato</button>
+      <button class="sol-tab" id="ldT2" onclick="ldTipo('conversou',this)">Já conversaram</button>
+      <button class="sol-tab" id="ldT3" onclick="ldTipo('lotes',this)">Organizar listas</button>
     </div>
     <div class="panel">
       <div class="toolbar">
+        <select class="search" id="ldParc" style="max-width:270px" title="Filtra por quem mandou a lista">
+          <option value="">Todos os parceiros</option>
+        </select>
         <input class="search" id="ldBusca" placeholder="Buscar por nome ou telefone…">
         <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:var(--text-dim);white-space:nowrap">
           <input type="checkbox" id="ldRecentes"> só os últimos 90 dias
@@ -4740,7 +4745,12 @@ function vLeads(){
       <div id="ldTab"><div class="loading"><div class="spinner"></div>Carregando…</div></div>
     </div>`;
 
-  ldState = {tipo:"conversou", termo:"", recentes:false, page:0, size:50, total:0};
+  ldState = {tipo:"so_importado", termo:"", recentes:false, parceiro:"", page:0, size:50, total:0};
+  ldCarregarParceiros();
+  el("ldParc").addEventListener("change", e=>{
+    ldState.parceiro = e.target.value; ldState.page = 0;
+    if(ldState.tipo === "lotes") ldLotes(); else ldCarregar();
+  });
   el("ldBusca").addEventListener("input", e=>{
     clearTimeout(buscaTimer);
     buscaTimer = setTimeout(()=>{ ldState.termo=e.target.value.trim(); ldState.page=0; ldCarregar(); }, 300);
@@ -4755,7 +4765,84 @@ function ldTipo(t, btn){
   ldState.tipo = t; ldState.page = 0;
   document.querySelectorAll(".sol-tabs .sol-tab").forEach(b=>b.classList.remove("on"));
   btn.classList.add("on");
-  ldCarregar();
+  const busca = el("ldBusca");   // buscar por nome nao faz sentido em "Organizar listas"
+  if(busca) busca.style.display = (t === "lotes") ? "none" : "";
+  if(t === "lotes") ldLotes(); else ldCarregar();
+}
+
+/* ---------------------------------------------------------------------
+   LEADS POR PARCEIRO
+   O parceiro vem de duas origens: a ETIQUETA do RD ("Lead Barao") nas
+   listas novas, e o nome dado aqui em "Organizar listas" no historico,
+   que entrou antes de a equipe passar a etiquetar. O nome dado a mao tem
+   prioridade sobre a etiqueta.
+   --------------------------------------------------------------------- */
+async function ldCarregarParceiros(){
+  const sel = el("ldParc");
+  if(!sel) return;
+  try{
+    const {data, error} = await sb.rpc("parceiros_leads");
+    if(error || !data || !data.length) return;
+    const atual = sel.value;
+    sel.innerHTML = '<option value="">Todos os parceiros</option>'
+      + data.map(p=>`<option value="${p.parceiro}">${p.parceiro} — ${nf(p.sem_contato)} sem contato</option>`).join("");
+    sel.value = atual;
+  }catch(e){ /* seletor fica so com "todos" */ }
+}
+
+/* Agrupa o historico por horario de importacao: cada bloco de contatos que
+   entrou junto e uma planilha, e ganha o nome do parceiro de uma vez. */
+async function ldLotes(){
+  el("ldTab").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
+  const {data, error} = await sb.rpc("lotes_leads");
+  if(error) return erro(error,"ldTab");
+  let lotes = data || [];
+  if(ldState.parceiro) lotes = lotes.filter(l => l.parceiro === ldState.parceiro);
+  if(!lotes.length){
+    el("ldTab").innerHTML='<div class="empty">Nenhuma lista neste filtro.</div>';
+    return;
+  }
+  window.__ldLotes = lotes;
+  const semNome = lotes.filter(l=>!l.parceiro).length;
+  el("ldTab").innerHTML = `
+    <div class="note" style="border-left-color:var(--blue);margin:0 0 14px">
+      Cada linha é uma lista subida no RD — contatos que entraram juntos, com
+      menos de 30 minutos entre um e outro. Escreva de quem veio e clique em
+      Salvar. Para desfazer, apague o nome e salve de novo.
+      ${semNome ? `<b>${semNome} lista(s) ainda sem parceiro.</b>` : "Todas já estão identificadas."}
+    </div>
+    <table><thead><tr>
+      <th>Quando entrou</th><th>Contatos</th><th>Primeiros nomes</th><th>Parceiro</th><th></th>
+    </tr></thead><tbody>
+    ${lotes.map((l,i)=>`<tr>
+      <td class="num">${fmtData(l.inicio)}</td>
+      <td class="num">${nf(l.total)}</td>
+      <td style="color:var(--text-dim);font-size:12.5px">${(l.amostra||[]).filter(Boolean).join(" · ")||"—"}</td>
+      <td><input class="search" id="ldLote${i}" style="max-width:230px;padding:6px 9px"
+            value="${String(l.parceiro||"").replace(/"/g,"&quot;")}" placeholder="nome do parceiro"></td>
+      <td><button class="sol-tab" onclick="ldNomear(${i})">Salvar</button></td>
+    </tr>`).join("")}
+    </tbody></table>`;
+}
+
+async function ldNomear(i){
+  const lote = (window.__ldLotes||[])[i];
+  if(!lote) return;
+  const campo = el("ldLote"+i);
+  const nome = campo ? campo.value.trim() : "";
+  try{
+    const {data, error} = await sb.rpc("nomear_lote", {
+      p_de: lote.inicio, p_ate: lote.fim, p_parceiro: nome
+    });
+    if(error) throw error;
+    if(!data || data.ok === false) throw new Error((data && data.erro) || "recusado");
+    lote.parceiro = nome || null;
+    toast("Pronto", nf(data.atualizados) + " contato(s) marcado(s)"
+          + (nome ? " como " + nome + "." : " sem parceiro."));
+    ldCarregarParceiros();
+  }catch(e){
+    toast("Não deu para salvar", (e && e.message) || "Erro ao gravar o parceiro.");
+  }
 }
 
 async function ldCarregar(){
@@ -4763,8 +4850,10 @@ async function ldCarregar(){
   const de = ldState.page * ldState.size, ate = de + ldState.size - 1;
 
   let q = sb.from("vw_leads_rd")
-    .select("id,nome,telefone_rd,cpf,chave,atendimentos,primeiro_contato,ultimo_contato,ultimo_assessor,criado_no_rd,registros_manuais",{count:"exact"})
+    .select("id,nome,telefone_rd,cpf,chave,atendimentos,primeiro_contato,ultimo_contato,ultimo_assessor,criado_no_rd,registros_manuais,parceiro",{count:"exact"})
     .eq("tipo", ldState.tipo);
+
+  if(ldState.parceiro) q = q.eq("parceiro", ldState.parceiro);
 
   if(ldState.termo){
     q = q.or(`nome.ilike.%${ldState.termo}%,telefone_rd.ilike.%${ldState.termo}%`);
