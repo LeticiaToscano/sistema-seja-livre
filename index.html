@@ -6628,6 +6628,27 @@ async function vSDR(){
   else                                    sdrBoletados();
 }
 
+/* Diz em palavras o periodo que esta na tela. Sem isso, quem abre a aba
+   nao sabe se olha o trimestre ou o mes — e compara numeros de recortes
+   diferentes sem perceber. */
+function sdrRotuloPeriodo(){
+  if(sdrState.de || sdrState.ate){
+    const de  = sdrState.de  ? fmtData(sdrState.de)  : "o início";
+    const ate = sdrState.ate ? fmtData(sdrState.ate) : "hoje";
+    return "de " + de + " a " + ate;
+  }
+  return "últimos 90 dias";
+}
+
+/* A etiqueta em si. `extra` diz o que o periodo NAO filtra, quando for
+   o caso — e essa ressalva importa mais que a etiqueta. */
+function sdrEtiqueta(extra){
+  return `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:-4px 0 14px">
+    <span class="tag t-blue" style="font-size:11px">${sdrRotuloPeriodo()}</span>
+    ${extra?`<span style="font-size:11.5px;color:var(--text-faint)">${extra}</span>`:""}
+  </div>`;
+}
+
 function sdrAba(a){ sdrState.aba = a; vSDR(); }
 function sdrPeriodo(){
   sdrState.de  = el("sdrDe").value  || null;
@@ -6643,6 +6664,7 @@ function sdrPlacar(time){
     return;
   }
   el("sdrConteudo").innerHTML = `
+    ${sdrEtiqueta("a carteira e a cobertura são o estado de hoje, não do período")}
     <div class="note" style="margin-bottom:14px">
       <b>Como ler:</b> <b>cobertura</b> é quanto da carteira a pessoa tocou — depende só dela,
       e é a medida de esforço. <b>Reativação</b> é sobre quem <b>estava parado de verdade</b>,
@@ -6751,6 +6773,7 @@ async function sdrControle(){
     </div>`;
 
   el("sdrConteudo").innerHTML = `
+    ${sdrEtiqueta("pela data da conversa")}
     <div class="note" style="margin-bottom:16px">
       De <b>${nf(tot)} pessoas</b> que conversaram no período, o que aconteceu depois.
       A data de abertura usada é a de <b>habilitação na corretora</b> — a data de cadastro
@@ -6839,15 +6862,20 @@ async function sdrCarregarLista(){
 }
 
 /* =====================================================================
-   ANALISE DA REATIVACAO
+   REATIVACAO
 
-   Era uma lista de 187 linhas ordenada por contratos — e o topo era
-   justamente quem NAO interessa: os 39 marcados como inativo que nunca
-   estiveram parados. Ver quem ja voltou nao gera acao nenhuma.
+   A tela media com lupa 187 pessoas — as com etiqueta no RD. A base tem
+   5.280 parados. Medir bem a fatia errada e pior que nao medir: da a
+   impressao de que a operacao esta sob controle.
 
-   Virou analise: o funil com a perda em cada degrau, a comparacao entre
-   as pessoas na mesma regua, e quatro achados que viram lista exportavel.
-   A lista continua existindo — como saida, nao como a tela inteira.
+   REGUA DECIDIDA EM 01/09: acima de 90 dias parado, perdido. Sobram 557
+   na janela de trabalho. Os 2.794 acima disso viram base fria — sem
+   cobranca, mas a vista, porque decidir nao trabalhar nao e o mesmo que
+   nao saber que existem.
+
+   A PERGUNTA CENTRAL da tela nao e "qual a taxa de reativacao", e sim
+   "o esforco esta indo para onde tem chance?". Medindo: de 1.517 parados
+   contatados, 1.205 tinham parado ha mais de seis meses.
    ===================================================================== */
 async function sdrReativacao(){
   el("sdrConteudo").innerHTML='<div class="loading"><div class="spinner"></div>Analisando…</div>';
@@ -6857,75 +6885,71 @@ async function sdrReativacao(){
   ]);
   if(fu.error) return erro(fu.error,"sdrConteudo");
   const f = fu.data || {}, meses = te.data || [];
-
   const N = k => Number(f[k]||0);
   const pct = (a,b) => b ? Math.round(100*a/b) : 0;
 
-  // o funil: cada degrau sobre o anterior, com a perda dita em palavras
+  const esforcoTotal = N('esforco_janela') + N('esforco_fria');
+  const maxMes = Math.max(1, ...meses.map(m=>Number(m.reativados||0)));
+
   const degrau = (rot, val, base, cor, perda) => `
     <div class="sdr-degrau" style="padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.05)">
-      <div style="display:flex;align-items:baseline;gap:12px">
-        <span style="font-size:13px;font-weight:600;flex:0 0 190px">${rot}</span>
+      <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap">
+        <span style="font-size:13px;font-weight:600;flex:0 0 180px">${rot}</span>
         <span class="sdr-num" style="font-size:22px;font-weight:800;letter-spacing:-.5px;color:${cor}">${nf(val)}</span>
         <span style="font-size:12px;color:var(--text-faint)">${base?pct(val,base)+"% do degrau anterior":""}</span>
         <span style="flex:1"></span>
         ${perda?`<span class="sdr-perda" style="font-size:12px;color:var(--amber)">${perda}</span>`:""}
       </div>
       <div style="height:6px;background:var(--bg);border-radius:4px;margin-top:9px;overflow:hidden">
-        <div class="sdr-barra" style="height:100%;width:${N('tocados')?100*val/N('tocados'):0}%;background:${cor};border-radius:4px"></div>
+        <div class="sdr-barra" style="height:100%;width:${N('janela')?100*val/N('janela'):0}%;background:${cor};border-radius:4px"></div>
       </div>
     </div>`;
 
-  const maxMes = Math.max(1, ...meses.map(m=>Number(m.reativados||0)));
-
   el("sdrConteudo").innerHTML = `
-    <div class="panel" style="padding:16px 20px;margin-bottom:16px;display:flex;gap:34px;flex-wrap:wrap;align-items:center">
-      <div><div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px">Na carteira hoje</div>
-        <div style="font-size:24px;font-weight:800;letter-spacing:-.5px">${nf(N('na_carteira'))}</div></div>
-      <div><div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px">Nunca foram tocados</div>
-        <div style="font-size:24px;font-weight:800;letter-spacing:-.5px;color:${N('nunca_tocados')?'var(--red)':'var(--text-faint)'}">${nf(N('nunca_tocados'))}</div></div>
-      <div style="flex:1;min-width:220px;font-size:11.5px;color:var(--text-faint);line-height:1.6">
-        A carteira é <b>estado de hoje</b>, não evento do período — a etiqueta do RD diz que o
-        cliente foi atribuído, não quando. Por isso fica fora do funil abaixo.
-      </div>
+    ${sdrEtiqueta("a carteira de parados é o estado de hoje; a tendência mostra 2026 inteiro")}
+
+    <div class="note" style="border-left-color:var(--amber);margin-bottom:16px">
+      <b>${nf(N('total_parados'))} clientes pararam de operar há mais de 60 dias.</b>
+      A régua da casa considera perdido quem passa de <b>90 dias</b> — então
+      <b>${nf(N('janela'))}</b> estão na janela de trabalho e <b>${nf(N('fria'))}</b> viraram base fria.
     </div>
 
-    <div class="sec-title">O funil do período<span class="rule"></span></div>
+    <div class="sec-title">Para onde vai o esforço<span class="rule"></span></div>
     <div class="note" style="margin-bottom:14px">
-      Tudo ancorado na <b>conversa</b>, que tem data — os três degraus se conversam e as
-      taxas são verdadeiras. Se a queda maior está entre <b>tocados</b> e <b>estavam parados</b>,
-      a carteira está mal atribuída. Se está entre <b>estavam parados</b> e <b>voltaram</b>,
-      o contato acontece mas não converte.
-      <br><br><b>Só entra quem foi tocado há ${N('dias_maturacao')||30} dias ou mais.</b> Quem foi
-      tocado ontem ainda não teve tempo de voltar — contá-lo como fracasso seria avaliar a
-      semeadura três dias depois de plantar. Esses aparecem abaixo, em maturação.
+      Esta é a pergunta principal. Contato em quem parou há muito tempo raramente traz de
+      volta — o mesmo telefonema vale muito mais dentro da janela.
     </div>
-    <div class="panel" style="margin-bottom:22px">
-      ${degrau("Tocados no período", N('tocados'), 0, "var(--blue)", "")}
-      ${degrau("Estavam parados", N('estavam_parados'), N('tocados'), "var(--amber)",
-        N('mal_atribuidos') ? nf(N('mal_atribuidos')) + " não precisavam de reativação" : "")}
-      ${degrau("Voltaram a operar", N('voltaram'), N('estavam_parados'), "var(--green)",
-        N('sem_retorno') ? nf(N('sem_retorno')) + " falaram e não voltaram" : "")}
-      <div style="padding:13px 18px;font-size:12.5px;color:var(--text-dim)">
-        <b>${nf(N('contratos'))}</b> contratos recuperados${N('estavam_parados')?` · taxa de reativação de <b>${
-          Math.round(100*N('voltaram')/N('estavam_parados'))}%</b> sobre quem estava parado de fato`:""}.
+    <div class="panel" style="padding:18px 20px;margin-bottom:22px">
+      <div class="stack">
+        <div style="width:${esforcoTotal?100*N('esforco_janela')/esforcoTotal:0}%;background:var(--green)"></div>
+        <div style="width:${esforcoTotal?100*N('esforco_fria')/esforcoTotal:0}%;background:var(--text-faint)"></div>
+      </div>
+      <div class="stack-legend">
+        <span class="lg"><span class="sw" style="background:var(--green)"></span>Na janela · ${nf(N('esforco_janela'))}</span>
+        <span class="lg"><span class="sw" style="background:var(--text-faint)"></span>Base fria · ${nf(N('esforco_fria'))}</span>
+      </div>
+      <div class="stack-cap">
+        ${esforcoTotal
+          ? (N('esforco_fria') > N('esforco_janela')
+             ? `<b style="color:var(--amber)">${pct(N('esforco_fria'), esforcoTotal)}% dos contatos vão para quem já passou dos 90 dias.</b>
+                O esforço existe, mas mira quem tem menos chance de voltar.`
+             : `${pct(N('esforco_janela'), esforcoTotal)}% dos contatos vão para a janela de trabalho.`)
+          : "Nenhum contato registrado com clientes parados."}
       </div>
     </div>
 
-    ${N('em_maturacao') ? `
-    <div class="panel" style="padding:16px 20px;margin-bottom:22px;border-left:3px solid var(--blue)">
-      <div style="display:flex;gap:30px;flex-wrap:wrap;align-items:center">
-        <div><div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px">Em maturação</div>
-          <div style="font-size:24px;font-weight:800;letter-spacing:-.5px;color:var(--blue)">${nf(N('em_maturacao'))}</div>
-          <div style="font-size:11.5px;color:var(--text-faint)">${nf(N('maturacao_parados'))} estavam parados${
-            N('maturacao_voltou')?` · ${nf(N('maturacao_voltou'))} já voltaram`:""}</div></div>
-        <div style="flex:1;min-width:240px;font-size:12px;color:var(--text-dim);line-height:1.6">
-          Tocados nos últimos ${N('dias_maturacao')||30} dias. Ficam <b>fora da taxa</b> porque ainda
-          não tiveram tempo de voltar — entram no cálculo do período seguinte. Sem essa espera,
-          quem trabalha muito no fim do mês apareceria como fracasso.
-        </div>
+    <div class="sec-title">A janela de trabalho · até 90 dias parado<span class="rule"></span></div>
+    <div class="panel" style="margin-bottom:22px">
+      ${degrau("Parados na janela", N('janela'), 0, "var(--amber)",
+        N('janela_orfaos') ? nf(N('janela_orfaos')) + " sem dono e sem contato" : "")}
+      ${degrau("Atribuídos", N('janela_atribuidos'), N('janela'), "var(--purple)", "")}
+      ${degrau("Contatados", N('janela_tocados'), N('janela'), "var(--blue)", "")}
+      ${degrau("Voltaram a operar", N('janela_voltaram'), N('janela_tocados'), "var(--green)", "")}
+      <div style="padding:13px 18px;font-size:12.5px;color:var(--text-dim)">
+        Os <b>${nf(N('janela_orfaos'))}</b> sem dono operavam
+        <b>${nf(N('janela_contratos'))}</b> contratos antes de parar.
       </div>
-    </div>` : ""}
+    </div>
 
     ${meses.length ? `
     <div class="sec-title">Tendência<span class="rule"></span></div>
@@ -6937,27 +6961,23 @@ async function sdrReativacao(){
             <div class="as-serie-v">${nf(v)}</div>
             <div class="as-serie-barra"><span style="height:${Math.max(4,Math.round(100*v/maxMes))}%"></span></div>
             <div class="as-serie-m">${fmtMesAno(m.mes).slice(0,3)}</div>
-            <div class="as-serie-c">${nf(m.contratos)} ct</div>
+            <div class="as-serie-c">${nf(m.tocados||0)} tocados</div>
           </div>`;
         }).join("")}
       </div>
       <div style="font-size:11.5px;color:var(--text-faint);margin-top:16px;line-height:1.6">
-        Clientes que voltaram a operar em cada mês, e quantos contratos trouxeram.
-        Um mês com poucas voltas e muitos contratos vale mais que o contrário.
+        Clientes que voltaram a operar em cada mês de 2026, e quantos foram tocados.
       </div>
     </div>` : ""}
 
-    <div class="sec-title">O que fazer com isso<span class="rule"></span></div>
-    <div class="note" style="margin-bottom:14px">
-      Cada achado vira uma lista para trabalhar. Clique para ver quem são e exportar.
-    </div>
+    <div class="sec-title">Listas de trabalho<span class="rule"></span></div>
     <div class="radar-grid">
-      ${sdrCartaoAcao("nao_tocados", "Nunca foram tocados", N('nao_tocados'), "var(--red)",
-        "Estão na carteira e ninguém falou. É esforço que não saiu do lugar.")}
-      ${sdrCartaoAcao("sem_retorno", "Falaram e não voltaram", N('sem_retorno'), "var(--amber)",
-        "Houve conversa e o cliente seguiu parado. Merecem segunda tentativa.")}
-      ${sdrCartaoAcao("mal_atribuidos", "Não precisavam", N('mal_atribuidos'), "var(--purple)",
-        "Marcados como inativo e nunca estiveram parados. Carteira mal atribuída.")}
+      ${sdrCartaoAcao("janela", "Fila prioritária", N('janela_orfaos'), "var(--green)",
+        `Pararam há até 90 dias, sem dono, ninguém falou. É a fila que se cobra —
+         ${nf(N('janela_contratos'))} contratos parados aí.`)}
+      ${sdrCartaoAcao("fria", "Base fria", N('fria'), "var(--text-faint)",
+        `Acima de 90 dias parados. Fora da cobrança, mas à vista:
+         ${nf(N('fria_ate_180'))} pararam há menos de 6 meses e ainda podem responder a campanha.`)}
     </div>
 
     <div id="sdrAcaoLista" style="margin-top:18px"></div>`;
@@ -6974,64 +6994,60 @@ function sdrCartaoAcao(tipo, rot, val, cor, explica){
   </div>`;
 }
 
-const SDR_ACAO_ROT = {
-  nao_tocados:    ["Nunca foram tocados", "Última operação", "—"],
-  sem_retorno:    ["Falaram e não voltaram", "Última conversa", "Última operação"],
-  mal_atribuidos: ["Não precisavam de reativação", "Última operação", "Última conversa"],
-  nao_operaram:   ["Abriram conta e não operaram", "Abriu em", "Conversou em"]
+const SDR_FILA_ROT = {
+  janela: "Fila prioritária · pararam há até 90 dias, sem ninguém cuidando",
+  fria:   "Base fria · pararam há mais de 90 dias"
 };
 
 async function sdrVerAcao(tipo){
   sdrState.acao = tipo;
-  document.querySelectorAll(".rcard .tag").forEach(t=>t.remove());
   const alvo = el("sdrAcaoLista"); if(!alvo) return;
   alvo.innerHTML = '<div class="loading"><div class="spinner"></div>Carregando…</div>';
 
-  const {data,error} = await sb.rpc("sdr_acao",{p_tipo: tipo});
+  const {data,error} = await sb.rpc("sdr_fila",{p_tipo: tipo, p_limite: 1000});
   if(error) return erro(error,"sdrAcaoLista");
   const lista = data || [];
-  const rot = SDR_ACAO_ROT[tipo] || ["Lista","Referência","—"];
   if(!lista.length){
-    alvo.innerHTML = '<div class="empty">Ninguém neste grupo. Boa notícia.</div>';
+    alvo.innerHTML = '<div class="empty">Ninguém nesta fila. Boa notícia.</div>';
     return;
   }
+  window.__sdrFila = lista;
 
-  window.__sdrAcao = lista;
+  const ct = lista.reduce((a,x)=>a+Number(x.contratos_bmf||0),0);
   alvo.innerHTML = `
     <div style="display:flex;align-items:baseline;gap:14px;margin-bottom:10px;flex-wrap:wrap">
-      <div style="font-size:14px;font-weight:700">${rot[0]}</div>
-      <div style="font-size:12px;color:var(--text-faint)">${nf(lista.length)} cliente(s)</div>
+      <div style="font-size:14px;font-weight:700">${SDR_FILA_ROT[tipo]||"Lista"}</div>
+      <div style="font-size:12px;color:var(--text-faint)">${nf(lista.length)} cliente(s) · ${nf(ct)} contratos</div>
       <button class="btn-rd" onclick="sdrExportar('${tipo}')">Exportar para planilha</button>
     </div>
     <div class="panel"><table><thead><tr>
-      <th>Cliente</th><th>Barra</th><th>Assessor</th><th>Telefone</th>
-      <th>${rot[1]}</th><th>${rot[2]}</th><th>Contratos</th>
+      <th>Cliente</th><th>Barra</th><th>Telefone</th>
+      <th>Parou em</th><th>Há</th><th>Contratos</th><th>Última conversa</th>
     </tr></thead><tbody>
     ${lista.slice(0,200).map(x=>`<tr style="cursor:default">
       <td><div class="cell-name"><span class="mini-av">${ini(x.nome||"?")}</span>${x.nome||"—"}
         <span class="num" style="font-size:11px;color:var(--text-faint)">${x.sinacor||""}</span></div></td>
       <td class="num">${x.barra||"—"}</td>
-      <td class="num">${x.assessor||"—"}</td>
       <td class="num">${x.telefone||"—"}</td>
-      <td class="num">${x.referencia?fmtData(x.referencia):"—"}</td>
-      <td class="num">${x.segunda_data?fmtData(x.segunda_data):"—"}</td>
-      <td class="num">${Number(x.peso)>0?nf(x.peso):"—"}</td>
+      <td class="num">${x.data_ultima_operacao?fmtData(x.data_ultima_operacao):"—"}</td>
+      <td class="num"><span style="color:${x.dias_parado<=90?'var(--amber)':'var(--text-faint)'}">${nf(x.dias_parado)} dias</span></td>
+      <td class="num" style="font-weight:700">${Number(x.contratos_bmf)>0?nf(x.contratos_bmf):"—"}</td>
+      <td class="num">${x.ultima_conversa?fmtData(x.ultima_conversa):'<span style="color:var(--red)">nunca</span>'}</td>
     </tr>`).join("")}
     </tbody></table>
     ${lista.length>200?`<div style="padding:11px 16px;font-size:11px;color:var(--text-faint)">
-      Mostrando 200 de ${nf(lista.length)} · a exportação leva todos</div>`:""}
+      Mostrando 200 de ${nf(lista.length)} · a exportação leva todos · do maior volume para o menor</div>`:""}
     </div>`;
 }
 
 function sdrExportar(tipo){
-  const lista = window.__sdrAcao || [];
+  const lista = window.__sdrFila || [];
   if(!lista.length){ toast("Nada para exportar","",true); return; }
-  const rot = SDR_ACAO_ROT[tipo] || ["lista","referencia","segunda"];
   baixarCSV(
-    "sdr_" + tipo + "_" + hojeISO() + ".csv",
-    ["nome","sinacor","barra","assessor","telefone", rot[1], rot[2], "contratos","motivo"],
-    lista.map(x => [x.nome, x.sinacor, x.barra, x.assessor, x.telefone,
-                    x.referencia, x.segunda_data, x.peso, x.motivo]));
+    "reativacao_" + tipo + "_" + hojeISO() + ".csv",
+    ["nome","sinacor","barra","telefone","parou em","dias parado","contratos","ultima conversa"],
+    lista.map(x => [x.nome, x.sinacor, x.barra, x.telefone,
+                    x.data_ultima_operacao, x.dias_parado, x.contratos_bmf, x.ultima_conversa]));
 }
 
 /* Os leads que viraram cliente. */
@@ -7050,6 +7066,7 @@ async function sdrBoletados(){
   }
   const operaram = data.filter(x=>x.primeira_operacao).length;
   el("sdrConteudo").innerHTML = `
+    ${sdrEtiqueta("pela data em que a conta foi aberta")}
     <div class="note" style="margin-bottom:14px">
       Leads que <b>não estavam na base</b>, conversaram com alguém e abriram conta em até 4 dias.
       Dos ${nf(data.length)} aqui, <b>${nf(operaram)} chegaram a operar</b> — conta aberta que não
@@ -7085,4 +7102,3 @@ boot();
 </script>
 </body>
 </html>
-  
