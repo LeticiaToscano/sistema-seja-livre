@@ -6753,48 +6753,171 @@ async function sdrCarregarLista(){
       · da conversa mais recente para a mais antiga</div>`;
 }
 
-/* A carteira de inativos, cliente a cliente. */
+/* =====================================================================
+   ANALISE DA REATIVACAO
+
+   Era uma lista de 187 linhas ordenada por contratos — e o topo era
+   justamente quem NAO interessa: os 39 marcados como inativo que nunca
+   estiveram parados. Ver quem ja voltou nao gera acao nenhuma.
+
+   Virou analise: o funil com a perda em cada degrau, a comparacao entre
+   as pessoas na mesma regua, e quatro achados que viram lista exportavel.
+   A lista continua existindo — como saida, nao como a tela inteira.
+   ===================================================================== */
 async function sdrReativacao(){
-  el("sdrConteudo").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
-  const {data,error} = await sb.from("vw_sdr_reativacao")
-    .select("sinacor,nome,barra,assessor_responsavel,ultimo_contato,ultima_operacao,voltou_em,contratos_depois,situacao,atendimentos")
-    .not("assessor_responsavel","is",null)
-    .order("contratos_depois",{ascending:false,nullsFirst:false})
-    .limit(400);
-  if(error) return erro(error,"sdrConteudo");
-  if(!data || !data.length){
-    el("sdrConteudo").innerHTML='<div class="empty">Nenhum cliente marcado como inativo.</div>';
+  el("sdrConteudo").innerHTML='<div class="loading"><div class="spinner"></div>Analisando…</div>';
+  const [fu, te] = await Promise.all([
+    sb.rpc("sdr_funil",     {p_de: sdrState.de, p_ate: sdrState.ate}),
+    sb.rpc("sdr_tendencia", {p_meses: 6})
+  ]);
+  if(fu.error) return erro(fu.error,"sdrConteudo");
+  const f = fu.data || {}, meses = te.data || [];
+
+  const N = k => Number(f[k]||0);
+  const pct = (a,b) => b ? Math.round(100*a/b) : 0;
+
+  // o funil: cada degrau sobre o anterior, com a perda dita em palavras
+  const degrau = (rot, val, base, cor, perda) => `
+    <div style="padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.05)">
+      <div style="display:flex;align-items:baseline;gap:12px">
+        <span style="font-size:13px;font-weight:600;flex:0 0 190px">${rot}</span>
+        <span style="font-size:22px;font-weight:800;letter-spacing:-.5px;color:${cor}">${nf(val)}</span>
+        <span style="font-size:12px;color:var(--text-faint)">${base?pct(val,base)+"% do degrau anterior":""}</span>
+        <span style="flex:1"></span>
+        ${perda?`<span style="font-size:12px;color:var(--amber)">${perda}</span>`:""}
+      </div>
+      <div style="height:6px;background:var(--bg);border-radius:4px;margin-top:9px;overflow:hidden">
+        <div style="height:100%;width:${N('na_carteira')?100*val/N('na_carteira'):0}%;background:${cor};border-radius:4px"></div>
+      </div>
+    </div>`;
+
+  const maxMes = Math.max(1, ...meses.map(m=>Number(m.reativados||0)));
+
+  el("sdrConteudo").innerHTML = `
+    <div class="sec-title">O funil da reativação<span class="rule"></span></div>
+    <div class="note" style="margin-bottom:14px">
+      Onde a carteira se perde. Se a queda maior está entre <b>na carteira</b> e <b>tocados</b>,
+      o problema é falta de contato. Se está entre <b>estavam parados</b> e <b>voltaram</b>,
+      o contato acontece mas não converte — são problemas com soluções opostas.
+    </div>
+    <div class="panel" style="margin-bottom:22px">
+      ${degrau("Na carteira", N('na_carteira'), 0, "var(--text-dim)",
+        N('nao_tocados') ? nf(N('nao_tocados')) + " nunca foram tocados" : "")}
+      ${degrau("Tocados", N('tocados'), N('na_carteira'), "var(--blue)", "")}
+      ${degrau("Estavam parados", N('estavam_parados'), N('tocados'), "var(--amber)",
+        N('mal_atribuidos') ? nf(N('mal_atribuidos')) + " não precisavam de reativação" : "")}
+      ${degrau("Voltaram a operar", N('voltaram'), N('estavam_parados'), "var(--green)",
+        N('sem_retorno') ? nf(N('sem_retorno')) + " falaram e não voltaram" : "")}
+      <div style="padding:13px 18px;font-size:12.5px;color:var(--text-dim)">
+        <b>${nf(N('contratos'))}</b> contratos recuperados no período.
+      </div>
+    </div>
+
+    ${meses.length ? `
+    <div class="sec-title">Tendência<span class="rule"></span></div>
+    <div class="panel" style="padding:20px 22px;margin-bottom:22px">
+      <div class="as-serie">
+        ${meses.map(m=>{
+          const v = Number(m.reativados||0);
+          return `<div class="as-serie-col">
+            <div class="as-serie-v">${nf(v)}</div>
+            <div class="as-serie-barra"><span style="height:${Math.max(4,Math.round(100*v/maxMes))}%"></span></div>
+            <div class="as-serie-m">${fmtMesAno(m.mes).slice(0,3)}</div>
+            <div class="as-serie-c">${nf(m.contratos)} ct</div>
+          </div>`;
+        }).join("")}
+      </div>
+      <div style="font-size:11.5px;color:var(--text-faint);margin-top:16px;line-height:1.6">
+        Clientes que voltaram a operar em cada mês, e quantos contratos trouxeram.
+        Um mês com poucas voltas e muitos contratos vale mais que o contrário.
+      </div>
+    </div>` : ""}
+
+    <div class="sec-title">O que fazer com isso<span class="rule"></span></div>
+    <div class="note" style="margin-bottom:14px">
+      Cada achado vira uma lista para trabalhar. Clique para ver quem são e exportar.
+    </div>
+    <div class="radar-grid">
+      ${sdrCartaoAcao("nao_tocados", "Nunca foram tocados", N('nao_tocados'), "var(--red)",
+        "Estão na carteira e ninguém falou. É esforço que não saiu do lugar.")}
+      ${sdrCartaoAcao("sem_retorno", "Falaram e não voltaram", N('sem_retorno'), "var(--amber)",
+        "Houve conversa e o cliente seguiu parado. Merecem segunda tentativa.")}
+      ${sdrCartaoAcao("mal_atribuidos", "Não precisavam", N('mal_atribuidos'), "var(--purple)",
+        "Marcados como inativo e nunca estiveram parados. Carteira mal atribuída.")}
+    </div>
+
+    <div id="sdrAcaoLista" style="margin-top:18px"></div>`;
+
+  if(sdrState.acao) sdrVerAcao(sdrState.acao);
+}
+
+function sdrCartaoAcao(tipo, rot, val, cor, explica){
+  return `<div class="rcard" style="cursor:pointer" onclick="sdrVerAcao('${tipo}')">
+    <div class="rc-top"><span class="rc-name">${rot}</span>
+      ${sdrState.acao===tipo?'<span class="tag t-green">vendo</span>':''}</div>
+    <div class="rc-val" style="color:${cor}">${nf(val)}</div>
+    <div style="font-size:11.5px;color:var(--text-faint);margin-top:10px;line-height:1.5">${explica}</div>
+  </div>`;
+}
+
+const SDR_ACAO_ROT = {
+  nao_tocados:    ["Nunca foram tocados", "Última operação", "—"],
+  sem_retorno:    ["Falaram e não voltaram", "Última conversa", "Última operação"],
+  mal_atribuidos: ["Não precisavam de reativação", "Última operação", "Última conversa"],
+  nao_operaram:   ["Abriram conta e não operaram", "Abriu em", "Conversou em"]
+};
+
+async function sdrVerAcao(tipo){
+  sdrState.acao = tipo;
+  document.querySelectorAll(".rcard .tag").forEach(t=>t.remove());
+  const alvo = el("sdrAcaoLista"); if(!alvo) return;
+  alvo.innerHTML = '<div class="loading"><div class="spinner"></div>Carregando…</div>';
+
+  const {data,error} = await sb.rpc("sdr_acao",{p_tipo: tipo});
+  if(error) return erro(error,"sdrAcaoLista");
+  const lista = data || [];
+  const rot = SDR_ACAO_ROT[tipo] || ["Lista","Referência","—"];
+  if(!lista.length){
+    alvo.innerHTML = '<div class="empty">Ninguém neste grupo. Boa notícia.</div>';
     return;
   }
-  const cor = {
-    "reativado":"s-saudavel",
-    "tocado, ainda parado":"s-em_recuperacao",
-    "ja operava":"s-nunca_operou",
-    "nao tocado":"s-critico"
-  };
-  el("sdrConteudo").innerHTML = `
-    <div class="note" style="margin-bottom:14px">
-      <b>Reativado</b> exige as três coisas em ordem: estava sem operar há 30 dias, houve conversa,
-      e voltou a operar depois. <b>Já operava</b> é quem foi tocado mas não estava parado — não há
-      o que reativar. <b>Não tocado</b> é carteira em aberto.
+
+  window.__sdrAcao = lista;
+  alvo.innerHTML = `
+    <div style="display:flex;align-items:baseline;gap:14px;margin-bottom:10px;flex-wrap:wrap">
+      <div style="font-size:14px;font-weight:700">${rot[0]}</div>
+      <div style="font-size:12px;color:var(--text-faint)">${nf(lista.length)} cliente(s)</div>
+      <button class="btn-rd" onclick="sdrExportar('${tipo}')">Exportar para planilha</button>
     </div>
     <div class="panel"><table><thead><tr>
-      <th>Cliente</th><th>Barra</th><th>Assessor</th><th>Última conversa</th>
-      <th>Voltou em</th><th>Contratos depois</th><th>Situação</th>
+      <th>Cliente</th><th>Barra</th><th>Assessor</th><th>Telefone</th>
+      <th>${rot[1]}</th><th>${rot[2]}</th><th>Contratos</th>
     </tr></thead><tbody>
-    ${data.map(c=>`<tr style="cursor:default">
-      <td><div class="cell-name"><span class="mini-av">${ini(c.nome||"?")}</span>${c.nome||"—"}
-        <span class="num" style="font-size:11px;color:var(--text-faint)">${c.sinacor}</span></div></td>
-      <td class="num">${c.barra||"—"}</td>
-      <td class="num">${c.assessor_responsavel||"—"}</td>
-      <td class="num">${c.ultimo_contato?fmtData(c.ultimo_contato):'<span style="color:var(--red)">nunca</span>'}</td>
-      <td class="num">${c.voltou_em?fmtData(c.voltou_em):"—"}</td>
-      <td class="num" style="font-weight:${Number(c.contratos_depois)>0?"700":"400"}">${Number(c.contratos_depois)>0?nf(c.contratos_depois):"—"}</td>
-      <td><span class="status ${cor[c.situacao]||"s-nunca_operou"}">${c.situacao}</span></td>
+    ${lista.slice(0,200).map(x=>`<tr style="cursor:default">
+      <td><div class="cell-name"><span class="mini-av">${ini(x.nome||"?")}</span>${x.nome||"—"}
+        <span class="num" style="font-size:11px;color:var(--text-faint)">${x.sinacor||""}</span></div></td>
+      <td class="num">${x.barra||"—"}</td>
+      <td class="num">${x.assessor||"—"}</td>
+      <td class="num">${x.telefone||"—"}</td>
+      <td class="num">${x.referencia?fmtData(x.referencia):"—"}</td>
+      <td class="num">${x.segunda_data?fmtData(x.segunda_data):"—"}</td>
+      <td class="num">${Number(x.peso)>0?nf(x.peso):"—"}</td>
     </tr>`).join("")}
     </tbody></table>
-    <div style="padding:11px 16px;font-size:11px;color:var(--text-faint)">
-      ${nf(data.length)} cliente(s) · do maior volume recuperado para o menor</div></div>`;
+    ${lista.length>200?`<div style="padding:11px 16px;font-size:11px;color:var(--text-faint)">
+      Mostrando 200 de ${nf(lista.length)} · a exportação leva todos</div>`:""}
+    </div>`;
+}
+
+function sdrExportar(tipo){
+  const lista = window.__sdrAcao || [];
+  if(!lista.length){ toast("Nada para exportar","",true); return; }
+  const rot = SDR_ACAO_ROT[tipo] || ["lista","referencia","segunda"];
+  baixarCSV(
+    "sdr_" + tipo + "_" + hojeISO() + ".csv",
+    ["nome","sinacor","barra","assessor","telefone", rot[1], rot[2], "contratos","motivo"],
+    lista.map(x => [x.nome, x.sinacor, x.barra, x.assessor, x.telefone,
+                    x.referencia, x.segunda_data, x.peso, x.motivo]));
 }
 
 /* Os leads que viraram cliente. */
@@ -6848,3 +6971,4 @@ boot();
 </script>
 </body>
 </html>
+  
