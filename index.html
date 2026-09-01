@@ -6588,18 +6588,43 @@ function sdrPlacar(time){
     </tr>`).join("")}
     </tbody></table></div>
 
-    <div class="sec-title">Prospecção<span class="rule"></span></div>
-    <div class="panel"><table><thead><tr>
-      <th>Assessor</th><th>Pessoas tocadas</th><th>Conversas</th>
-      <th>Contas abertas</th><th>Operaram</th><th>Conversão</th><th>Dias até abrir</th>
+    <div class="sec-title">De onde vieram as conversas<span class="rule"></span></div>
+    <div class="note" style="margin-bottom:14px">
+      <b>Nós procuramos</b> é prospecção de verdade — o assessor puxou a conversa.
+      <b>Nos procuraram</b> é demanda que chegou: atender bem é trabalho, mas não é o mesmo
+      esforço. <b>Veio do bot</b> é automação. Medindo agosto no RD, a prospecção ativa era
+      só <b>9%</b> do total — somar tudo premiaria quem recebe mais mensagem, não quem prospecta.
+    </div>
+    <div class="panel" style="margin-bottom:22px"><table><thead><tr>
+      <th>Assessor</th><th>Nós procuramos</th><th>Nos procuraram</th><th>Veio do bot</th>
+      <th>Sem registro</th><th>Total tocado</th>
     </tr></thead><tbody>
     ${time.map(x=>`<tr style="cursor:default">
       <td><div class="cell-name"><span class="mini-av">${ini(x.assessor)}</span>${x.assessor}</div></td>
+      <td class="num" style="font-weight:700;color:var(--green)">${nf(x.nos_procuramos)}</td>
+      <td class="num">${nf(x.nos_procuraram)}</td>
+      <td class="num" style="color:var(--text-dim)">${nf(x.veio_do_bot)}</td>
+      <td class="num" style="color:var(--text-faint)">${nf(x.sem_registro)}</td>
       <td class="num">${nf(x.pessoas_tocadas)}</td>
-      <td class="num">${nf(x.conversas)}</td>
+    </tr>`).join("")}
+    </tbody></table>
+    <div style="padding:11px 16px;font-size:11px;color:var(--text-faint)">
+      "Sem registro" são atendimentos anteriores a setembro/2026, de antes de o RD passar a
+      guardar quem iniciou. Ficam à parte em vez de serem chutados para um dos lados.</div></div>
+
+    <div class="sec-title">Prospecção<span class="rule"></span></div>
+    <div class="panel"><table><thead><tr>
+      <th>Assessor</th><th>Nós procuramos</th><th>Total tocado</th>
+      <th>Contas abertas</th><th>Operaram</th><th>Conversão ativa</th><th>Conversão geral</th><th>Dias até abrir</th>
+    </tr></thead><tbody>
+    ${time.map(x=>`<tr style="cursor:default">
+      <td><div class="cell-name"><span class="mini-av">${ini(x.assessor)}</span>${x.assessor}</div></td>
+      <td class="num" style="font-weight:700">${nf(x.nos_procuramos)}</td>
+      <td class="num" style="color:var(--text-dim)">${nf(x.pessoas_tocadas)}</td>
       <td class="num" style="font-weight:700">${nf(x.contas_abertas)}</td>
       <td class="num">${nf(x.contas_que_operaram)}${x.contas_abertas>0?` <span style="color:var(--text-faint);font-size:11px">de ${nf(x.contas_abertas)}</span>`:""}</td>
-      <td class="num"><span style="font-weight:700">${x.conversao_pct==null?"—":x.conversao_pct+"%"}</span></td>
+      <td class="num"><span style="font-weight:700;color:var(--green)">${x.conversao_ativa_pct==null?"—":x.conversao_ativa_pct+"%"}</span></td>
+      <td class="num" style="color:var(--text-dim)">${x.conversao_pct==null?"—":x.conversao_pct+"%"}</td>
       <td class="num">${x.media_dias_ate_abrir==null?"—":x.media_dias_ate_abrir}</td>
     </tr>`).join("")}
     </tbody></table>
@@ -6823,5 +6848,3 @@ boot();
 </script>
 </body>
 </html>
-
-  
