@@ -6486,7 +6486,7 @@ function pbListaHTML(){
    As reguas estao escritas na tela, e nao so no codigo, porque numero
    que vira bonus precisa poder ser conferido por quem e medido.
    ===================================================================== */
-let sdrState = {de:null, ate:null, aba:"placar"};
+let sdrState = {de:null, ate:null, aba:"controle", grupo:"ainda_nao_abriu"};
 
 async function vSDR(){
   el("content").innerHTML='<div class="loading"><div class="spinner"></div>Calculando…</div>';
@@ -6502,6 +6502,7 @@ async function vSDR(){
 
   el("content").innerHTML = `
     <div class="sol-tabs">
+      <button class="sol-tab ${sdrState.aba==="controle"?"on":""}"   onclick="sdrAba('controle')">Controle geral</button>
       <button class="sol-tab ${sdrState.aba==="placar"?"on":""}"     onclick="sdrAba('placar')">Placar</button>
       <button class="sol-tab ${sdrState.aba==="reativacao"?"on":""}" onclick="sdrAba('reativacao')">Reativação</button>
       <button class="sol-tab ${sdrState.aba==="boletados"?"on":""}"  onclick="sdrAba('boletados')">Boletados</button>
@@ -6536,7 +6537,8 @@ async function vSDR(){
 
     <div id="sdrConteudo"></div>`;
 
-  if(sdrState.aba === "placar")          sdrPlacar(time);
+  if(sdrState.aba === "controle")        sdrControle();
+  else if(sdrState.aba === "placar")     sdrPlacar(time);
   else if(sdrState.aba === "reativacao") sdrReativacao();
   else                                    sdrBoletados();
 }
@@ -6565,10 +6567,7 @@ function sdrPlacar(time){
       mais gente pode recuperar menos contratos. Vale olhar as duas colunas antes de decidir bônus.
     </div>
 
-      <div class="sec-title">Reativação de inativos
-      <span class="tag t-green" style="font-size:10.5px"
-        title="Este bloco não respeita o período escolhido acima — a reativação é sempre calculada sobre os últimos 90 dias">últimos 90 dias</span>
-      <span class="rule"></span></div>
+    <div class="sec-title">Reativação de inativos<span class="rule"></span></div>
     <div class="panel" style="margin-bottom:22px"><table><thead><tr>
       <th>Assessor</th><th>Na carteira</th><th>Tocados</th><th>Cobertura</th>
       <th>Estavam parados</th><th>Voltaram</th><th>Taxa</th><th>Contratos recuperados</th>
@@ -6604,6 +6603,125 @@ function sdrPlacar(time){
       Conta aberta só entra aqui se a pessoa <b>já era lead antes da conversa</b>, conversou
       <b>antes</b> de abrir, e a conta saiu em até <b>4 dias</b>. O crédito é de quem falou por último.
     </div></div>`;
+}
+
+/* =====================================================================
+   CONTROLE GERAL — de quem conversou, quem virou cliente e quem nao
+
+   A pergunta parece simples e tem uma armadilha: a `data_cadastro` nao
+   servia como marco de abertura. 1.343 clientes tinham 26/05/2025 (carga
+   historica) e 1.316 nao tinham data nenhuma — medir "abriu depois da
+   conversa" com ela dava ZERO, o que nao era verdade, era data errada.
+
+   A conta usa a data de HABILITACAO, que vem do Diversificador e e a data
+   real de abertura na corretora. Com ela, os 155 aparecem.
+   ===================================================================== */
+async function sdrControle(){
+  el("sdrConteudo").innerHTML='<div class="loading"><div class="spinner"></div>Calculando…</div>';
+  const {data,error} = await sb.rpc("sdr_controle", {p_de: sdrState.de, p_ate: sdrState.ate});
+  if(error) return erro(error,"sdrConteudo");
+  const r = data || {};
+  const tot = Number(r.conversaram||0);
+  const pct = n => tot ? ((100*Number(n||0)/tot).toFixed(1)) + "%" : "—";
+
+  const grupo = (chave, rot, val, cor, explica) => `
+    <div class="rcard" style="cursor:pointer" onclick="sdrGrupo('${chave}')">
+      <div class="rc-top">
+        <span class="rc-name">${rot}</span>
+        ${sdrState.grupo===chave?'<span class="tag t-green">vendo</span>':''}
+      </div>
+      <div class="rc-val" style="color:${cor}">${nf(val)}</div>
+      <div class="rc-pct">${pct(val)} de quem conversou</div>
+      <div class="rc-bar"><div class="rc-fill" style="width:${tot?100*val/tot:0}%;background:${cor}"></div></div>
+      <div style="font-size:11.5px;color:var(--text-faint);margin-top:10px;line-height:1.5">${explica}</div>
+    </div>`;
+
+  el("sdrConteudo").innerHTML = `
+    <div class="note" style="margin-bottom:16px">
+      De <b>${nf(tot)} pessoas</b> que conversaram no período, o que aconteceu depois.
+      A data de abertura usada é a de <b>habilitação na corretora</b> — a data de cadastro
+      no CRM não serve, porque milhares vieram de carga histórica com a mesma data.
+    </div>
+
+    <div class="radar-grid">
+      ${grupo("ainda_nao_abriu", "Ainda não abriram", r.ainda_nao_abriu, "var(--amber)",
+        `O estoque quente. <b>${nf(r.falaram_semana||0)}</b> falaram na última semana e
+         <b>${nf(r.insistiram||0)}</b> voltaram a falar mais de uma vez.`)}
+      ${grupo("abriu_depois", "Abriram conta depois", r.abriu_depois, "var(--green)",
+        `Conversaram e a conta foi habilitada em seguida.
+         <b>${nf(r.abriu_ate_4_dias||0)}</b> em até 4 dias — quando converte, converte rápido.`)}
+      ${grupo("ja_era_cliente", "Já eram clientes", r.ja_era_cliente, "var(--text-dim)",
+        "A conversa foi atendimento, não prospecção. É a maior parte do volume.")}
+    </div>
+
+    ${Number(r.cliente_sem_data||0) > 0 ? `
+      <div class="note" style="border-left-color:var(--text-faint);margin-bottom:14px;font-size:12px">
+        ${nf(r.cliente_sem_data)} são clientes sem data de habilitação — não constam no
+        Diversificador, então ficam fora da classificação acima.
+      </div>` : ""}
+
+    <div class="sec-title" id="sdrLista">Quem são<span class="rule"></span></div>
+    <div class="panel" id="sdrListaTab"><div class="loading"><div class="spinner"></div>Carregando…</div></div>`;
+
+  sdrCarregarLista();
+}
+
+function sdrGrupo(g){
+  sdrState.grupo = g;
+  sdrControle();
+}
+
+async function sdrCarregarLista(){
+  const alvo = el("sdrListaTab"); if(!alvo) return;
+  const {data,error} = await sb.rpc("sdr_controle_lista",
+    {p_grupo: sdrState.grupo, p_de: sdrState.de, p_ate: sdrState.ate});
+  if(error) return erro(error,"sdrListaTab");
+  const lista = data || [];
+  if(!lista.length){ alvo.innerHTML='<div class="empty">Ninguém neste grupo.</div>'; return; }
+
+  const abriu   = sdrState.grupo === "abriu_depois";
+  const pendente= sdrState.grupo === "ainda_nao_abriu";
+
+  alvo.innerHTML = `<table><thead><tr>
+      <th>Pessoa</th><th>Telefone</th><th>Falou com</th>
+      <th>Primeira conversa</th><th>Última</th><th>Conversas</th>
+      ${abriu?"<th>Habilitou em</th><th>Dias</th><th>Operou</th>"
+             :pendente?"<th>Parceiro</th><th>Há quanto tempo</th>"
+             :"<th>Barra</th><th>Cliente desde</th>"}
+    </tr></thead><tbody>
+    ${lista.map(x=>{
+      const nome = x.nome_cliente || x.nome_no_rd || "(sem nome)";
+      const dias = x.data_habilitacao && x.primeira_conversa
+        ? Math.round((new Date(x.data_habilitacao) - new Date(x.primeira_conversa))/86400000) : null;
+      const desdeUltima = x.ultima_conversa
+        ? Math.round((Date.now() - new Date(x.ultima_conversa+"T00:00:00"))/86400000) : null;
+      return `<tr style="cursor:default">
+        <td><div class="cell-name"><span class="mini-av">${ini(nome)}</span>${nome}
+          ${x.sinacor?`<span class="num" style="font-size:11px;color:var(--text-faint)">${x.sinacor}</span>`:""}
+          ${x.conversas>2?'<span class="tag t-amber" style="font-size:10px">insistiu</span>':""}</div></td>
+        <td class="num">${x.telefone_rd||"—"}</td>
+        <td class="num">${x.assessor||"—"}</td>
+        <td class="num">${fmtData(x.primeira_conversa)}</td>
+        <td class="num">${fmtData(x.ultima_conversa)}</td>
+        <td class="num" style="font-weight:${x.conversas>1?"700":"400"}">${nf(x.conversas)}</td>
+        ${abriu
+          ? `<td class="num">${fmtData(x.data_habilitacao)}</td>
+             <td class="num"><span style="color:${dias<=4?'var(--green)':'var(--text-dim)'}">${dias==null?"—":dias}</span></td>
+             <td>${x.primeira_operacao
+                   ? `<span class="status s-saudavel">${fmtData(x.primeira_operacao)}</span>`
+                   : '<span class="status s-critico">não operou</span>'}</td>`
+          : pendente
+          ? `<td class="num">${x.parceiro||"—"}</td>
+             <td class="num"><span style="color:${desdeUltima<=7?'var(--green)':desdeUltima<=15?'var(--amber)':'var(--text-faint)'}">${
+                desdeUltima==null?"—":desdeUltima===0?"hoje":nf(desdeUltima)+" dias"}</span></td>`
+          : `<td class="num">${x.barra||"—"}</td>
+             <td class="num">${fmtData(x.data_habilitacao)}</td>`}
+      </tr>`;
+    }).join("")}
+    </tbody></table>
+    <div style="padding:11px 16px;font-size:11px;color:var(--text-faint)">
+      ${nf(lista.length)} pessoa(s)${lista.length===500?" · mostrando as 500 mais recentes":""}
+      · da conversa mais recente para a mais antiga</div>`;
 }
 
 /* A carteira de inativos, cliente a cliente. */
