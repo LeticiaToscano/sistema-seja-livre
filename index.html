@@ -753,6 +753,14 @@
     50%    { transform:scale(1.1); opacity:.6 }
   }
 
+  /* sdr: a linha subindo — e exatamente o que a aba mede */
+  .nav-item[data-view="sdr"]:hover svg,
+  .nav-item[data-view="sdr"].active svg{ animation:gSobe 2.4s ease-in-out infinite }
+  @keyframes gSobe{
+    0%,100%{ transform:translate(0,0) }
+    45%    { transform:translate(1px,-3px) }
+  }
+
   /* quem prefere menos movimento nao ve nenhum */
   @media (prefers-reduced-motion:reduce){
     .nav-item svg{ animation:none !important }
@@ -888,6 +896,83 @@
     transition:.15s;
   }
   .as-mud-b:hover{ color:var(--text); border-color:var(--border-strong) }
+
+  /* ---------------------------------------------------------------
+     SDR — o movimento conta a historia, nao decora.
+
+     O FUNIL: cada degrau entra depois do anterior, de cima para baixo, e
+     a barra cresce da esquerda. Ver a barra encurtando degrau a degrau E
+     a propria perda — o olho entende antes de ler o numero.
+
+     A TENDENCIA: as colunas sobem do chao, da esquerda para a direita,
+     como o tempo passa.
+
+     Nada disso repete. Animacao que fica piscando vira ruido; esta
+     acontece uma vez, quando o dado chega, e para.
+  --------------------------------------------------------------- */
+  .sdr-degrau{ opacity:0; animation:sdrEntra .45s cubic-bezier(.2,.7,.3,1) forwards }
+  .sdr-degrau:nth-child(1){ animation-delay:.05s }
+  .sdr-degrau:nth-child(2){ animation-delay:.20s }
+  .sdr-degrau:nth-child(3){ animation-delay:.35s }
+  .sdr-degrau:nth-child(4){ animation-delay:.50s }
+  .sdr-degrau:nth-child(5){ animation-delay:.65s }
+  @keyframes sdrEntra{
+    from{ opacity:0; transform:translateY(-9px) }
+    to  { opacity:1; transform:none }
+  }
+
+  .sdr-barra{ transform-origin:left center; transform:scaleX(0);
+    animation:sdrCresce .7s cubic-bezier(.2,.7,.3,1) forwards }
+  .sdr-degrau:nth-child(1) .sdr-barra{ animation-delay:.20s }
+  .sdr-degrau:nth-child(2) .sdr-barra{ animation-delay:.35s }
+  .sdr-degrau:nth-child(3) .sdr-barra{ animation-delay:.50s }
+  .sdr-degrau:nth-child(4) .sdr-barra{ animation-delay:.65s }
+  @keyframes sdrCresce{ to{ transform:scaleX(1) } }
+
+  .sdr-num{ opacity:0; animation:sdrNum .5s ease-out forwards }
+  .sdr-degrau:nth-child(1) .sdr-num{ animation-delay:.22s }
+  .sdr-degrau:nth-child(2) .sdr-num{ animation-delay:.37s }
+  .sdr-degrau:nth-child(3) .sdr-num{ animation-delay:.52s }
+  .sdr-degrau:nth-child(4) .sdr-num{ animation-delay:.67s }
+  @keyframes sdrNum{
+    from{ opacity:0; transform:translateX(-6px) scale(.9) }
+    to  { opacity:1; transform:none }
+  }
+
+  /* a perda entra por ultimo e mais devagar: e a leitura, nao o dado */
+  .sdr-perda{ opacity:0; animation:sdrPerda .6s ease-out forwards .9s }
+  @keyframes sdrPerda{ from{opacity:0} to{opacity:.95} }
+
+  .sdr-col span{ transform-origin:bottom; transform:scaleY(0);
+    animation:sdrSobe .55s cubic-bezier(.2,.7,.3,1) forwards }
+  .sdr-col:nth-child(1) span{ animation-delay:.10s }
+  .sdr-col:nth-child(2) span{ animation-delay:.18s }
+  .sdr-col:nth-child(3) span{ animation-delay:.26s }
+  .sdr-col:nth-child(4) span{ animation-delay:.34s }
+  .sdr-col:nth-child(5) span{ animation-delay:.42s }
+  .sdr-col:nth-child(6) span{ animation-delay:.50s }
+  @keyframes sdrSobe{ to{ transform:scaleY(1) } }
+
+  .sdr-cartao{ opacity:0; animation:sdrEntra .5s ease-out forwards;
+    transition:transform .2s, border-color .2s }
+  .sdr-cartao:nth-child(1){ animation-delay:.06s }
+  .sdr-cartao:nth-child(2){ animation-delay:.14s }
+  .sdr-cartao:nth-child(3){ animation-delay:.22s }
+  .sdr-cartao:hover{ transform:translateY(-3px); border-color:var(--border-strong) }
+
+  /* o cartao escolhido pulsa uma vez, confirmando o clique */
+  .sdr-cartao.escolhido{ animation:sdrEscolhe .45s ease-out }
+  @keyframes sdrEscolhe{
+    0%  { transform:scale(1) }
+    40% { transform:scale(1.025) }
+    100%{ transform:scale(1) }
+  }
+
+  @media (prefers-reduced-motion:reduce){
+    .sdr-degrau,.sdr-barra,.sdr-num,.sdr-perda,.sdr-col span,.sdr-cartao{
+      animation:none !important; opacity:1 !important; transform:none !important;
+    }
+  }
 </style>
 <!-- leitor de Excel: a planilha de custos vem em .xlsx, e converter para
      CSV todo mês seria um passo a mais sem motivo -->
@@ -6778,40 +6863,69 @@ async function sdrReativacao(){
 
   // o funil: cada degrau sobre o anterior, com a perda dita em palavras
   const degrau = (rot, val, base, cor, perda) => `
-    <div style="padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.05)">
+    <div class="sdr-degrau" style="padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.05)">
       <div style="display:flex;align-items:baseline;gap:12px">
         <span style="font-size:13px;font-weight:600;flex:0 0 190px">${rot}</span>
-        <span style="font-size:22px;font-weight:800;letter-spacing:-.5px;color:${cor}">${nf(val)}</span>
+        <span class="sdr-num" style="font-size:22px;font-weight:800;letter-spacing:-.5px;color:${cor}">${nf(val)}</span>
         <span style="font-size:12px;color:var(--text-faint)">${base?pct(val,base)+"% do degrau anterior":""}</span>
         <span style="flex:1"></span>
-        ${perda?`<span style="font-size:12px;color:var(--amber)">${perda}</span>`:""}
+        ${perda?`<span class="sdr-perda" style="font-size:12px;color:var(--amber)">${perda}</span>`:""}
       </div>
       <div style="height:6px;background:var(--bg);border-radius:4px;margin-top:9px;overflow:hidden">
-        <div style="height:100%;width:${N('na_carteira')?100*val/N('na_carteira'):0}%;background:${cor};border-radius:4px"></div>
+        <div class="sdr-barra" style="height:100%;width:${N('tocados')?100*val/N('tocados'):0}%;background:${cor};border-radius:4px"></div>
       </div>
     </div>`;
 
   const maxMes = Math.max(1, ...meses.map(m=>Number(m.reativados||0)));
 
   el("sdrConteudo").innerHTML = `
-    <div class="sec-title">O funil da reativação<span class="rule"></span></div>
+    <div class="panel" style="padding:16px 20px;margin-bottom:16px;display:flex;gap:34px;flex-wrap:wrap;align-items:center">
+      <div><div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px">Na carteira hoje</div>
+        <div style="font-size:24px;font-weight:800;letter-spacing:-.5px">${nf(N('na_carteira'))}</div></div>
+      <div><div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px">Nunca foram tocados</div>
+        <div style="font-size:24px;font-weight:800;letter-spacing:-.5px;color:${N('nunca_tocados')?'var(--red)':'var(--text-faint)'}">${nf(N('nunca_tocados'))}</div></div>
+      <div style="flex:1;min-width:220px;font-size:11.5px;color:var(--text-faint);line-height:1.6">
+        A carteira é <b>estado de hoje</b>, não evento do período — a etiqueta do RD diz que o
+        cliente foi atribuído, não quando. Por isso fica fora do funil abaixo.
+      </div>
+    </div>
+
+    <div class="sec-title">O funil do período<span class="rule"></span></div>
     <div class="note" style="margin-bottom:14px">
-      Onde a carteira se perde. Se a queda maior está entre <b>na carteira</b> e <b>tocados</b>,
-      o problema é falta de contato. Se está entre <b>estavam parados</b> e <b>voltaram</b>,
-      o contato acontece mas não converte — são problemas com soluções opostas.
+      Tudo ancorado na <b>conversa</b>, que tem data — os três degraus se conversam e as
+      taxas são verdadeiras. Se a queda maior está entre <b>tocados</b> e <b>estavam parados</b>,
+      a carteira está mal atribuída. Se está entre <b>estavam parados</b> e <b>voltaram</b>,
+      o contato acontece mas não converte.
+      <br><br><b>Só entra quem foi tocado há ${N('dias_maturacao')||30} dias ou mais.</b> Quem foi
+      tocado ontem ainda não teve tempo de voltar — contá-lo como fracasso seria avaliar a
+      semeadura três dias depois de plantar. Esses aparecem abaixo, em maturação.
     </div>
     <div class="panel" style="margin-bottom:22px">
-      ${degrau("Na carteira", N('na_carteira'), 0, "var(--text-dim)",
-        N('nao_tocados') ? nf(N('nao_tocados')) + " nunca foram tocados" : "")}
-      ${degrau("Tocados", N('tocados'), N('na_carteira'), "var(--blue)", "")}
+      ${degrau("Tocados no período", N('tocados'), 0, "var(--blue)", "")}
       ${degrau("Estavam parados", N('estavam_parados'), N('tocados'), "var(--amber)",
         N('mal_atribuidos') ? nf(N('mal_atribuidos')) + " não precisavam de reativação" : "")}
       ${degrau("Voltaram a operar", N('voltaram'), N('estavam_parados'), "var(--green)",
         N('sem_retorno') ? nf(N('sem_retorno')) + " falaram e não voltaram" : "")}
       <div style="padding:13px 18px;font-size:12.5px;color:var(--text-dim)">
-        <b>${nf(N('contratos'))}</b> contratos recuperados no período.
+        <b>${nf(N('contratos'))}</b> contratos recuperados${N('estavam_parados')?` · taxa de reativação de <b>${
+          Math.round(100*N('voltaram')/N('estavam_parados'))}%</b> sobre quem estava parado de fato`:""}.
       </div>
     </div>
+
+    ${N('em_maturacao') ? `
+    <div class="panel" style="padding:16px 20px;margin-bottom:22px;border-left:3px solid var(--blue)">
+      <div style="display:flex;gap:30px;flex-wrap:wrap;align-items:center">
+        <div><div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px">Em maturação</div>
+          <div style="font-size:24px;font-weight:800;letter-spacing:-.5px;color:var(--blue)">${nf(N('em_maturacao'))}</div>
+          <div style="font-size:11.5px;color:var(--text-faint)">${nf(N('maturacao_parados'))} estavam parados${
+            N('maturacao_voltou')?` · ${nf(N('maturacao_voltou'))} já voltaram`:""}</div></div>
+        <div style="flex:1;min-width:240px;font-size:12px;color:var(--text-dim);line-height:1.6">
+          Tocados nos últimos ${N('dias_maturacao')||30} dias. Ficam <b>fora da taxa</b> porque ainda
+          não tiveram tempo de voltar — entram no cálculo do período seguinte. Sem essa espera,
+          quem trabalha muito no fim do mês apareceria como fracasso.
+        </div>
+      </div>
+    </div>` : ""}
 
     ${meses.length ? `
     <div class="sec-title">Tendência<span class="rule"></span></div>
@@ -6819,7 +6933,7 @@ async function sdrReativacao(){
       <div class="as-serie">
         ${meses.map(m=>{
           const v = Number(m.reativados||0);
-          return `<div class="as-serie-col">
+          return `<div class="as-serie-col sdr-col">
             <div class="as-serie-v">${nf(v)}</div>
             <div class="as-serie-barra"><span style="height:${Math.max(4,Math.round(100*v/maxMes))}%"></span></div>
             <div class="as-serie-m">${fmtMesAno(m.mes).slice(0,3)}</div>
@@ -6852,7 +6966,7 @@ async function sdrReativacao(){
 }
 
 function sdrCartaoAcao(tipo, rot, val, cor, explica){
-  return `<div class="rcard" style="cursor:pointer" onclick="sdrVerAcao('${tipo}')">
+  return `<div class="rcard sdr-cartao${sdrState.acao===tipo?" escolhido":""}" style="cursor:pointer" onclick="sdrVerAcao('${tipo}')">
     <div class="rc-top"><span class="rc-name">${rot}</span>
       ${sdrState.acao===tipo?'<span class="tag t-green">vendo</span>':''}</div>
     <div class="rc-val" style="color:${cor}">${nf(val)}</div>
