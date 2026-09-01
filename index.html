@@ -2614,7 +2614,7 @@ async function asDesenhar(){
   el("pageTitle").textContent = asF.assessor;
   el("content").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
 
-  const [q, p, d, b, cli, pat, pes, res] = await Promise.all([
+  const [q, p, d, b, cli, pat, pes, res, cab] = await Promise.all([
     sb.from("vw_assessores").select("*").eq("assessor", asF.assessor).maybeSingle(),
     sb.rpc("fn_placar_assessor",{p_assessor: asF.assessor, p_de: asF.de, p_ate: asF.ate}),
     asModelo === "carteira"
@@ -2633,11 +2633,13 @@ async function asDesenhar(){
     // 60 pessoais nunca apareciam, e o filtro de origem sumia
     sb.from("carteira_pessoal").select("sinacor",{count:"exact",head:true})
       .eq("assessor", asF.assessor),
-    sb.rpc("fn_resumo_assessor",{p_assessor: asF.assessor, p_de: asF.de, p_ate: asF.ate})
+    sb.rpc("fn_resumo_assessor",{p_assessor: asF.assessor, p_de: asF.de, p_ate: asF.ate}),
+    sb.rpc("fn_cabecalho_assessor",{p_assessor: asF.assessor, p_de: asF.de, p_ate: asF.ate})
   ]);
   if(cli.error) return erro(cli.error,"content");
 
   const a = q.data || {}, pl = (p.data && p.data[0]) || {}, lista = cli.data || [];
+  const cb = cab.data || {};
   const r = (res.data && res.data[0]) || {};
   const pessoais = pes.count || 0;
 
@@ -2649,7 +2651,7 @@ async function asDesenhar(){
       ${asSelPeriodo()}
     </div>
 
-    ${asModelo === "carteira" ? asCabecalho(a, r) : asCabecalhoFila(a)}
+    ${asModelo === "carteira" ? asCabecalho(a, r) : asCabecalhoFila(a, cb)}
     ${asModelo === "carteira" ? asPatrimonio(pat.data) + asSerie(pat.data) : ""}
     ${asPlacar(pl)}
     ${asDiagnostico(d.data)}
@@ -2674,22 +2676,37 @@ async function asDesenhar(){
 
 /** O cabecalho de quem trabalha na fila: o que ele atendeu e o que
  *  sobrou para tratar. E como sempre foi. */
-function asCabecalhoFila(a){
+/* O cabecalho respeita o periodo escolhido. Antes lia da `vw_assessores`,
+   que nao tem parametro de data — o seletor dizia "ultimos 7 dias" e o
+   numero mostrava o historico inteiro. Duas reguas na mesma tela, e
+   nenhuma avisando qual era qual.
+
+   "Atende desde" e o ultimo atendimento seguem acumulados: sao datas
+   fixas, filtrar nao faria sentido. A tela diz isso embaixo de cada um. */
+function asCabecalhoFila(a, cb){
+  cb = cb || {};
+  const rot = (asF.de || asF.ate) ? "no período" : "em todo o tempo";
   return `<div class="panel" style="padding:20px 22px;margin-bottom:16px;
       display:flex;gap:34px;flex-wrap:wrap;align-items:center">
     <span class="as-av" style="width:52px;height:52px;font-size:17px;flex:0 0 52px">${ini(a.assessor||"")}</span>
     <div><div class="as-rot">clientes atendidos</div>
-      <div style="font-size:26px;font-weight:300;letter-spacing:-1px">${nf(a.clientes||0)}</div></div>
-    <div><div class="as-rot">atendimentos no mês</div>
-      <div style="font-size:26px;font-weight:300;letter-spacing:-1px">${nf(a.atendimentos_30d||0)}</div></div>
-    <div><div class="as-rot">na semana</div>
-      <div style="font-size:26px;font-weight:300;letter-spacing:-1px">${nf(a.clientes_7d||0)}</div></div>
+      <div style="font-size:26px;font-weight:300;letter-spacing:-1px">${nf(cb.clientes||0)}</div>
+      <div style="font-size:11px;color:var(--text-faint)">${rot}</div></div>
+    <div><div class="as-rot">conversas</div>
+      <div style="font-size:26px;font-weight:300;letter-spacing:-1px">${nf(cb.conversas||0)}</div>
+      <div style="font-size:11px;color:var(--text-faint)">${rot}</div></div>
+    <div><div class="as-rot">ele procurou</div>
+      <div style="font-size:26px;font-weight:300;letter-spacing:-1px;color:${
+        Number(cb.nos_procuramos)?'var(--green)':'var(--text-faint)'}">${nf(cb.nos_procuramos||0)}</div>
+      <div style="font-size:11px;color:var(--text-faint)">${nf(cb.nos_procuraram||0)} procuraram ele</div></div>
     <div><div class="as-rot">fila no diagnóstico</div>
       <div style="font-size:26px;font-weight:300;letter-spacing:-1px;color:${
-        a.no_diagnostico?'var(--amber)':'var(--text-faint)'}">${nf(a.no_diagnostico||0)}</div></div>
+        a.no_diagnostico?'var(--amber)':'var(--text-faint)'}">${nf(a.no_diagnostico||0)}</div>
+      <div style="font-size:11px;color:var(--text-faint)">estado de hoje</div></div>
     <div><div class="as-rot">atende desde</div>
-      <div style="font-size:17px;font-weight:600">${a.primeiro?fmtData(a.primeiro):"—"}</div>
-      <div style="font-size:11px;color:var(--text-faint)">último em ${a.ultimo?fmtData(a.ultimo):"—"}</div></div>
+      <div style="font-size:17px;font-weight:600">${cb.primeiro?fmtData(cb.primeiro):(a.primeiro?fmtData(a.primeiro):"—")}</div>
+      <div style="font-size:11px;color:var(--text-faint)">último em ${
+        cb.ultimo?fmtData(cb.ultimo):(a.ultimo?fmtData(a.ultimo):"—")} · ${nf(cb.clientes_total||0)} clientes no total</div></div>
   </div>`;
 }
 
