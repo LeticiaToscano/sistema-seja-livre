@@ -6168,13 +6168,42 @@ async function marcarTratativa(sinacor, chave, venc, status, btn){
     wrap.querySelectorAll(".tr-btn").forEach(b=>b.classList.remove("on"));
     if(desfazer) btn.classList.add("on");
     toast("Não foi possível salvar a marcação.");
+    return;
+  }
+  // Marcou dentro da ficha: o titulo muda de grupo, entao a ficha se
+  // redesenha e ele aparece na aba certa. Fora da ficha (na lista), a
+  // linha fica onde esta — quem esta conferindo nao perde o lugar.
+  if(document.getElementById("drBody") && btn.closest("#drBody") && vencFichaSinacor){
+    const destino = desfazer ? "aplicados" : status;
+    abrirVencCliente(vencFichaSinacor, true).then(()=>vencFichaTrocar(destino));
   }
 }
 
 // ---- clique no nome: tudo sobre os vencimentos daquele cliente ----
-const VENC_SIT = {atual:"em carteira", a_vencer:"vence em 30 dias", vencido:"vencido", encerrado:"encerrado"};
+// O selo do titulo fala da DATA dele, nao da faixa em que ele caiu.
+// "vence em 30 dias" num titulo que vence hoje foi exatamente o tipo de
+// texto que confundiu na tela.
+function seloTitulo(t){
+  if(t.situacao === "encerrado")
+    return `<span class="venc-sit vs-encerrado">saiu da posição</span>`;
+  const d = t.dias;
+  const cls = d < 0 ? "vs-vencido" : (d === 0 ? "vs-hoje" : (d <= 30 ? "vs-a_vencer" : "vs-atual"));
+  const txt = d < 0 ? "venceu há " + nf(Math.abs(d)) + " dias"
+            : d === 0 ? "vence HOJE"
+            : d === 1 ? "vence amanhã"
+            : "vence em " + nf(d) + " dias";
+  return `<span class="venc-sit ${cls}">${txt}</span>`;
+}
 
-async function abrirVencCliente(sinacor){
+// ---- clique no nome: tudo sobre os vencimentos daquele cliente ----
+// Tres grupos, em sub-abas: o que esta aplicado, o que foi reaplicado e o
+// que foi resgatado. Marcar um titulo o TIRA de Aplicações e o joga no
+// grupo certo — e por isso a ficha se redesenha depois de marcar.
+let vencFichaSinacor = null, vencFichaAba = "aplicados";
+
+async function abrirVencCliente(sinacor, manterAba){
+  vencFichaSinacor = String(sinacor);
+  if(!manterAba) vencFichaAba = "aplicados";
   el("overlay").classList.add("open"); el("drawer").classList.add("open");
   el("drBody").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
   el("drName").textContent=""; el("drSub").textContent="";
@@ -6186,34 +6215,61 @@ async function abrirVencCliente(sinacor){
   el("drSub").innerHTML = `Sinacor ${d.sinacor} · ${d.barra||"sem barra"}`;
   el("drActions").innerHTML = btnRD(d.cliente||"");
 
+  const grupos = {
+    aplicados:  tit.filter(t=>!t.tratativa),
+    reaplicado: tit.filter(t=>t.tratativa==="reaplicado"),
+    resgatado:  tit.filter(t=>t.tratativa==="resgatado")
+  };
+  const somaG = g => grupos[g].reduce((s,t)=>s+(Number(t.vl_bruto)||0),0);
+
+  const tabela = (lista, comBotao) => !lista.length
+    ? '<div class="empty">Nada aqui.</div>'
+    : `<table><thead><tr><th>Aplicação</th><th>Vencimento</th><th class="num">Bruto</th><th>Situação</th><th>Tratativa</th></tr></thead>
+       <tbody>${lista.map(t=>`<tr>
+         <td>${t.produto||"—"}<div style="font-size:11px;color:var(--text-dim)">${t.emissor||""}${t.cd_cetip?" · "+t.cd_cetip:""}</div></td>
+         <td>${fmtData(t.dt_vencimento)}</td>
+         <td class="num">${brl(t.vl_bruto)}</td>
+         <td>${seloTitulo(t)}</td>
+         <td>${btnTratativa(d.sinacor,t.chave_titulo,t.dt_vencimento,t.tratativa,t.tratativa_autor)}
+             ${t.tratativa&&t.tratativa_autor?`<div style="font-size:10.5px;color:var(--text-faint);margin-top:3px">por ${t.tratativa_autor}</div>`:""}</td>
+       </tr>`).join("")}</tbody></table>`;
+
   const cat = (d.por_categoria||[]).map(c=>
     `<tr><td>${c.categoria||"—"}</td><td class="num">${nf(c.titulos)}</td><td class="num">${brl(c.bruto)}</td></tr>`).join("");
 
+  const aba = (k,rot,n) => `<button class="sa-btn ${vencFichaAba===k?'on':''}" onclick="vencFichaTrocar('${k}')">${rot}${n?` <span style="opacity:.6">${n}</span>`:""}</button>`;
+
   el("drBody").innerHTML = `
     <div class="dr-venc-tot">
-      <div><div class="v">${brl(d.total_ativo)}</div><div class="k">em carteira</div></div>
-      <div><div class="v">${nf(d.qtd_ativo)}</div><div class="k">títulos ativos</div></div>
-      <div><div class="v">${nf(d.qtd_encerrado)}</div><div class="k">encerrados</div></div>
+      <div><div class="v">${brl(somaG("aplicados"))}</div><div class="k">aplicado</div></div>
+      <div><div class="v">${nf(grupos.reaplicado.length)}</div><div class="k">reaplicados</div></div>
+      <div><div class="v">${nf(grupos.resgatado.length)}</div><div class="k">resgatados</div></div>
     </div>
-    ${d.posicoes<2?'<div class="venc-stale">Só uma posição importada — o histórico de encerrados começa a existir a partir do segundo arquivo.</div>':''}
+    ${d.posicoes<2?'<div class="venc-stale">Só uma posição importada — o histórico começa a existir a partir do segundo arquivo.</div>':''}
 
-    <div class="sec-title">Por categoria<span class="rule"></span></div>
+    <div class="sub-abas">
+      ${aba("aplicados","Aplicações",grupos.aplicados.length)}
+      ${aba("reaplicado","Reaplicados",grupos.reaplicado.length)}
+      ${aba("resgatado","Resgatados",grupos.resgatado.length)}
+    </div>
+    <div id="fichaAplicados" class="${vencFichaAba==='aplicados'?'':'hidden'}">${tabela(grupos.aplicados)}</div>
+    <div id="fichaReaplicado" class="${vencFichaAba==='reaplicado'?'':'hidden'}">${tabela(grupos.reaplicado)}</div>
+    <div id="fichaResgatado" class="${vencFichaAba==='resgatado'?'':'hidden'}">${tabela(grupos.resgatado)}</div>
+
+    <div class="sec-title" style="margin-top:20px">Por categoria<span class="rule"></span></div>
     <table><thead><tr><th>Categoria</th><th class="num">Títulos</th><th class="num">Bruto</th></tr></thead>
       <tbody>${cat||'<tr><td colspan="3">—</td></tr>'}</tbody></table>
 
-    <div class="sec-title" style="margin-top:18px">Todos os títulos<span class="rule"></span></div>
-    <table><thead><tr><th>Aplicação</th><th>Vencimento</th><th class="num">Bruto</th><th>Situação</th><th>Tratativa</th></tr></thead>
-      <tbody>${tit.map(t=>`<tr>
-        <td>${t.produto||"—"}<div style="font-size:11px;color:var(--text-dim)">${t.emissor||""}${t.cd_cetip?" · "+t.cd_cetip:""}</div></td>
-        <td>${fmtData(t.dt_vencimento)}<div style="font-size:11px;color:var(--text-dim)">${
-            t.situacao==='encerrado' ? "visto até "+fmtData(t.visto_ate)
-            : t.dias<0 ? "há "+nf(Math.abs(t.dias))+" dias"
-            : "em "+nf(t.dias)+" dias"}</div></td>
-        <td class="num">${brl(t.vl_bruto)}</td>
-        <td><span class="venc-sit vs-${t.situacao}">${VENC_SIT[t.situacao]||t.situacao}</span></td>
-        <td>${btnTratativa(d.sinacor,t.chave_titulo,t.dt_vencimento,t.tratativa,t.tratativa_autor)}</td>
-      </tr>`).join("")}</tbody></table>
-    <div class="note" style="margin-top:14px">Aplicado em ${fmtData(tit.length?tit[0].dt_operacao:null)} · ${nf(d.posicoes)} posição(ões) importada(s) · foto de ${fmtData(d.dt_posicao)}. "Encerrado" quer dizer que o título sumiu da posição mais recente — foi resgatado ou reaplicado.</div>`;
+    <div class="note" style="margin-top:14px">${nf(d.posicoes)} posição(ões) importada(s) · foto de ${fmtData(d.dt_posicao)}. "Saiu da posição" quer dizer que o título não aparece mais no último arquivo da corretora.</div>`;
+}
+
+function vencFichaTrocar(qual){
+  vencFichaAba=qual;
+  el("fichaAplicados").classList.toggle("hidden", qual!=="aplicados");
+  el("fichaReaplicado").classList.toggle("hidden", qual!=="reaplicado");
+  el("fichaResgatado").classList.toggle("hidden", qual!=="resgatado");
+  document.querySelectorAll("#drBody .sa-btn").forEach(b=>
+    b.classList.toggle("on", b.getAttribute("onclick").includes("'"+qual+"'")));
 }
 
 // ---------- FICHA (drawer) ----------
