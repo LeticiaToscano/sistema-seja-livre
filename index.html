@@ -6099,7 +6099,13 @@ function vencAtalho(k){
   else if(k==="hoje"){ vencState.de=iso(hj); vencState.ate=iso(hj); }
   else if(k==="amanha"){ const a=new Date(hj.getTime()+86400000); vencState.de=iso(a); vencState.ate=iso(a); }
   else if(k==="vencidos"){ vencState.de=""; vencState.ate=iso(new Date(hj.getTime()-86400000)); }
-  else { vencState.de=iso(hj); vencState.ate=iso(new Date(hj.getTime()+Number(k)*86400000)); }
+  else {
+    // Cada atalho e UM DIA, nao uma janela: "7 dias" mostra o que vence
+    // no setimo dia, sem misturar com o de hoje. Para ver um intervalo,
+    // os campos de data ao lado fazem isso.
+    const alvo = iso(new Date(hj.getTime()+Number(k)*86400000));
+    vencState.de=alvo; vencState.ate=alvo;
+  }
   el("vencDe").value=vencState.de; el("vencAte").value=vencState.ate;
   document.querySelectorAll(".vp-btn").forEach(b=>b.classList.remove("on"));
   const b=[...document.querySelectorAll(".vp-btn")].find(x=>x.getAttribute("onclick").includes("'"+k+"'"));
