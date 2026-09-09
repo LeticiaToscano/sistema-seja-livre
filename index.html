@@ -1002,6 +1002,21 @@
   .dr-venc-tot .v{font-size:16px;font-weight:700}
   .dr-venc-tot .k{font-size:11px;color:var(--text-dim)}
 
+  .linha-alerta{background:rgba(224,74,74,.07);box-shadow:inset 3px 0 0 #E86A6A}
+  .linha-alerta:hover{background:rgba(224,74,74,.12)}
+  .vs-hoje{background:rgba(224,74,74,.18);color:#E86A6A;font-weight:700;letter-spacing:.3px}
+  .tr-wrap{display:flex;gap:5px}
+  .tr-btn{border:1px solid var(--line);background:#161B18;color:var(--text-dim);
+    border-radius:999px;padding:4px 10px;font-size:11.5px;font-family:inherit;cursor:pointer;white-space:nowrap}
+  .tr-btn:hover{color:var(--text);border-color:#2E3A33}
+  .tr-verde.on{background:rgba(58,190,120,.18);border-color:var(--green);color:var(--green);font-weight:650}
+  .tr-amarelo.on{background:rgba(224,168,74,.18);border-color:var(--amber);color:var(--amber);font-weight:650}
+
+  .venc-busca select{background:var(--panel);border:1px solid var(--line);color:var(--text);
+    border-radius:10px;padding:10px 13px;font-size:13.5px;font-family:inherit;min-width:180px}
+  .venc-busca select:focus{outline:none;border-color:var(--green)}
+  #vencBarras tfoot td{border-top:1px solid var(--line);color:var(--text)}
+
   .venc-periodo{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:-4px 0 14px}
   .vp-atalhos{display:flex;gap:6px;flex-wrap:wrap}
   .vp-btn{background:#161B18;border:1px solid var(--line);color:var(--text-dim);
@@ -5762,13 +5777,14 @@ async function carregarVencRadar(){
     return;
   }
   el("vencRadar").innerHTML = avisoPosicao(d) + `
-    <table><thead><tr><th>Cliente</th><th>Barra</th><th>Aplicação</th><th>Quando</th><th class="num">Valor bruto</th></tr></thead>
+    <table><thead><tr><th>Cliente</th><th>Barra</th><th>Aplicação</th><th>Quando</th><th class="num">Valor bruto</th><th></th></tr></thead>
     <tbody>${linhas.map(l=>`<tr onclick="abrirVencCliente('${l.sinacor}')">
       <td><div class="cell-name"><span class="mini-av">${ini(l.cliente)}</span>${l.cliente||"—"}</div></td>
       <td>${l.barra||"—"}</td>
       <td>${l.produto||"—"}<div class="ab" style="font-size:11px;color:var(--text-dim)">${l.emissor||""}</div></td>
       <td><span class="venc-quando ${l.quando==='hoje'?'vq-hoje':'vq-amanha'}">${l.quando==='hoje'?'hoje':'amanhã'}</span></td>
-      <td class="num">${brl(l.vl_bruto)}</td></tr>`).join("")}</tbody></table>
+      <td class="num">${brl(l.vl_bruto)}</td>
+      <td>${l.status?`<span class="venc-sit ${l.status==='reaplicado'?'vs-atual':'vs-a_vencer'}">${l.status}</span>`:""}</td></tr>`).join("")}</tbody></table>
     <div class="stack-cap" style="margin-top:10px">${nf(d.qtd_hoje)} vencendo hoje (${brl(d.bruto_hoje)}) e ${nf(d.qtd_amanha)} amanhã (${brl(d.bruto_amanha)}). Clique no nome para ver o histórico do cliente.</div>`;
 }
 
@@ -5814,15 +5830,16 @@ document.addEventListener("DOMContentLoaded",()=>{
 });
 
 // ---- aba Vencimentos: todos os clientes ----
-let vencState={termo:"",de:"",ate:"",atalho:"todos"};
+let vencState={termo:"",de:"",ate:"",atalho:"todos",barra:"todas"};
 async function vVencimentos(){
   el("content").innerHTML=`
     <div class="venc-busca">
       <input id="vencBusca" placeholder="Buscar por nome, Sinacor ou CPF…" value="${vencState.termo}">
+      <select id="vencBarra"><option value="todas">Todas as barras</option></select>
     </div>
     <div class="venc-periodo">
       <div class="vp-atalhos">
-        ${[["todos","Todos"],["7","7 dias"],["30","30 dias"],["90","90 dias"],["vencidos","Já vencidos"]]
+        ${[["hoje","Hoje"],["amanha","Amanhã"],["7","7 dias"],["30","30 dias"],["90","90 dias"],["vencidos","Já vencidos"],["todos","Todos"]]
           .map(([k,r])=>`<button class="vp-btn ${vencState.atalho===k?'on':''}" onclick="vencAtalho('${k}')">${r}</button>`).join("")}
       </div>
       <div class="vp-datas">
@@ -5831,6 +5848,9 @@ async function vVencimentos(){
       </div>
     </div>
     <div id="vencResumo"></div>
+    <div class="sec-title">Carteira de renda fixa por assessor<span class="rule"></span></div>
+    <div class="panel" id="vencBarras"><div class="loading"><div class="spinner"></div>Carregando…</div></div>
+    <div class="sec-title" style="margin-top:20px">Clientes<span class="rule"></span></div>
     <div class="panel" id="vencLista"><div class="loading"><div class="spinner"></div>Carregando…</div></div>`;
   let t=null;
   el("vencBusca").addEventListener("input",e=>{
@@ -5843,6 +5863,54 @@ async function vVencimentos(){
     document.querySelectorAll(".vp-btn").forEach(b=>b.classList.remove("on"));
     carregarVencLista();
   }));
+  el("vencBarra").addEventListener("change",e=>{
+    vencState.barra=e.target.value; carregarVencLista();
+  });
+  carregarVencBarras();
+  carregarVencLista();
+}
+
+// ---- carteira de renda fixa por assessor ----
+// A variacao compara a posicao atual com a ANTERIOR importada. Com um
+// unico arquivo no banco nao ha o que comparar, e a coluna fica vazia.
+async function carregarVencBarras(){
+  const {data,error} = await sb.rpc("rf_barras");
+  if(error){ return erro(error,"vencBarras"); }
+  const d=data||{}, bs=d.barras||[];
+  // preenche o seletor uma vez
+  const sel=el("vencBarra");
+  if(sel && sel.options.length<=1){
+    bs.map(b=>b.barra).sort().forEach(nome=>{
+      const o=document.createElement("option"); o.value=nome; o.textContent=nome; sel.appendChild(o);
+    });
+    sel.value=vencState.barra;
+  }
+  if(!bs.length){ el("vencBarras").innerHTML='<div class="empty">Nenhuma barra na posição.</div>'; return; }
+  const semComparar = d.dt_anterior==null;
+  const varCel = b => {
+    if(b.var_bruto==null) return '<span style="color:var(--text-dim)">—</span>';
+    const up=b.var_bruto>=0;
+    return `<span style="color:${up?'var(--green)':'#E86A6A'}">${up?'▲':'▼'} ${brl(Math.abs(b.var_bruto))}${b.var_pct!=null?` · ${up?'+':''}${b.var_pct}%`:''}</span>`;
+  };
+  el("vencBarras").innerHTML = `
+    ${semComparar?'<div class="venc-stale">Só uma posição importada — a evolução aparece a partir do segundo arquivo.</div>'
+                 :`<div class="stack-cap" style="margin-bottom:10px">Comparando a posição de <b>${fmtData(d.dt_posicao)}</b> com a de <b>${fmtData(d.dt_anterior)}</b>.</div>`}
+    <table><thead><tr><th>Assessor</th><th class="num">Clientes</th><th class="num">Títulos</th><th class="num">Em carteira</th><th class="num">Vence em 30d</th><th>Evolução</th></tr></thead>
+    <tbody>${bs.map(b=>`<tr onclick="filtrarPorBarra('${String(b.barra).replace(/'/g,"")}')">
+      <td><div class="cell-name"><span class="mini-av">${ini(b.barra)}</span>${b.barra}</div></td>
+      <td class="num">${nf(b.clientes)}${b.var_clientes?`<span style="color:${b.var_clientes>0?'var(--green)':'#E86A6A'};font-size:11px"> ${b.var_clientes>0?'+':''}${nf(b.var_clientes)}</span>`:''}</td>
+      <td class="num">${nf(b.titulos)}</td>
+      <td class="num">${brl(b.bruto)}</td>
+      <td class="num">${b.em_30d?nf(b.em_30d)+" · "+brl(b.bruto_30d):"—"}</td>
+      <td>${varCel(b)}</td></tr>`).join("")}</tbody>
+    <tfoot><tr><td><b>Total</b></td><td class="num"><b>${nf(d.total_clientes)}</b></td><td class="num">—</td><td class="num"><b>${brl(d.total_bruto)}</b></td><td class="num">—</td><td></td></tr></tfoot>
+    </table>
+    <div class="stack-cap" style="margin-top:10px">Clique num assessor para filtrar a lista de clientes abaixo.</div>`;
+}
+
+function filtrarPorBarra(nome){
+  vencState.barra = (vencState.barra===nome) ? "todas" : nome;   // clicar de novo limpa
+  const sel=el("vencBarra"); if(sel) sel.value=vencState.barra;
   carregarVencLista();
 }
 
@@ -5853,6 +5921,8 @@ function vencAtalho(k){
   const hj=new Date(), iso=d=>d.toISOString().slice(0,10);
   vencState.atalho=k;
   if(k==="todos"){ vencState.de=""; vencState.ate=""; }
+  else if(k==="hoje"){ vencState.de=iso(hj); vencState.ate=iso(hj); }
+  else if(k==="amanha"){ const a=new Date(hj.getTime()+86400000); vencState.de=iso(a); vencState.ate=iso(a); }
   else if(k==="vencidos"){ vencState.de=""; vencState.ate=iso(new Date(hj.getTime()-86400000)); }
   else { vencState.de=iso(hj); vencState.ate=iso(new Date(hj.getTime()+Number(k)*86400000)); }
   el("vencDe").value=vencState.de; el("vencAte").value=vencState.ate;
@@ -5864,7 +5934,8 @@ function vencAtalho(k){
 
 async function carregarVencLista(){
   const {data,error} = await sb.rpc("rf_clientes",{
-    p_busca: vencState.termo||null, p_barra:null,
+    p_busca: vencState.termo||null,
+    p_barra: (vencState.barra && vencState.barra!=="todas") ? vencState.barra : null,
     p_de: vencState.de||null, p_ate: vencState.ate||null});
   if(error){ return erro(error,"vencLista"); }
   const d=data||{}, linhas=d.linhas||[];
@@ -5876,20 +5947,48 @@ async function carregarVencLista(){
     </div>`;
   if(!linhas.length){ el("vencLista").innerHTML='<div class="empty">Nenhum cliente encontrado.</div>'; return; }
   el("vencLista").innerHTML=`
-    <table><thead><tr><th>Cliente</th><th>Barra</th><th class="num">Títulos</th><th class="num">Valor bruto</th><th>Próximo vencimento</th></tr></thead>
+    <table><thead><tr><th>Cliente</th><th>Barra</th><th class="num">Títulos</th><th class="num">Valor bruto</th><th>Próximo vencimento</th><th>Tratativa</th></tr></thead>
     <tbody>${linhas.map(l=>{
       const cls = l.dias_proximo<0 ? "vs-vencido" : (l.dias_proximo<=30 ? "vs-a_vencer" : "vs-atual");
       const txt = l.dias_proximo<0 ? "venceu "+fmtData(l.proximo_venc)
-                : l.dias_proximo===0 ? "hoje"
+                : l.dias_proximo===0 ? "HOJE"
                 : l.dias_proximo===1 ? "amanhã"
                 : fmtData(l.proximo_venc)+" · em "+nf(l.dias_proximo)+" dias";
-      return `<tr onclick="abrirVencCliente('${l.sinacor}')">
+      const alerta = l.dias_proximo===0 && !l.status ? " linha-alerta" : "";
+      return `<tr class="${alerta}" onclick="abrirVencCliente('${l.sinacor}')">
         <td><div class="cell-name"><span class="mini-av">${ini(l.cliente)}</span>${l.cliente||"—"}</div></td>
         <td>${l.barra||"—"}</td>
         <td class="num">${nf(l.titulos)}</td>
         <td class="num">${brl(l.total_bruto)}</td>
-        <td><span class="venc-sit ${cls}">${txt}</span></td></tr>`;
+        <td><span class="venc-sit ${l.dias_proximo===0?'vs-hoje':cls}">${txt}</span></td>
+        <td>${btnTratativa(l.sinacor,l.chave_proximo,l.proximo_venc,l.status,l.status_autor)}</td></tr>`;
     }).join("")}</tbody></table>`;
+}
+
+// ---- tratativa: reaplicado (verde) / resgatado (amarelo) ----
+// Clicar de novo no mesmo botao desfaz a marcacao.
+function btnTratativa(sinacor, chave, venc, status, autor){
+  if(!chave || !venc) return "—";
+  const arg = `'${sinacor}','${String(chave).replace(/'/g,"")}','${venc}'`;
+  const t = (k,rot,cls)=>`<button class="tr-btn ${cls} ${status===k?'on':''}" title="${status===k&&autor?'marcado por '+autor:rot}"
+      onclick="event.stopPropagation();marcarTratativa(${arg},'${k}',this)">${rot}</button>`;
+  return `<div class="tr-wrap">${t("reaplicado","Reaplicado","tr-verde")}${t("resgatado","Resgatado","tr-amarelo")}</div>`;
+}
+
+async function marcarTratativa(sinacor, chave, venc, status, btn){
+  const desfazer = btn.classList.contains("on");
+  const wrap = btn.closest(".tr-wrap");
+  wrap.querySelectorAll(".tr-btn").forEach(b=>b.classList.remove("on"));
+  if(!desfazer) btn.classList.add("on");
+  const tr = btn.closest("tr"); if(tr) tr.classList.remove("linha-alerta");
+  const {data,error} = await sb.rpc("rf_marcar",{
+    p_sinacor:String(sinacor), p_chave:String(chave),
+    p_venc:venc, p_status: desfazer ? null : status});
+  if(error || (data && data.ok===false)){
+    wrap.querySelectorAll(".tr-btn").forEach(b=>b.classList.remove("on"));
+    if(desfazer) btn.classList.add("on");
+    toast("Não foi possível salvar a marcação.");
+  }
 }
 
 // ---- clique no nome: tudo sobre os vencimentos daquele cliente ----
@@ -5923,7 +6022,7 @@ async function abrirVencCliente(sinacor){
       <tbody>${cat||'<tr><td colspan="3">—</td></tr>'}</tbody></table>
 
     <div class="sec-title" style="margin-top:18px">Todos os títulos<span class="rule"></span></div>
-    <table><thead><tr><th>Aplicação</th><th>Vencimento</th><th class="num">Bruto</th><th>Situação</th></tr></thead>
+    <table><thead><tr><th>Aplicação</th><th>Vencimento</th><th class="num">Bruto</th><th>Situação</th><th>Tratativa</th></tr></thead>
       <tbody>${tit.map(t=>`<tr>
         <td>${t.produto||"—"}<div style="font-size:11px;color:var(--text-dim)">${t.emissor||""}${t.cd_cetip?" · "+t.cd_cetip:""}</div></td>
         <td>${fmtData(t.dt_vencimento)}<div style="font-size:11px;color:var(--text-dim)">${
@@ -5932,6 +6031,7 @@ async function abrirVencCliente(sinacor){
             : "em "+nf(t.dias)+" dias"}</div></td>
         <td class="num">${brl(t.vl_bruto)}</td>
         <td><span class="venc-sit vs-${t.situacao}">${VENC_SIT[t.situacao]||t.situacao}</span></td>
+        <td>${btnTratativa(d.sinacor,t.chave_titulo,t.dt_vencimento,t.tratativa,t.tratativa_autor)}</td>
       </tr>`).join("")}</tbody></table>
     <div class="note" style="margin-top:14px">Aplicado em ${fmtData(tit.length?tit[0].dt_operacao:null)} · ${nf(d.posicoes)} posição(ões) importada(s) · foto de ${fmtData(d.dt_posicao)}. "Encerrado" quer dizer que o título sumiu da posição mais recente — foi resgatado ou reaplicado.</div>`;
 }
@@ -7394,4 +7494,3 @@ boot();
 </script>
 </body>
 </html>
-  
