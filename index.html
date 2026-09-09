@@ -1077,6 +1077,11 @@
   .vpop-item .vn{font-size:13.5px;font-weight:600}
   .vpop-item .vb{font-size:11.5px;color:var(--text-dim)}
   .vpop-item .vv{margin-left:auto;text-align:right;font-size:13.5px;font-weight:650}
+  .vpop-sec{margin-bottom:16px}
+  .vpop-sec:last-child{margin-bottom:0}
+  .vpop-sec-t{font-size:13px;font-weight:650;margin-bottom:6px;padding-bottom:7px;
+    border-bottom:1px solid var(--line)}
+  .vq-aniv{background:rgba(120,140,230,.16);color:#8FA3E8;border:1px solid rgba(120,140,230,.32)}
   .vpop-foot{display:flex;gap:10px;padding:0 20px 18px}
   .vpop-foot button{flex:1;border-radius:10px;padding:10px;font-size:13px;font-family:inherit;
     cursor:pointer;border:1px solid var(--line);background:#1A211D;color:var(--text)}
@@ -1347,7 +1352,7 @@ async function mostrarApp(session){
   el("userRole").textContent = papel==="admin"?"Administrador":papel==="gerencia"?"Gerência":"Assessor";
   render("radar");
   carregarNotif();
-  popupVencimentos();
+  popupAvisos();
   document.addEventListener("click",e=>{ if(!e.target.closest(".notif-wrap")) el("notifPanel").classList.remove("open"); });
 }
 
@@ -5966,36 +5971,72 @@ async function carregarVencRadar(){
 let USUARIO_ID = null;
 const chaveResolvido = () => "venc_resolvido_" + (USUARIO_ID||"anon") + "_" + hojeISO();
 
-async function popupVencimentos(){
+// Popup de entrada. Junta dois avisos numa janela so — dois modais
+// empilhados no login seriam pior que o problema que resolvem.
+//
+// Aniversario dispara em EXATAMENTE 15 dias, nao na janela inteira: com
+// a janela, a mesma pessoa apareceria quinze dias seguidos e o aviso
+// viraria paisagem. Quinze e o dia de encomendar o presente. Para virar
+// janela, troque o filtro `c.dias === 15` por `c.dias <= 15`.
+const DIAS_PRESENTE = 15;
+
+async function popupAvisos(){
   try{ if(localStorage.getItem(chaveResolvido())) return; }catch(e){}
-  const {data,error} = await sb.rpc("rf_radar");
-  if(error) return;
-  const d = data||{}, linhas = d.linhas||[];
-  if(!linhas.length) return;                 // nada vencendo: nao incomoda
-  el("vpop").innerHTML = `
-    <div class="vpop-head">
-      <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><path d="M12 7v5.2l3.2 2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div>
-        <h3>${nf(d.qtd_total)} ${d.qtd_total===1?"aplicação vence":"aplicações vencem"} hoje ou amanhã</h3>
-        <p>${brl((d.bruto_hoje||0)+(d.bruto_amanha||0))} no total · posição de ${fmtData(d.dt_posicao)}</p>
-      </div>
-      <button class="vpop-close" onclick="fecharPopupVenc()">✕</button>
-    </div>
-    <div class="vpop-body">
+
+  const [rv, ra] = await Promise.all([
+    sb.rpc("rf_radar"),
+    sb.rpc("aniversarios_proximos",{p_dias:DIAS_PRESENTE, p_faixas:["preta"]})
+  ]);
+
+  const d = (!rv.error && rv.data) ? rv.data : {};
+  const venc = d.linhas || [];
+  const aniv = (!ra.error && ra.data && ra.data.linhas ? ra.data.linhas : [])
+    .filter(c => c.dias === DIAS_PRESENTE);
+
+  if(!venc.length && !aniv.length) return;   // nada a dizer: nao incomoda
+
+  const totalVenc = (d.bruto_hoje||0) + (d.bruto_amanha||0);
+
+  const blocoVenc = !venc.length ? "" : `
+    <div class="vpop-sec">
+      <div class="vpop-sec-t">${nf(d.qtd_total)} ${d.qtd_total===1?"aplicação vence":"aplicações vencem"} hoje ou amanhã
+        <span style="color:var(--text-dim);font-weight:400"> · ${brl(totalVenc)}</span></div>
       ${d.idade_dias>7?`<div class="venc-stale">Posição de ${nf(d.idade_dias)} dias atrás — confirme antes de ligar.</div>`:""}
-      ${linhas.slice(0,8).map(l=>`<div class="vpop-item" onclick="fecharPopupVenc();abrirVencCliente('${l.sinacor}')">
+      ${venc.slice(0,6).map(l=>`<div class="vpop-item" onclick="fecharPopupVenc();abrirVencCliente('${l.sinacor}')">
         <span class="venc-quando ${l.quando==='hoje'?'vq-hoje':'vq-amanha'}">${l.quando==='hoje'?'hoje':'amanhã'}</span>
         <div><div class="vn">${l.cliente||"—"}</div><div class="vb">${l.barra||"—"} · ${l.produto||""}</div></div>
         <div class="vv">${brl(l.vl_bruto)}</div></div>`).join("")}
-      ${linhas.length>8?`<div class="vb" style="padding-top:10px">e mais ${nf(linhas.length-8)} na aba Vencimentos</div>`:""}
+      ${venc.length>6?`<div class="vb" style="padding-top:8px">e mais ${nf(venc.length-6)} na aba Vencimentos</div>`:""}
+    </div>`;
+
+  const blocoAniv = !aniv.length ? "" : `
+    <div class="vpop-sec">
+      <div class="vpop-sec-t">${nf(aniv.length)} faixa preta faz aniversário em ${DIAS_PRESENTE} dias
+        <span style="color:var(--text-dim);font-weight:400"> · hora de encomendar o presente</span></div>
+      ${aniv.map(c=>`<div class="vpop-item" onclick="fecharPopupVenc();abrirFicha('${c.id}')">
+        <span class="venc-quando vq-aniv">${c.aniversario}</span>
+        <div><div class="vn">${c.nome}</div><div class="vb">${c.barra||"—"}</div></div>
+        <div class="vv">${faixaBadge(c.faixa,c.grau)}</div></div>`).join("")}
+    </div>`;
+
+  const titulo = venc.length && aniv.length ? "Dois avisos para hoje"
+               : venc.length ? "Vencimentos" : "Aniversário chegando";
+
+  el("vpop").innerHTML = `
+    <div class="vpop-head">
+      <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><path d="M12 7v5.2l3.2 2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div><h3>${titulo}</h3><p>${fmtData(hojeISO())}</p></div>
+      <button class="vpop-close" onclick="fecharPopupVenc()">✕</button>
     </div>
+    <div class="vpop-body">${blocoVenc}${blocoAniv}</div>
     <div class="vpop-foot">
       <button onclick="fecharPopupVenc()">Depois</button>
       <button class="ok" onclick="resolverPopupVenc()">Resolvido</button>
-      <button class="prim" onclick="fecharPopupVenc();irParaVencimentos()">Abrir Vencimentos</button>
+      ${venc.length?`<button class="prim" onclick="fecharPopupVenc();irParaVencimentos()">Abrir Vencimentos</button>`:""}
     </div>`;
   el("vpopBack").classList.add("open");
 }
+
 function fecharPopupVenc(){ el("vpopBack").classList.remove("open"); }
 
 // "Resolvido" cala o popup pelo resto do dia. Vale por navegador: quem
