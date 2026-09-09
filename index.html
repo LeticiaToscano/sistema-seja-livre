@@ -5999,7 +5999,8 @@ let vencState={termo:"",de:"",ate:"",atalho:"todos",barra:"todas",aba:"clientes"
 async function vVencimentos(){
   el("content").innerHTML=`
     <div class="sub-abas">
-      <button class="sa-btn ${vencState.aba==='clientes'?'on':''}" onclick="vencAba('clientes')">Clientes</button>
+      <button class="sa-btn ${vencState.aba==='clientes'?'on':''}" onclick="vencAba('clientes')">A vencer</button>
+      <button class="sa-btn ${vencState.aba==='vencidos'?'on':''}" onclick="vencAba('vencidos')">Vencidos</button>
       <button class="sa-btn ${vencState.aba==='barras'?'on':''}" onclick="vencAba('barras')">Barras</button>
     </div>
 
@@ -6010,7 +6011,7 @@ async function vVencimentos(){
       </div>
       <div class="venc-periodo">
         <div class="vp-atalhos">
-          ${[["hoje","Hoje"],["amanha","Amanhã"],["vencidos","Já vencidos"],["todos","Todos"]]
+          ${[["hoje","Hoje"],["amanha","Amanhã"],["todos","Todos"]]
             .map(([k,r])=>`<button class="vp-btn ${vencState.atalho===k?'on':''}" onclick="vencAtalho('${k}')">${r}</button>`).join("")}
         </div>
         <div class="vp-datas">
@@ -6023,6 +6024,16 @@ async function vVencimentos(){
       <div class="panel" id="vencLista"><div class="loading"><div class="spinner"></div>Carregando…</div></div>
     </div>
 
+    <div id="abaVencidos" class="${vencState.aba==='vencidos'?'':'hidden'}">
+      <div class="note" style="border-left-color:var(--amber);margin-bottom:14px">
+        Títulos com vencimento já passado que continuam na última posição da corretora.
+        Marcar <b>Reaplicado</b> ou <b>Resgatado</b> é o que dá baixa — o número que sobra
+        aqui sem marcação é o que ninguém tratou.
+      </div>
+      <div id="vencResumoV"></div>
+      <div class="panel" id="vencListaV"><div class="loading"><div class="spinner"></div>Carregando…</div></div>
+    </div>
+
     <div id="abaBarras" class="${vencState.aba==='barras'?'':'hidden'}">
       <div class="panel" id="vencBarras"><div class="loading"><div class="spinner"></div>Carregando…</div></div>
     </div>`;
@@ -6030,7 +6041,10 @@ async function vVencimentos(){
   let t=null;
   el("vencBusca").addEventListener("input",e=>{
     vencState.termo=e.target.value;
-    clearTimeout(t); t=setTimeout(carregarVencLista,350);
+    clearTimeout(t); t=setTimeout(()=>{
+      carregarVencLista();
+      if(vencState.aba==="vencidos") carregarVencVencidos();
+    },350);
   });
   ["vencDe","vencAte"].forEach(id=>el(id).addEventListener("change",()=>{
     vencState.de=el("vencDe").value; vencState.ate=el("vencAte").value;
@@ -6040,6 +6054,7 @@ async function vVencimentos(){
   }));
   el("vencBarra").addEventListener("change",e=>{
     vencState.barra=e.target.value; carregarVencDias(); carregarVencLista();
+    if(vencState.aba==="vencidos") carregarVencVencidos();
   });
   carregarVencBarras();
   carregarVencDias();
@@ -6055,8 +6070,9 @@ async function carregarVencDias(){
     p_barra:(vencState.barra && vencState.barra!=="todas") ? vencState.barra : null});
   const alvo = el("vencDias"); if(!alvo) return;
   if(error || !data){ alvo.innerHTML=""; return; }
-  const dias = data.dias||[];
-  if(!dias.length){ alvo.innerHTML='<div class="empty" style="padding:10px">Nenhum vencimento nesta posição.</div>'; return; }
+  // So hoje e o futuro: o passado tem aba propria.
+  const dias = (data.dias||[]).filter(d=>!d.passado);
+  if(!dias.length){ alvo.innerHTML='<div class="empty" style="padding:10px">Nenhum vencimento de hoje em diante nesta posição.</div>'; return; }
   const hojeStr = data.hoje;
   alvo.innerHTML = `<div class="df-rot">Dias com vencimento</div><div class="df-lista" id="dfLista">${
     dias.map(d=>{
@@ -6090,7 +6106,9 @@ function vencDia(dia){
 function vencAba(qual){
   vencState.aba=qual;
   el("abaClientes").classList.toggle("hidden", qual!=="clientes");
+  el("abaVencidos").classList.toggle("hidden", qual!=="vencidos");
   el("abaBarras").classList.toggle("hidden", qual!=="barras");
+  if(qual==="vencidos") carregarVencVencidos();
   document.querySelectorAll(".sa-btn").forEach(b=>
     b.classList.toggle("on", b.getAttribute("onclick").includes("'"+qual+"'")));
 }
@@ -6170,10 +6188,14 @@ function vencAtalho(k){
 }
 
 async function carregarVencLista(){
+  // Piso em HOJE: esta aba e so o que esta por vir. Mesmo com o campo de
+  // data em branco, nada anterior a hoje entra aqui.
+  const hojeStr = hojeISO();
+  const de = (vencState.de && vencState.de > hojeStr) ? vencState.de : hojeStr;
   const {data,error} = await sb.rpc("rf_titulos",{
     p_busca: vencState.termo||null,
     p_barra: (vencState.barra && vencState.barra!=="todas") ? vencState.barra : null,
-    p_de: vencState.de||null, p_ate: vencState.ate||null});
+    p_de: de, p_ate: vencState.ate||null});
   if(error){ return erro(error,"vencLista"); }
   const d=data||{}, linhas=d.linhas||[];
   el("vencResumo").innerHTML = avisoPosicao(d) + `
@@ -6202,6 +6224,40 @@ async function carregarVencLista(){
         <td>${l.barra||"—"}</td>
         <td>${l.produto||"—"}<div style="font-size:11px;color:var(--text-dim)">${l.emissor||""}</div></td>
         <td><span class="venc-sit ${cls}">${txt}</span></td>
+        <td class="num">${brl(l.vl_bruto)}</td>
+        <td>${btnTratativa(l.sinacor,l.chave_titulo,l.dt_vencimento,l.status,l.status_autor)}</td></tr>`;
+    }).join("")}</tbody></table>`;
+}
+
+// ---- aba Vencidos: o que ja passou e continua na posicao ----
+// Mesma tabela, outra janela: tudo com vencimento anterior a hoje.
+// Ordenada do mais antigo para o mais recente — o que esta parado ha
+// mais tempo aparece primeiro.
+async function carregarVencVencidos(){
+  const ontem = new Date(Date.now()-86400000).toISOString().slice(0,10);
+  const {data,error} = await sb.rpc("rf_titulos",{
+    p_busca: vencState.termo||null,
+    p_barra: (vencState.barra && vencState.barra!=="todas") ? vencState.barra : null,
+    p_de: null, p_ate: ontem});
+  if(error){ return erro(error,"vencListaV"); }
+  const d=data||{}, linhas=d.linhas||[];
+  const semTrat = linhas.filter(l=>!l.status);
+  el("vencResumoV").innerHTML = avisoPosicao(d) + `
+    <div class="venc-resumo">
+      <div class="vr-card"><div class="v" style="color:${semTrat.length?'#E86A6A':'var(--green)'}">${nf(semTrat.length)}</div><div class="k">sem tratativa</div></div>
+      <div class="vr-card"><div class="v">${nf(d.total_titulos)}</div><div class="k">títulos vencidos</div></div>
+      <div class="vr-card"><div class="v">${brl(semTrat.reduce((s,l)=>s+(Number(l.vl_bruto)||0),0))}</div><div class="k">valor sem tratativa</div></div>
+    </div>`;
+  if(!linhas.length){ el("vencListaV").innerHTML='<div class="empty">Nenhum título vencido nesta posição.</div>'; return; }
+  el("vencListaV").innerHTML=`
+    <table><thead><tr><th>Cliente</th><th>Barra</th><th>Aplicação</th><th>Venceu</th><th class="num">Valor bruto</th><th>Tratativa</th></tr></thead>
+    <tbody>${linhas.map(l=>{
+      const alerta = !l.status ? " linha-alerta" : "";
+      return `<tr class="${alerta}" onclick="abrirVencCliente('${l.sinacor}')">
+        <td><div class="cell-name"><span class="mini-av">${ini(l.cliente)}</span>${l.cliente||"—"}</div></td>
+        <td>${l.barra||"—"}</td>
+        <td>${l.produto||"—"}<div style="font-size:11px;color:var(--text-dim)">${l.emissor||""}</div></td>
+        <td><span class="venc-sit vs-vencido">${fmtData(l.dt_vencimento)} · há ${nf(Math.abs(l.dias))} dias</span></td>
         <td class="num">${brl(l.vl_bruto)}</td>
         <td>${btnTratativa(l.sinacor,l.chave_titulo,l.dt_vencimento,l.status,l.status_autor)}</td></tr>`;
     }).join("")}</tbody></table>`;
