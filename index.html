@@ -1002,6 +1002,18 @@
   .dr-venc-tot .v{font-size:16px;font-weight:700}
   .dr-venc-tot .k{font-size:11px;color:var(--text-dim)}
 
+  .venc-periodo{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:-4px 0 14px}
+  .vp-atalhos{display:flex;gap:6px;flex-wrap:wrap}
+  .vp-btn{background:#161B18;border:1px solid var(--line);color:var(--text-dim);
+    border-radius:999px;padding:6px 13px;font-size:12.5px;font-family:inherit;cursor:pointer}
+  .vp-btn:hover{color:var(--text);border-color:#2E3A33}
+  .vp-btn.on{background:rgba(58,190,120,.14);border-color:var(--green);color:var(--green);font-weight:600}
+  .vp-datas{display:flex;gap:7px;align-items:center;margin-left:auto}
+  .vp-datas label{font-size:12px;color:var(--text-dim)}
+  .vp-datas input{background:var(--panel);border:1px solid var(--line);color:var(--text);
+    border-radius:9px;padding:7px 10px;font-size:12.5px;font-family:inherit;color-scheme:dark}
+  .vp-datas input:focus{outline:none;border-color:var(--green)}
+
   /* popup de entrada */
   .vpop-back{position:fixed;inset:0;background:rgba(0,0,0,.66);backdrop-filter:blur(3px);
     z-index:120;display:flex;align-items:center;justify-content:center;padding:20px;
@@ -5762,8 +5774,6 @@ async function carregarVencRadar(){
 
 // ---- popup de entrada: uma vez por dia, e so quando ha algo ----
 async function popupVencimentos(){
-  const chave = "venc_popup_" + hojeISO();
-  try{ if(localStorage.getItem(chave)) return; }catch(e){}
   const {data,error} = await sb.rpc("rf_radar");
   if(error) return;
   const d = data||{}, linhas = d.linhas||[];
@@ -5790,7 +5800,6 @@ async function popupVencimentos(){
       <button class="prim" onclick="fecharPopupVenc();irParaVencimentos()">Abrir Vencimentos</button>
     </div>`;
   el("vpopBack").classList.add("open");
-  try{ localStorage.setItem(chave,"1"); }catch(e){}
 }
 function fecharPopupVenc(){ el("vpopBack").classList.remove("open"); }
 function irParaVencimentos(){
@@ -5805,11 +5814,21 @@ document.addEventListener("DOMContentLoaded",()=>{
 });
 
 // ---- aba Vencimentos: todos os clientes ----
-let vencState={termo:""};
+let vencState={termo:"",de:"",ate:"",atalho:"todos"};
 async function vVencimentos(){
   el("content").innerHTML=`
     <div class="venc-busca">
       <input id="vencBusca" placeholder="Buscar por nome, Sinacor ou CPF…" value="${vencState.termo}">
+    </div>
+    <div class="venc-periodo">
+      <div class="vp-atalhos">
+        ${[["todos","Todos"],["7","7 dias"],["30","30 dias"],["90","90 dias"],["vencidos","Já vencidos"]]
+          .map(([k,r])=>`<button class="vp-btn ${vencState.atalho===k?'on':''}" onclick="vencAtalho('${k}')">${r}</button>`).join("")}
+      </div>
+      <div class="vp-datas">
+        <label>de</label><input type="date" id="vencDe" value="${vencState.de}">
+        <label>até</label><input type="date" id="vencAte" value="${vencState.ate}">
+      </div>
     </div>
     <div id="vencResumo"></div>
     <div class="panel" id="vencLista"><div class="loading"><div class="spinner"></div>Carregando…</div></div>`;
@@ -5818,18 +5837,42 @@ async function vVencimentos(){
     vencState.termo=e.target.value;
     clearTimeout(t); t=setTimeout(carregarVencLista,350);
   });
+  ["vencDe","vencAte"].forEach(id=>el(id).addEventListener("change",()=>{
+    vencState.de=el("vencDe").value; vencState.ate=el("vencAte").value;
+    vencState.atalho="";                 // data escolhida a mao desliga o atalho
+    document.querySelectorAll(".vp-btn").forEach(b=>b.classList.remove("on"));
+    carregarVencLista();
+  }));
+  carregarVencLista();
+}
+
+// Atalhos de periodo. "Ja vencidos" olha para tras: tudo que venceu antes
+// de hoje e ainda aparece na posicao — dinheiro que pode ter saido sem
+// ninguem falar com o cliente.
+function vencAtalho(k){
+  const hj=new Date(), iso=d=>d.toISOString().slice(0,10);
+  vencState.atalho=k;
+  if(k==="todos"){ vencState.de=""; vencState.ate=""; }
+  else if(k==="vencidos"){ vencState.de=""; vencState.ate=iso(new Date(hj.getTime()-86400000)); }
+  else { vencState.de=iso(hj); vencState.ate=iso(new Date(hj.getTime()+Number(k)*86400000)); }
+  el("vencDe").value=vencState.de; el("vencAte").value=vencState.ate;
+  document.querySelectorAll(".vp-btn").forEach(b=>b.classList.remove("on"));
+  const b=[...document.querySelectorAll(".vp-btn")].find(x=>x.getAttribute("onclick").includes("'"+k+"'"));
+  if(b) b.classList.add("on");
   carregarVencLista();
 }
 
 async function carregarVencLista(){
-  const {data,error} = await sb.rpc("rf_clientes",{p_busca: vencState.termo||null, p_barra:null});
+  const {data,error} = await sb.rpc("rf_clientes",{
+    p_busca: vencState.termo||null, p_barra:null,
+    p_de: vencState.de||null, p_ate: vencState.ate||null});
   if(error){ return erro(error,"vencLista"); }
   const d=data||{}, linhas=d.linhas||[];
   el("vencResumo").innerHTML = avisoPosicao(d) + `
     <div class="venc-resumo">
       <div class="vr-card"><div class="v">${nf(d.total_clientes)}</div><div class="k">clientes com renda fixa</div></div>
       <div class="vr-card"><div class="v">${brl(d.total_bruto)}</div><div class="k">valor bruto na posição</div></div>
-      <div class="vr-card"><div class="v">${nf(linhas.filter(l=>l.vencem_30d>0).length)}</div><div class="k">com vencimento em 30 dias</div></div>
+      <div class="vr-card"><div class="v">${nf(d.total_titulos)}</div><div class="k">títulos ${(d.de||d.ate)?"no período":"na posição"}</div></div>
     </div>`;
   if(!linhas.length){ el("vencLista").innerHTML='<div class="empty">Nenhum cliente encontrado.</div>'; return; }
   el("vencLista").innerHTML=`
@@ -7351,3 +7394,4 @@ boot();
 </script>
 </body>
 </html>
+  
