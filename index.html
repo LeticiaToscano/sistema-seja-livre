@@ -4606,6 +4606,68 @@ async function impProcessar(nome, texto){
       : "";
     window.__impDiv = {arquivo:nome, competencia:comp, itens:itens};
     impCartao(nome, data, linhas.length-1, colunas, null, null, null, null, itens.length);
+  } else if(data && data.formato === "vencimentos_rf"){
+    // Posicao de renda fixa. A DATA vem em DT_POSICAO e e a mesma em todas
+    // as linhas — e ela que identifica a foto. O Excel as vezes entrega
+    // data como numero de dias desde 30/12/1899, entao passa pelo dataDe.
+    const acha = (...nomes) => {
+      for(const n of nomes){
+        const i = colunas.findIndex(c=>c.trim().toUpperCase() === n.toUpperCase());
+        if(i >= 0) return i;
+      }
+      return -1;
+    };
+    const dataDe = v => {
+      const t = String(v||"").trim();
+      if(!t || t.toUpperCase()==="NULL") return null;
+      if(/^\d{4}-\d{2}-\d{2}/.test(t)) return t.slice(0,10);
+      if(/^\d{5}(\.\d+)?$/.test(t)){
+        const d = new Date(Date.UTC(1899,11,30) + Math.floor(Number(t))*86400000);
+        return d.toISOString().slice(0,10);
+      }
+      const m = t.match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})/);
+      return m ? `${m[3]}-${m[2]}-${m[1]}` : null;
+    };
+    const numero = v => {
+      let t = String(v||"").trim();
+      if(t === "" || t.toUpperCase() === "NULL") return null;
+      if(t.includes(",")) t = t.replace(/\./g,"").replace(",",".");
+      const n = Number(t);
+      return isNaN(n) ? null : n;
+    };
+    const col = {
+      sinacor:    acha("CD_CONTA"),
+      cpf:        acha("CPF_CPNJ","CPF_CNPJ"),
+      cliente:    acha("CLIENTE"),
+      barra:      acha("ASSESSOR"),
+      produto:    acha("PRODUTO"),
+      categoria:  acha("CATEGORIA"),
+      emissor:    acha("NM_EMISSOR"),
+      indice:     acha("NM_INDICE"),
+      pct:        acha("NR_PERCENTUAL_INDICE"),
+      taxa:       acha("VL_TAXA"),
+      dt_oper:    acha("DT_OPERACAO"),
+      dt_venc:    acha("DT_VENCIMENTO"),
+      bruto:      acha("VL_BRUTO"),
+      liquido:    acha("VL_LIQUIDO"),
+      qtd:        acha("QUANTIDADE_TOTAL"),
+      cetip:      acha("CD_CETIP"),
+      dt_pos:     acha("DT_POSICAO")
+    };
+    const itens = linhas.slice(1).map(l=>{
+      const q = l.split(sep).map(x=>x.replace(/^"|"$/g,"").trim());
+      const g = k => col[k] >= 0 ? (q[col[k]] || "") : "";
+      return { sinacor:g("sinacor"), cpf:g("cpf"), cliente:g("cliente"), barra:g("barra"),
+               produto:g("produto"), categoria:g("categoria"), emissor:g("emissor"),
+               indice:g("indice"), pct_indice:numero(g("pct")), taxa:numero(g("taxa")),
+               dt_operacao:dataDe(g("dt_oper")), dt_vencimento:dataDe(g("dt_venc")),
+               vl_bruto:numero(g("bruto")), vl_liquido:numero(g("liquido")),
+               quantidade:numero(g("qtd")), cd_cetip:g("cetip") };
+    }).filter(x=>x.sinacor && x.dt_vencimento);
+    const pos = col.dt_pos >= 0
+      ? dataDe((linhas[1].split(sep)[col.dt_pos]||"").replace(/^"|"$/g,"").trim()) : null;
+    window.__impRF = {arquivo:nome, dt_posicao:pos, itens:itens};
+    impCartao(nome, data, linhas.length-1, colunas, null, null, null, null, null, null, itens.length, pos);
   } else if(data && data.formato === "custos"){
     const idx = n => colunas.findIndex(c=>c.trim().toUpperCase() === n);
     const iS=idx("COD SINACOR CLIENTE SEM DIGITO"), iA=idx("ASSESSOR"),
@@ -4691,7 +4753,55 @@ async function impProcessarChegadas(){
   impHistorico();
 }
 
+// A receber_rf SUBSTITUI a posicao inteira: apaga por dt_posicao e regrava.
+// Por isso o envio e em UMA chamada so, nunca em blocos — mandar em blocos
+// faria cada bloco apagar o anterior. Se um dia o arquivo passar de ~8 mil
+// linhas, o desenho precisa mudar (area de espera antes da troca).
+async function impProcessarRF(){
+  const lote = window.__impRF;
+  if(!lote || !lote.itens.length) return;
+  if(!lote.dt_posicao){ toast("Arquivo sem DT_POSICAO."); return; }
+
+  const ok = confirm(
+    "Importar " + nf(lote.itens.length) + " títulos da posição de " +
+    fmtData(lote.dt_posicao) + "?\n\n" +
+    "Se esta posição já existe no sistema, ela é SUBSTITUÍDA por inteiro. " +
+    "As marcações de reaplicado/resgatado não são afetadas — elas vivem em " +
+    "outra tabela.\n\n" +
+    "Posições de outras datas continuam intactas: é assim que o histórico se forma.");
+  if(!ok) return;
+
+  const barra = document.createElement("div");
+  barra.className = "panel";
+  barra.style.cssText = "padding:16px 18px;margin-top:12px;border-left:3px solid var(--green)";
+  barra.innerHTML = '<div style="font-weight:700">Importando a posição…</div>';
+  el("impSaida").appendChild(barra);
+
+  const {data,error} = await sb.rpc("receber_rf",{
+    lote:{ dt_posicao: lote.dt_posicao, linhas: lote.itens }
+  });
+
+  if(error || !data || data.ok === false){
+    barra.style.borderLeftColor = "var(--red)";
+    const msg = error ? error.message : (data && data.erro) || "erro desconhecido";
+    barra.innerHTML = `<div style="font-weight:700;margin-bottom:6px">Não importou</div>
+      <div style="font-size:13px;color:var(--red)">${msg}</div>
+      ${data && data.antes ? `<div style="font-size:12.5px;color:var(--text-dim);margin-top:6px">
+        O sistema já tem ${nf(data.antes)} títulos nessa posição e o arquivo trouxe ${nf(data.recebidas)}.
+        Um arquivo menor não substitui um maior — é a trava que impede uma importação
+        parcial de apagar a posição boa.</div>` : ""}`;
+    return;
+  }
+
+  barra.innerHTML = `<div style="font-weight:700;margin-bottom:6px">Posição de ${fmtData(data.dt_posicao)} importada</div>
+    <div style="font-size:13px;color:var(--text-dim)">
+      ${nf(data.gravadas)} títulos gravados${data.antes?` · substituiu os ${nf(data.antes)} que estavam lá`:""}.
+      A aba Vencimentos já está lendo esta posição.</div>`;
+  toast("Vencimentos atualizados.");
+}
+
 async function impProcessarDiversificador(){
+
   const lote = window.__impDiv;
   if(!lote || !lote.itens.length) return;
 
@@ -4802,7 +4912,7 @@ async function impProcessarSaidas(){
   impHistorico();
 }
 
-function impCartao(nome, res, linhas, colunas, erroTxt, loteSaida, qtdPlat, qtdCusto, qtdDiv, qtdCheg){
+function impCartao(nome, res, linhas, colunas, erroTxt, loteSaida, qtdPlat, qtdCusto, qtdDiv, qtdCheg, qtdRF, posRF){
   if(loteSaida) window.__impSaidas = loteSaida;
   const reconhecido = res && res.reconhecido;
   const cor = erroTxt ? "var(--red)" : reconhecido ? "var(--green)" : "var(--amber)";
@@ -4829,6 +4939,11 @@ function impCartao(nome, res, linhas, colunas, erroTxt, loteSaida, qtdPlat, qtdC
               Atualizar ${nf(qtdDiv)} cadastros</button>` : ""}
             ${qtdCheg ? `<button class="cfg-save" style="margin-top:12px" onclick="impProcessarChegadas()">
               Confirmar ${nf(qtdCheg)} entrada(s)</button>` : ""}
+            ${qtdRF ? (posRF
+              ? `<button class="cfg-save" style="margin-top:12px" onclick="impProcessarRF()">
+                   Importar ${nf(qtdRF)} títulos · posição de ${fmtData(posRF)}</button>`
+              : `<div style="color:var(--red);font-size:13px;margin-top:10px">
+                   Não achei a data da posição (DT_POSICAO) no arquivo — sem ela não dá para importar.</div>`) : ""}
           </div>`
        : `<div style="margin-top:8px">
             <span class="tag t-amber">formato ainda não reconhecido</span>
@@ -5993,7 +6108,7 @@ function vencAtalho(k){
 }
 
 async function carregarVencLista(){
-  const {data,error} = await sb.rpc("rf_clientes",{
+  const {data,error} = await sb.rpc("rf_titulos",{
     p_busca: vencState.termo||null,
     p_barra: (vencState.barra && vencState.barra!=="todas") ? vencState.barra : null,
     p_de: vencState.de||null, p_ate: vencState.ate||null});
@@ -6001,27 +6116,32 @@ async function carregarVencLista(){
   const d=data||{}, linhas=d.linhas||[];
   el("vencResumo").innerHTML = avisoPosicao(d) + `
     <div class="venc-resumo">
-      <div class="vr-card"><div class="v">${nf(d.total_clientes)}</div><div class="k">clientes com renda fixa</div></div>
-      <div class="vr-card"><div class="v">${brl(d.total_bruto)}</div><div class="k">valor bruto na posição</div></div>
       <div class="vr-card"><div class="v">${nf(d.total_titulos)}</div><div class="k">títulos ${(d.de||d.ate)?"no período":"na posição"}</div></div>
+      <div class="vr-card"><div class="v">${nf(d.total_clientes)}</div><div class="k">clientes</div></div>
+      <div class="vr-card"><div class="v">${brl(d.total_bruto)}</div><div class="k">valor bruto</div></div>
+      ${d.em_aberto?`<div class="vr-card"><div class="v" style="color:#E86A6A">${nf(d.em_aberto)}</div><div class="k">venceram sem tratativa</div></div>`:""}
     </div>`;
-  if(!linhas.length){ el("vencLista").innerHTML='<div class="empty">Nenhum cliente encontrado.</div>'; return; }
+  if(!linhas.length){ el("vencLista").innerHTML='<div class="empty">Nenhum título encontrado neste filtro.</div>'; return; }
+
+  // Uma linha por TITULO. Dois vencimentos do mesmo cliente sao duas
+  // linhas — somar datas diferentes num total so foi o erro que essa
+  // tela ja teve.
   el("vencLista").innerHTML=`
-    <table><thead><tr><th>Cliente</th><th>Barra</th><th class="num">Títulos</th><th class="num">Valor bruto</th><th>Próximo vencimento</th><th>Tratativa</th></tr></thead>
+    <table><thead><tr><th>Cliente</th><th>Barra</th><th>Aplicação</th><th>Vencimento</th><th class="num">Valor bruto</th><th>Tratativa</th></tr></thead>
     <tbody>${linhas.map(l=>{
-      const cls = l.dias_proximo<0 ? "vs-vencido" : (l.dias_proximo<=30 ? "vs-a_vencer" : "vs-atual");
-      const txt = l.dias_proximo<0 ? "venceu "+fmtData(l.proximo_venc)
-                : l.dias_proximo===0 ? "HOJE"
-                : l.dias_proximo===1 ? "amanhã"
-                : fmtData(l.proximo_venc)+" · em "+nf(l.dias_proximo)+" dias";
-      const alerta = l.dias_proximo===0 && !l.status ? " linha-alerta" : "";
+      const cls = l.dias<0 ? "vs-vencido" : (l.dias===0 ? "vs-hoje" : (l.dias<=30 ? "vs-a_vencer" : "vs-atual"));
+      const txt = l.dias<0 ? "venceu "+fmtData(l.dt_vencimento)
+                : l.dias===0 ? "HOJE"
+                : l.dias===1 ? "amanhã"
+                : fmtData(l.dt_vencimento)+" · em "+nf(l.dias)+" dias";
+      const alerta = l.dias===0 && !l.status ? " linha-alerta" : "";
       return `<tr class="${alerta}" onclick="abrirVencCliente('${l.sinacor}')">
         <td><div class="cell-name"><span class="mini-av">${ini(l.cliente)}</span>${l.cliente||"—"}</div></td>
         <td>${l.barra||"—"}</td>
-        <td class="num">${nf(l.titulos)}</td>
-        <td class="num">${brl(l.total_bruto)}</td>
-        <td><span class="venc-sit ${l.dias_proximo===0?'vs-hoje':cls}">${txt}</span></td>
-        <td>${btnTratativa(l.sinacor,l.chave_proximo,l.proximo_venc,l.status,l.status_autor)}</td></tr>`;
+        <td>${l.produto||"—"}<div style="font-size:11px;color:var(--text-dim)">${l.emissor||""}</div></td>
+        <td><span class="venc-sit ${cls}">${txt}</span></td>
+        <td class="num">${brl(l.vl_bruto)}</td>
+        <td>${btnTratativa(l.sinacor,l.chave_titulo,l.dt_vencimento,l.status,l.status_autor)}</td></tr>`;
     }).join("")}</tbody></table>`;
 }
 
