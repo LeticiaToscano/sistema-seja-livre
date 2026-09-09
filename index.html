@@ -1062,6 +1062,7 @@
   .vpop-foot{display:flex;gap:10px;padding:0 20px 18px}
   .vpop-foot button{flex:1;border-radius:10px;padding:10px;font-size:13px;font-family:inherit;
     cursor:pointer;border:1px solid var(--line);background:#1A211D;color:var(--text)}
+  .vpop-foot .ok{background:rgba(58,190,120,.12);border-color:rgba(58,190,120,.4);color:var(--green)}
   .vpop-foot .prim{background:var(--green);color:#0A0D0C;border-color:var(--green);font-weight:650}
 </style>
 <!-- leitor de Excel: a planilha de custos vem em .xlsx, e converter para
@@ -5795,7 +5796,11 @@ async function carregarVencRadar(){
 }
 
 // ---- popup de entrada: uma vez por dia, e so quando ha algo ----
+// Chave do "Resolvido": vale so para o dia, e so neste navegador.
+const chaveResolvido = () => "venc_resolvido_" + hojeISO();
+
 async function popupVencimentos(){
+  try{ if(localStorage.getItem(chaveResolvido())) return; }catch(e){}
   const {data,error} = await sb.rpc("rf_radar");
   if(error) return;
   const d = data||{}, linhas = d.linhas||[];
@@ -5819,12 +5824,29 @@ async function popupVencimentos(){
     </div>
     <div class="vpop-foot">
       <button onclick="fecharPopupVenc()">Depois</button>
+      <button class="ok" onclick="resolverPopupVenc()">Resolvido</button>
       <button class="prim" onclick="fecharPopupVenc();irParaVencimentos()">Abrir Vencimentos</button>
     </div>`;
   el("vpopBack").classList.add("open");
 }
 function fecharPopupVenc(){ el("vpopBack").classList.remove("open"); }
+
+// "Resolvido" cala o popup pelo resto do dia. Vale por navegador: quem
+// abrir o sistema em outra maquina volta a ver o aviso.
+function resolverPopupVenc(){
+  try{ localStorage.setItem(chaveResolvido(),"1"); }catch(e){}
+  fecharPopupVenc();
+  toast("Vencimentos de hoje marcados como resolvidos.");
+}
+
+// Abre a aba mostrando SO o que estava no popup: hoje e amanha.
 function irParaVencimentos(){
+  const hj=new Date(), iso=d=>d.toISOString().slice(0,10);
+  vencState.aba="clientes";
+  vencState.termo=""; vencState.barra="todas";
+  vencState.atalho=""; 
+  vencState.de=iso(hj);
+  vencState.ate=iso(new Date(hj.getTime()+86400000));
   document.querySelectorAll(".nav-item").forEach(x=>x.classList.remove("active"));
   const b=document.querySelector('.nav-item[data-view="vencimentos"]');
   if(b) b.classList.add("active");
