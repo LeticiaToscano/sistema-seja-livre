@@ -1023,6 +1023,24 @@
   .venc-busca select:focus{outline:none;border-color:var(--green)}
   #vencBarras tfoot td{border-top:1px solid var(--line);color:var(--text)}
 
+  .dias-faixa{margin:0 0 16px}
+  .df-rot{font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--text-faint);margin-bottom:7px}
+  .df-lista{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;scrollbar-width:thin}
+  .df-lista::-webkit-scrollbar{height:6px}
+  .df-lista::-webkit-scrollbar-thumb{background:#243029;border-radius:99px}
+  .df-chip{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:1px;
+    background:#161B18;border:1px solid var(--line);border-radius:10px;
+    padding:7px 11px;cursor:pointer;font-family:inherit;min-width:56px}
+  .df-chip:hover{border-color:#2E3A33}
+  .df-chip .dd{font-size:12px;color:var(--text-dim)}
+  .df-chip .dn{font-size:14px;font-weight:700;color:var(--text)}
+  .df-chip.on{background:rgba(58,190,120,.14);border-color:var(--green)}
+  .df-chip.on .dd,.df-chip.on .dn{color:var(--green)}
+  .df-chip.hoje{border-color:#E86A6A}
+  .df-chip.hoje .dd{color:#E86A6A;font-weight:650}
+  .df-chip.pend{opacity:.62}
+  .df-chip.pend .dn{color:var(--amber)}
+
   .venc-periodo{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:-4px 0 14px}
   .vp-atalhos{display:flex;gap:6px;flex-wrap:wrap}
   .vp-btn{background:#161B18;border:1px solid var(--line);color:var(--text-dim);
@@ -5992,7 +6010,7 @@ async function vVencimentos(){
       </div>
       <div class="venc-periodo">
         <div class="vp-atalhos">
-          ${[["hoje","Hoje"],["amanha","Amanhã"],["7","7 dias"],["30","30 dias"],["90","90 dias"],["vencidos","Já vencidos"],["todos","Todos"]]
+          ${[["hoje","Hoje"],["amanha","Amanhã"],["vencidos","Já vencidos"],["todos","Todos"]]
             .map(([k,r])=>`<button class="vp-btn ${vencState.atalho===k?'on':''}" onclick="vencAtalho('${k}')">${r}</button>`).join("")}
         </div>
         <div class="vp-datas">
@@ -6000,6 +6018,7 @@ async function vVencimentos(){
           <label>até</label><input type="date" id="vencAte" value="${vencState.ate}">
         </div>
       </div>
+      <div class="dias-faixa" id="vencDias"></div>
       <div id="vencResumo"></div>
       <div class="panel" id="vencLista"><div class="loading"><div class="spinner"></div>Carregando…</div></div>
     </div>
@@ -6020,9 +6039,50 @@ async function vVencimentos(){
     carregarVencLista();
   }));
   el("vencBarra").addEventListener("change",e=>{
-    vencState.barra=e.target.value; carregarVencLista();
+    vencState.barra=e.target.value; carregarVencDias(); carregarVencLista();
   });
   carregarVencBarras();
+  carregarVencDias();
+  carregarVencLista();
+}
+
+// ---- os dias que realmente tem vencimento ----
+// Substitui os atalhos de 7/30/90: em vez de apostar numa data, mostra
+// onde ha titulo. Cada chip e um dia; o numero e quantos titulos vencem
+// nele. Dia com titulo ja vencido e sem tratativa aparece em vermelho.
+async function carregarVencDias(){
+  const {data,error} = await sb.rpc("rf_dias",{
+    p_barra:(vencState.barra && vencState.barra!=="todas") ? vencState.barra : null});
+  const alvo = el("vencDias"); if(!alvo) return;
+  if(error || !data){ alvo.innerHTML=""; return; }
+  const dias = data.dias||[];
+  if(!dias.length){ alvo.innerHTML='<div class="empty" style="padding:10px">Nenhum vencimento nesta posição.</div>'; return; }
+  const hojeStr = data.hoje;
+  alvo.innerHTML = `<div class="df-rot">Dias com vencimento</div><div class="df-lista" id="dfLista">${
+    dias.map(d=>{
+      const sel = (vencState.de===d.dia && vencState.ate===d.dia) ? " on" : "";
+      const hoje = d.dia===hojeStr ? " hoje" : "";
+      const pend = (d.passado && d.sem_tratativa>0) ? " pend" : "";
+      const [a,m,di] = d.dia.split("-");
+      return `<button class="df-chip${sel}${hoje}${pend}" onclick="vencDia('${d.dia}')"
+        title="${nf(d.clientes)} cliente(s) · ${brl(d.bruto)}">
+        <span class="dd">${di}/${m}</span><span class="dn">${nf(d.titulos)}</span></button>`;
+    }).join("")}</div>`;
+  // abre a faixa ja perto de hoje, nao no comeco do historico
+  const marca = alvo.querySelector(".df-chip.hoje") || alvo.querySelector(".df-chip:not(.pend)");
+  if(marca) marca.scrollIntoView({block:"nearest", inline:"center"});
+}
+
+function vencDia(dia){
+  const limpar = (vencState.de===dia && vencState.ate===dia);   // clicar de novo solta o dia
+  vencState.de = limpar ? "" : dia;
+  vencState.ate = limpar ? "" : dia;
+  vencState.atalho = limpar ? "todos" : "";
+  el("vencDe").value=vencState.de; el("vencAte").value=vencState.ate;
+  document.querySelectorAll(".vp-btn").forEach(b=>
+    b.classList.toggle("on", limpar && b.getAttribute("onclick").includes("'todos'")));
+  document.querySelectorAll(".df-chip").forEach(b=>
+    b.classList.toggle("on", !limpar && b.getAttribute("onclick").includes("'"+dia+"'")));
   carregarVencLista();
 }
 
@@ -6099,17 +6159,13 @@ function vencAtalho(k){
   else if(k==="hoje"){ vencState.de=iso(hj); vencState.ate=iso(hj); }
   else if(k==="amanha"){ const a=new Date(hj.getTime()+86400000); vencState.de=iso(a); vencState.ate=iso(a); }
   else if(k==="vencidos"){ vencState.de=""; vencState.ate=iso(new Date(hj.getTime()-86400000)); }
-  else {
-    // Cada atalho e UM DIA, nao uma janela: "7 dias" mostra o que vence
-    // no setimo dia, sem misturar com o de hoje. Para ver um intervalo,
-    // os campos de data ao lado fazem isso.
-    const alvo = iso(new Date(hj.getTime()+Number(k)*86400000));
-    vencState.de=alvo; vencState.ate=alvo;
-  }
+  else { vencState.de=""; vencState.ate=""; }
   el("vencDe").value=vencState.de; el("vencAte").value=vencState.ate;
   document.querySelectorAll(".vp-btn").forEach(b=>b.classList.remove("on"));
   const b=[...document.querySelectorAll(".vp-btn")].find(x=>x.getAttribute("onclick").includes("'"+k+"'"));
   if(b) b.classList.add("on");
+  document.querySelectorAll(".df-chip").forEach(c=>c.classList.toggle("on",
+    vencState.de && c.getAttribute("onclick").includes("'"+vencState.de+"'") && vencState.de===vencState.ate));
   carregarVencLista();
 }
 
