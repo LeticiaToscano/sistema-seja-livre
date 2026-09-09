@@ -1320,6 +1320,7 @@ el("logoutBtn").addEventListener("click", async ()=>{ await sb.auth.signOut(); l
 async function mostrarApp(session){
   el("login").classList.add("hidden"); el("app").classList.remove("hidden");
   const email = session.user.email;
+  USUARIO_ID = session.user.id;
   // busca o papel/nome do assessor logado
   let nome=email, papel="—";
   const {data:a} = await sb.from("assessores").select("nome,papel").eq("auth_user_id",session.user.id).maybeSingle();
@@ -5796,8 +5797,11 @@ async function carregarVencRadar(){
 }
 
 // ---- popup de entrada: uma vez por dia, e so quando ha algo ----
-// Chave do "Resolvido": vale so para o dia, e so neste navegador.
-const chaveResolvido = () => "venc_resolvido_" + hojeISO();
+// Chave do "Resolvido": por PESSOA e por dia. Incluir o id do usuario
+// evita que, numa maquina compartilhada, o clique de um cale o aviso do
+// proximo que logar ali. Ainda e local: em outro navegador, reaparece.
+let USUARIO_ID = null;
+const chaveResolvido = () => "venc_resolvido_" + (USUARIO_ID||"anon") + "_" + hojeISO();
 
 async function popupVencimentos(){
   try{ if(localStorage.getItem(chaveResolvido())) return; }catch(e){}
