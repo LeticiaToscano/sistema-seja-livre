@@ -1470,10 +1470,40 @@ async function carregarFilaFull(){
 function mudarFila(d){ filaState.page=Math.max(0,filaState.page+d); carregarFilaFull(); document.querySelector(".main").scrollTop=0; }
 
 // ---------- ANIVERSARIANTES (tela cheia) ----------
+// Aviso com antecedencia para dar tempo de comprar e mandar presente.
+// Quinze dias e a janela pedida; o dia exato aparece em cada linha para
+// nao virar "faz aniversario em algum momento por ai".
+async function carregarAnivPreta(){
+  const {data,error} = await sb.rpc("aniversarios_proximos",{p_dias:15, p_faixas:["preta"]});
+  const alvo = el("anivPreta"); if(!alvo) return;
+  if(error){ return erro(error,"anivPreta"); }
+  const linhas = (data&&data.linhas)||[];
+  if(!linhas.length){
+    alvo.innerHTML='<div class="empty">Nenhum cliente faixa preta faz aniversário nos próximos 15 dias.</div>';
+    return;
+  }
+  alvo.innerHTML = `<table><thead><tr><th>Cliente</th><th>Barra</th><th>Faixa</th><th>Aniversário</th><th>Quando</th></tr></thead>
+    <tbody>${linhas.map(c=>{
+      const q = c.dias===0 ? '<span class="venc-sit vs-hoje">HOJE</span>'
+              : c.dias===1 ? '<span class="venc-sit vs-a_vencer">amanhã</span>'
+              : `<span class="venc-sit ${c.dias<=5?'vs-a_vencer':'vs-atual'}">em ${nf(c.dias)} dias</span>`;
+      return `<tr onclick="abrirFicha('${c.id}')">
+        <td><div class="cell-name"><span class="mini-av">${ini(c.nome)}</span>${c.nome}</div></td>
+        <td>${c.barra||"—"}</td>
+        <td>${faixaBadge(c.faixa,c.grau)}</td>
+        <td class="num">${c.aniversario}</td>
+        <td>${q}</td></tr>`;
+    }).join("")}</tbody></table>
+    <div class="stack-cap" style="margin-top:10px">${nf(linhas.length)} cliente(s) faixa preta com aniversário em até 15 dias. A faixa é a do mês corrente — quem cair de faixa até lá deixa de aparecer aqui.</div>`;
+}
+
 async function vAniversariantes(){
   el("content").innerHTML=`
-    <div class="sec-title">Aniversariantes de hoje<span class="rule"></span></div>
+    <div class="sec-title">Faixa preta nos próximos 15 dias<span class="rule"></span></div>
+    <div class="panel" id="anivPreta"><div class="loading"><div class="spinner"></div>Carregando…</div></div>
+    <div class="sec-title" style="margin-top:22px">Aniversariantes de hoje<span class="rule"></span></div>
     <div class="panel" id="anivFull"><div class="loading"><div class="spinner"></div>Carregando…</div></div>`;
+  carregarAnivPreta();
   const {data,error} = await sb.from("vw_aniversariantes_hoje").select("id,nome,barra,sinacor,faixa,grau,parceiros").limit(200);
   if(error){ return erro(error,"anivFull"); }
   if(!data||!data.length){ el("anivFull").innerHTML='<div class="empty">Nenhum aniversariante hoje.</div>'; return; }
