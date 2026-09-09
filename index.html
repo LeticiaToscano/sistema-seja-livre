@@ -973,6 +973,63 @@
       animation:none !important; opacity:1 !important; transform:none !important;
     }
   }
+
+  /* ===== VENCIMENTOS DE RENDA FIXA ===== */
+  .venc-stale{display:flex;align-items:center;gap:8px;background:rgba(224,168,74,.10);
+    border:1px solid rgba(224,168,74,.32);color:var(--amber);border-radius:10px;
+    padding:9px 12px;font-size:12.5px;margin-bottom:12px}
+  .venc-stale b{color:var(--amber)}
+  .venc-quando{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.4px;
+    text-transform:uppercase;padding:2px 8px;border-radius:999px}
+  .vq-hoje{background:rgba(224,74,74,.16);color:#E86A6A;border:1px solid rgba(224,74,74,.35)}
+  .vq-amanha{background:rgba(224,168,74,.14);color:var(--amber);border:1px solid rgba(224,168,74,.32)}
+  .venc-resumo{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+  .vr-card{flex:1;min-width:150px;background:var(--panel);border:1px solid var(--line);
+    border-radius:12px;padding:12px 14px}
+  .vr-card .v{font-size:20px;font-weight:700;letter-spacing:-.5px}
+  .vr-card .k{font-size:11.5px;color:var(--text-dim);margin-top:2px}
+  .venc-sit{display:inline-block;font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:999px}
+  .vs-atual{background:rgba(58,190,120,.14);color:var(--green)}
+  .vs-a_vencer{background:rgba(224,168,74,.16);color:var(--amber)}
+  .vs-vencido{background:rgba(224,74,74,.16);color:#E86A6A}
+  .vs-encerrado{background:#222824;color:var(--text-dim)}
+  .venc-busca{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+  .venc-busca input{flex:1;min-width:220px;background:var(--panel);border:1px solid var(--line);
+    color:var(--text);border-radius:10px;padding:10px 13px;font-size:13.5px;font-family:inherit}
+  .venc-busca input:focus{outline:none;border-color:var(--green)}
+  .dr-venc-tot{display:flex;gap:14px;flex-wrap:wrap;margin:4px 0 16px}
+  .dr-venc-tot div{background:#161B18;border:1px solid var(--line);border-radius:10px;padding:9px 12px;flex:1;min-width:110px}
+  .dr-venc-tot .v{font-size:16px;font-weight:700}
+  .dr-venc-tot .k{font-size:11px;color:var(--text-dim)}
+
+  /* popup de entrada */
+  .vpop-back{position:fixed;inset:0;background:rgba(0,0,0,.66);backdrop-filter:blur(3px);
+    z-index:120;display:flex;align-items:center;justify-content:center;padding:20px;
+    opacity:0;pointer-events:none;transition:opacity .18s ease}
+  .vpop-back.open{opacity:1;pointer-events:auto}
+  .vpop{background:var(--panel);border:1px solid var(--line);border-radius:16px;
+    width:min(560px,100%);max-height:82vh;overflow:auto;box-shadow:0 24px 60px rgba(0,0,0,.5);
+    transform:translateY(10px);transition:transform .18s ease}
+  .vpop-back.open .vpop{transform:none}
+  .vpop-head{display:flex;align-items:flex-start;gap:12px;padding:18px 20px 12px;border-bottom:1px solid var(--line)}
+  .vpop-head .ico{width:36px;height:36px;border-radius:10px;background:rgba(224,168,74,.14);
+    color:var(--amber);display:grid;place-items:center;flex-shrink:0}
+  .vpop-head h3{font-size:15.5px;font-weight:650;margin:0}
+  .vpop-head p{font-size:12.5px;color:var(--text-dim);margin:3px 0 0}
+  .vpop-close{margin-left:auto;background:none;border:none;color:var(--text-dim);
+    font-size:17px;cursor:pointer;line-height:1;padding:2px 4px}
+  .vpop-close:hover{color:var(--text)}
+  .vpop-body{padding:14px 20px 18px}
+  .vpop-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer}
+  .vpop-item:last-child{border-bottom:none}
+  .vpop-item:hover .vn{color:var(--green)}
+  .vpop-item .vn{font-size:13.5px;font-weight:600}
+  .vpop-item .vb{font-size:11.5px;color:var(--text-dim)}
+  .vpop-item .vv{margin-left:auto;text-align:right;font-size:13.5px;font-weight:650}
+  .vpop-foot{display:flex;gap:10px;padding:0 20px 18px}
+  .vpop-foot button{flex:1;border-radius:10px;padding:10px;font-size:13px;font-family:inherit;
+    cursor:pointer;border:1px solid var(--line);background:#1A211D;color:var(--text)}
+  .vpop-foot .prim{background:var(--green);color:#0A0D0C;border-color:var(--green);font-weight:650}
 </style>
 <!-- leitor de Excel: a planilha de custos vem em .xlsx, e converter para
      CSV todo mês seria um passo a mais sem motivo -->
@@ -1019,6 +1076,7 @@
       <button class="nav-item" data-view="plataformas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8M12 18v3" stroke-linecap="round"/></svg>Plataformas</button>
       <button class="nav-item" data-view="fila"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h10M4 12h10M4 18h7" stroke-linecap="round"/><path d="M17 15l2.2 2.2L23 13" stroke-linecap="round" stroke-linejoin="round"/></svg>Fila de ação</button>
       <button class="nav-item" data-view="aniversariantes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20h16v-8H4z"/><path d="M4 14c2 0 2-1.3 4-1.3s2 1.3 4 1.3 2-1.3 4-1.3 2 1.3 4 1.3" stroke-linecap="round"/><path d="M12 8V5" stroke-linecap="round"/></svg>Aniversariantes</button>
+      <button class="nav-item" data-view="vencimentos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4" stroke-linecap="round"/><path d="M12 13v3.5l2 1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Vencimentos</button>
       <button class="nav-item" data-view="solicitacoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h16v14H4z"/><path d="M4 9h16M9 5v4" stroke-linecap="round"/><path d="M8 14l2.5 2.5L16 11" stroke-linecap="round" stroke-linejoin="round"/></svg>Solicitações</button>
 
       <div class="nav-label">Atendimento</div>
@@ -1080,6 +1138,7 @@
 </div>
 
 <div class="overlay" id="overlay"></div>
+<div class="vpop-back" id="vpopBack"><div class="vpop" id="vpop"></div></div>
 <aside class="drawer" id="drawer">
   <div class="dr-head"><button class="dr-close" id="drClose">✕</button><div class="dr-badges" id="drStatus"></div><div class="dr-name" id="drName"></div><div class="dr-sub" id="drSub"></div><div class="dr-actions" id="drActions"></div></div>
   <div class="dr-body" id="drBody"></div>
@@ -1235,6 +1294,7 @@ async function mostrarApp(session){
   el("userRole").textContent = papel==="admin"?"Administrador":papel==="gerencia"?"Gerência":"Assessor";
   render("radar");
   carregarNotif();
+  popupVencimentos();
   document.addEventListener("click",e=>{ if(!e.target.closest(".notif-wrap")) el("notifPanel").classList.remove("open"); });
 }
 
@@ -1245,6 +1305,7 @@ const TITLES={
   multiconta:["CARTEIRA","Mesmo CPF · clientes com mais de uma conta"],
   publico:["CARTEIRA","Público · quem são os nossos clientes"],
   fila:["CARTEIRA","Fila de ação"], aniversariantes:["CARTEIRA","Aniversariantes"],
+  vencimentos:["CARTEIRA","Vencimentos · renda fixa"],
   solicitacoes:["CARTEIRA","Solicitações"],
   fluxos:["ATENDIMENTO","Fluxos"], assessores:["ATENDIMENTO","Assessores"],
   config:["GESTÃO","Configurações"], auditoria:["GESTÃO","Auditoria"],
@@ -1267,7 +1328,7 @@ const RESERVADAS={
   ia:{icon:"ia",desc:"O diagnóstico estratégico da operação em linguagem natural, e o copiloto de IA por assessor — cada um enxergando apenas a própria carteira."},
   integracoes:{icon:"integracoes",desc:"As conexões do sistema — Volume Operado (operação), RD Conversas (atendimento), Gmail/Genial (entrada de clientes) e IA. Ligadas e a ligar."}
 };
-const VIEWS={sdr:vSDR,radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,multiconta:vMulticonta,publico:vPublico,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes,auditoria:vAuditoria,diagnostico:vDiagnostico,legenda:vLegenda,leads:vLeads,importacoes:vImportacoes,saidas:vSaidas,plataformas:vPlataformas,custos:vCustos,conferencia:vConferencia,ranking:vRanking,assessores:vAssessores};
+const VIEWS={sdr:vSDR,radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,multiconta:vMulticonta,publico:vPublico,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes,auditoria:vAuditoria,diagnostico:vDiagnostico,legenda:vLegenda,leads:vLeads,importacoes:vImportacoes,saidas:vSaidas,plataformas:vPlataformas,custos:vCustos,conferencia:vConferencia,ranking:vRanking,assessores:vAssessores,vencimentos:vVencimentos};
 document.querySelectorAll(".nav-item").forEach(b=>b.addEventListener("click",()=>{
   document.querySelectorAll(".nav-item").forEach(x=>x.classList.remove("active"));
   b.classList.add("active"); fecharMenu(); render(b.dataset.view);
@@ -1416,6 +1477,9 @@ async function vRadar(){
       ${bloco("Nunca operou",nunca,"var(--text-dim)",'<span class="tag t-red">ativar</span>')}
     </div>
 
+    <div class="sec-title">Vencimentos de hoje e amanhã<span class="rule"></span></div>
+    <div class="panel" id="vencRadar"><div class="loading"><div class="spinner"></div>Carregando…</div></div>
+
     <div class="radar-lower">
       <div>
         <div class="sec-title">Fila de ação · maior volume parado<span class="rule"></span></div>
@@ -1430,6 +1494,7 @@ async function vRadar(){
 
   carregarFila();
   carregarAniversariantes();
+  carregarVencRadar();
   carregarMovimentoHoje();
 }
 function hojeISO(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
@@ -5659,6 +5724,173 @@ async function dgAbrir(codigo, manterPosicao){
     <div style="padding:11px 16px;font-size:11px;color:var(--text-faint)">
       Mostrando ${nf(data.length)} de ${nf(count)} · ordenados por volume operado ·
       o CSV leva o que estiver neste filtro</div>`;
+}
+
+
+// ---------- VENCIMENTOS DE RENDA FIXA ----------
+// A posicao vem de um arquivo importado sem periodicidade fixa. Por isso
+// TODA tela daqui mostra de quando e a foto: um numero de junho nao serve
+// para ligar para cliente em setembro, e a tela tem que dizer isso.
+const brl = v => (v==null ? "—" : Number(v).toLocaleString("pt-BR",
+  {style:"currency",currency:"BRL",maximumFractionDigits:2}));
+
+function avisoPosicao(d){
+  if(d.dt_posicao==null) return '<div class="venc-stale">Nenhuma posição importada ainda.</div>';
+  if(d.idade_dias>7) return `<div class="venc-stale">Posição de <b>${fmtData(d.dt_posicao)}</b> · ${nf(d.idade_dias)} dias atrás — importe um arquivo novo antes de agir por estes números.</div>`;
+  return "";
+}
+
+// ---- bloco fixo no Radar (fica sempre, mesmo sem vencimento) ----
+async function carregarVencRadar(){
+  const {data,error} = await sb.rpc("rf_radar");
+  if(error){ return erro(error,"vencRadar"); }
+  const d = data||{}, linhas = d.linhas||[];
+  if(!linhas.length){
+    el("vencRadar").innerHTML = avisoPosicao(d) + '<div class="empty">Nenhum vencimento hoje ou amanhã.</div>';
+    return;
+  }
+  el("vencRadar").innerHTML = avisoPosicao(d) + `
+    <table><thead><tr><th>Cliente</th><th>Barra</th><th>Aplicação</th><th>Quando</th><th class="num">Valor bruto</th></tr></thead>
+    <tbody>${linhas.map(l=>`<tr onclick="abrirVencCliente('${l.sinacor}')">
+      <td><div class="cell-name"><span class="mini-av">${ini(l.cliente)}</span>${l.cliente||"—"}</div></td>
+      <td>${l.barra||"—"}</td>
+      <td>${l.produto||"—"}<div class="ab" style="font-size:11px;color:var(--text-dim)">${l.emissor||""}</div></td>
+      <td><span class="venc-quando ${l.quando==='hoje'?'vq-hoje':'vq-amanha'}">${l.quando==='hoje'?'hoje':'amanhã'}</span></td>
+      <td class="num">${brl(l.vl_bruto)}</td></tr>`).join("")}</tbody></table>
+    <div class="stack-cap" style="margin-top:10px">${nf(d.qtd_hoje)} vencendo hoje (${brl(d.bruto_hoje)}) e ${nf(d.qtd_amanha)} amanhã (${brl(d.bruto_amanha)}). Clique no nome para ver o histórico do cliente.</div>`;
+}
+
+// ---- popup de entrada: uma vez por dia, e so quando ha algo ----
+async function popupVencimentos(){
+  const chave = "venc_popup_" + hojeISO();
+  try{ if(localStorage.getItem(chave)) return; }catch(e){}
+  const {data,error} = await sb.rpc("rf_radar");
+  if(error) return;
+  const d = data||{}, linhas = d.linhas||[];
+  if(!linhas.length) return;                 // nada vencendo: nao incomoda
+  el("vpop").innerHTML = `
+    <div class="vpop-head">
+      <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><path d="M12 7v5.2l3.2 2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div>
+        <h3>${nf(d.qtd_total)} ${d.qtd_total===1?"aplicação vence":"aplicações vencem"} hoje ou amanhã</h3>
+        <p>${brl((d.bruto_hoje||0)+(d.bruto_amanha||0))} no total · posição de ${fmtData(d.dt_posicao)}</p>
+      </div>
+      <button class="vpop-close" onclick="fecharPopupVenc()">✕</button>
+    </div>
+    <div class="vpop-body">
+      ${d.idade_dias>7?`<div class="venc-stale">Posição de ${nf(d.idade_dias)} dias atrás — confirme antes de ligar.</div>`:""}
+      ${linhas.slice(0,8).map(l=>`<div class="vpop-item" onclick="fecharPopupVenc();abrirVencCliente('${l.sinacor}')">
+        <span class="venc-quando ${l.quando==='hoje'?'vq-hoje':'vq-amanha'}">${l.quando==='hoje'?'hoje':'amanhã'}</span>
+        <div><div class="vn">${l.cliente||"—"}</div><div class="vb">${l.barra||"—"} · ${l.produto||""}</div></div>
+        <div class="vv">${brl(l.vl_bruto)}</div></div>`).join("")}
+      ${linhas.length>8?`<div class="vb" style="padding-top:10px">e mais ${nf(linhas.length-8)} na aba Vencimentos</div>`:""}
+    </div>
+    <div class="vpop-foot">
+      <button onclick="fecharPopupVenc()">Depois</button>
+      <button class="prim" onclick="fecharPopupVenc();irParaVencimentos()">Abrir Vencimentos</button>
+    </div>`;
+  el("vpopBack").classList.add("open");
+  try{ localStorage.setItem(chave,"1"); }catch(e){}
+}
+function fecharPopupVenc(){ el("vpopBack").classList.remove("open"); }
+function irParaVencimentos(){
+  document.querySelectorAll(".nav-item").forEach(x=>x.classList.remove("active"));
+  const b=document.querySelector('.nav-item[data-view="vencimentos"]');
+  if(b) b.classList.add("active");
+  render("vencimentos");
+}
+document.addEventListener("DOMContentLoaded",()=>{
+  const back=el("vpopBack");
+  if(back) back.addEventListener("click",e=>{ if(e.target===back) fecharPopupVenc(); });
+});
+
+// ---- aba Vencimentos: todos os clientes ----
+let vencState={termo:""};
+async function vVencimentos(){
+  el("content").innerHTML=`
+    <div class="venc-busca">
+      <input id="vencBusca" placeholder="Buscar por nome, Sinacor ou CPF…" value="${vencState.termo}">
+    </div>
+    <div id="vencResumo"></div>
+    <div class="panel" id="vencLista"><div class="loading"><div class="spinner"></div>Carregando…</div></div>`;
+  let t=null;
+  el("vencBusca").addEventListener("input",e=>{
+    vencState.termo=e.target.value;
+    clearTimeout(t); t=setTimeout(carregarVencLista,350);
+  });
+  carregarVencLista();
+}
+
+async function carregarVencLista(){
+  const {data,error} = await sb.rpc("rf_clientes",{p_busca: vencState.termo||null, p_barra:null});
+  if(error){ return erro(error,"vencLista"); }
+  const d=data||{}, linhas=d.linhas||[];
+  el("vencResumo").innerHTML = avisoPosicao(d) + `
+    <div class="venc-resumo">
+      <div class="vr-card"><div class="v">${nf(d.total_clientes)}</div><div class="k">clientes com renda fixa</div></div>
+      <div class="vr-card"><div class="v">${brl(d.total_bruto)}</div><div class="k">valor bruto na posição</div></div>
+      <div class="vr-card"><div class="v">${nf(linhas.filter(l=>l.vencem_30d>0).length)}</div><div class="k">com vencimento em 30 dias</div></div>
+    </div>`;
+  if(!linhas.length){ el("vencLista").innerHTML='<div class="empty">Nenhum cliente encontrado.</div>'; return; }
+  el("vencLista").innerHTML=`
+    <table><thead><tr><th>Cliente</th><th>Barra</th><th class="num">Títulos</th><th class="num">Valor bruto</th><th>Próximo vencimento</th></tr></thead>
+    <tbody>${linhas.map(l=>{
+      const cls = l.dias_proximo<0 ? "vs-vencido" : (l.dias_proximo<=30 ? "vs-a_vencer" : "vs-atual");
+      const txt = l.dias_proximo<0 ? "venceu "+fmtData(l.proximo_venc)
+                : l.dias_proximo===0 ? "hoje"
+                : l.dias_proximo===1 ? "amanhã"
+                : fmtData(l.proximo_venc)+" · em "+nf(l.dias_proximo)+" dias";
+      return `<tr onclick="abrirVencCliente('${l.sinacor}')">
+        <td><div class="cell-name"><span class="mini-av">${ini(l.cliente)}</span>${l.cliente||"—"}</div></td>
+        <td>${l.barra||"—"}</td>
+        <td class="num">${nf(l.titulos)}</td>
+        <td class="num">${brl(l.total_bruto)}</td>
+        <td><span class="venc-sit ${cls}">${txt}</span></td></tr>`;
+    }).join("")}</tbody></table>`;
+}
+
+// ---- clique no nome: tudo sobre os vencimentos daquele cliente ----
+const VENC_SIT = {atual:"em carteira", a_vencer:"vence em 30 dias", vencido:"vencido", encerrado:"encerrado"};
+
+async function abrirVencCliente(sinacor){
+  el("overlay").classList.add("open"); el("drawer").classList.add("open");
+  el("drBody").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
+  el("drName").textContent=""; el("drSub").textContent="";
+  el("drStatus").innerHTML=""; el("drActions").innerHTML="";
+  const {data,error} = await sb.rpc("rf_cliente",{p_sinacor:String(sinacor)});
+  if(error||!data){ el("drBody").innerHTML='<div class="empty">Não foi possível carregar os vencimentos.</div>'; return; }
+  const d=data, tit=d.titulos||[];
+  el("drName").textContent = d.cliente||("Sinacor "+sinacor);
+  el("drSub").innerHTML = `Sinacor ${d.sinacor} · ${d.barra||"sem barra"}`;
+  el("drActions").innerHTML = btnRD(d.cliente||"");
+
+  const cat = (d.por_categoria||[]).map(c=>
+    `<tr><td>${c.categoria||"—"}</td><td class="num">${nf(c.titulos)}</td><td class="num">${brl(c.bruto)}</td></tr>`).join("");
+
+  el("drBody").innerHTML = `
+    <div class="dr-venc-tot">
+      <div><div class="v">${brl(d.total_ativo)}</div><div class="k">em carteira</div></div>
+      <div><div class="v">${nf(d.qtd_ativo)}</div><div class="k">títulos ativos</div></div>
+      <div><div class="v">${nf(d.qtd_encerrado)}</div><div class="k">encerrados</div></div>
+    </div>
+    ${d.posicoes<2?'<div class="venc-stale">Só uma posição importada — o histórico de encerrados começa a existir a partir do segundo arquivo.</div>':''}
+
+    <div class="sec-title">Por categoria<span class="rule"></span></div>
+    <table><thead><tr><th>Categoria</th><th class="num">Títulos</th><th class="num">Bruto</th></tr></thead>
+      <tbody>${cat||'<tr><td colspan="3">—</td></tr>'}</tbody></table>
+
+    <div class="sec-title" style="margin-top:18px">Todos os títulos<span class="rule"></span></div>
+    <table><thead><tr><th>Aplicação</th><th>Vencimento</th><th class="num">Bruto</th><th>Situação</th></tr></thead>
+      <tbody>${tit.map(t=>`<tr>
+        <td>${t.produto||"—"}<div style="font-size:11px;color:var(--text-dim)">${t.emissor||""}${t.cd_cetip?" · "+t.cd_cetip:""}</div></td>
+        <td>${fmtData(t.dt_vencimento)}<div style="font-size:11px;color:var(--text-dim)">${
+            t.situacao==='encerrado' ? "visto até "+fmtData(t.visto_ate)
+            : t.dias<0 ? "há "+nf(Math.abs(t.dias))+" dias"
+            : "em "+nf(t.dias)+" dias"}</div></td>
+        <td class="num">${brl(t.vl_bruto)}</td>
+        <td><span class="venc-sit vs-${t.situacao}">${VENC_SIT[t.situacao]||t.situacao}</span></td>
+      </tr>`).join("")}</tbody></table>
+    <div class="note" style="margin-top:14px">Aplicado em ${fmtData(tit.length?tit[0].dt_operacao:null)} · ${nf(d.posicoes)} posição(ões) importada(s) · foto de ${fmtData(d.dt_posicao)}. "Encerrado" quer dizer que o título sumiu da posição mais recente — foi resgatado ou reaplicado.</div>`;
 }
 
 // ---------- FICHA (drawer) ----------
