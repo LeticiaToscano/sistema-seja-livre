@@ -6610,6 +6610,7 @@ async function abrirFicha(id){
     <div class="dr-sec">Evolução de faixa · últimos 3 meses</div>
     <div class="timeline">${timeline}</div>
     <div id="fcPlat"></div>
+    <div id="fcZeragem"></div>
 
     <div class="dr-sec">Perfil do cliente</div>
     <div class="dr-stats">
@@ -6661,6 +6662,52 @@ async function abrirFicha(id){
 
   fcCarregarHistorico(c.id);
   fcPlataforma(c.sinacor);
+  fcZeragem(c.sinacor);
+}
+
+
+// ---------- ZERAGEM NA FICHA ----------
+// Mes a mes, com as duas medidas separadas. A coluna Bovespa e
+// FINANCEIRO em reais; a de BMF sao CONTRATOS. A mesma coluna
+// `quantidade` guarda as duas grandezas no banco e so o mercado
+// distingue — somar as duas produz numero sem sentido.
+async function fcZeragem(sinacor){
+  const alvo = el("fcZeragem"); if(!alvo || !sinacor) return;
+  const {data,error} = await sb.rpc("zeragem_mensal",{p_sinacor:String(sinacor)});
+  if(error){ alvo.innerHTML=""; return; }
+  const d=data||{}, linhas=d.linhas||[];
+  if(!linhas.length){
+    alvo.innerHTML = `<div class="dr-sec">Zeragem</div>
+      <div class="empty" style="padding:18px">Nunca foi zerado pela mesa.</div>`;
+    return;
+  }
+  const temBov = linhas.some(l=>Number(l.financeiro_bov)>0);
+  alvo.innerHTML = `
+    <div class="dr-sec">Zeragem</div>
+    <div class="dr-stats">
+      <div class="dr-stat"><div class="l">Contratos zerados</div>
+        <div class="v">${nf(d.total_contratos)} ct</div></div>
+      <div class="dr-stat"><div class="l">Vezes</div>
+        <div class="v">${nf(d.total_vezes)}</div></div>
+      <div class="dr-stat"><div class="l">Primeira</div>
+        <div class="v" style="font-size:14px">${fmtData(d.primeira)}</div></div>
+      <div class="dr-stat"><div class="l">Última</div>
+        <div class="v" style="font-size:14px">${fmtData(d.ultima)}</div></div>
+    </div>
+    <table style="margin-top:12px"><thead><tr>
+      <th>Mês</th><th class="num">Contratos BMF</th><th class="num">Vezes</th><th class="num">Pregões</th>
+      ${temBov?'<th class="num">Financeiro Bovespa</th>':''}</tr></thead>
+    <tbody>${linhas.map(l=>{
+      const [a,m] = l.mes.split("-");
+      return `<tr>
+        <td>${["","jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"][Number(m)]}/${a.slice(2)}</td>
+        <td class="num">${nf(l.contratos)}</td>
+        <td class="num">${nf(l.vezes)}</td>
+        <td class="num">${nf(l.pregoes)}</td>
+        ${temBov?`<td class="num">${Number(l.financeiro_bov)?brl(l.financeiro_bov):"—"}</td>`:''}
+      </tr>`;
+    }).join("")}</tbody></table>
+    <div class="stack-cap" style="margin-top:8px">${nf(d.meses)} ${d.meses===1?"mês":"meses"} com zeragem.${temBov?" Contratos e financeiro são grandezas diferentes — não somam." :""}</div>`;
 }
 
 // ---------- COMPLETAR CADASTRO E REGISTRAR CONTATO ----------
