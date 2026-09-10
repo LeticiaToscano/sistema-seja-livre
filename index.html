@@ -1041,6 +1041,17 @@
   .df-chip.pend{opacity:.62}
   .df-chip.pend .dn{color:var(--amber)}
 
+  .zg-mes{border:1px solid var(--line);border-radius:10px;margin-bottom:7px;overflow:hidden}
+  .zg-cab{display:flex;align-items:center;gap:9px;width:100%;background:#161B18;border:none;
+    color:var(--text);padding:10px 13px;font-family:inherit;font-size:13.5px;cursor:pointer;text-align:left}
+  .zg-cab:hover{background:#1A211D}
+  .zg-seta{color:var(--text-faint);font-size:11px;width:10px}
+  .zg-nome{font-weight:650;min-width:58px}
+  .zg-num{font-weight:700;color:var(--green)}
+  .zg-sub{margin-left:auto;font-size:11.5px;color:var(--text-dim);text-align:right}
+  .zg-dias{padding:2px 13px 10px;background:#121614}
+  .zg-dias table{font-size:12.5px}
+
   .venc-periodo{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:-4px 0 14px}
   .vp-atalhos{display:flex;gap:6px;flex-wrap:wrap}
   .vp-btn{background:#161B18;border:1px solid var(--line);color:var(--text-dim);
@@ -6667,21 +6678,28 @@ async function abrirFicha(id){
 
 
 // ---------- ZERAGEM NA FICHA ----------
-// Mes a mes, com as duas medidas separadas. A coluna Bovespa e
-// FINANCEIRO em reais; a de BMF sao CONTRATOS. A mesma coluna
-// `quantidade` guarda as duas grandezas no banco e so o mercado
-// distingue — somar as duas produz numero sem sentido.
+// Resumo por mes, e cada mes ABRE mostrando o dia a dia. Um cliente com
+// 39 zeragens viraria uma parede de linhas se tudo aparecesse de uma vez.
+//
+// A coluna Bovespa e FINANCEIRO em reais; a de BMF sao CONTRATOS. A
+// mesma coluna `quantidade` guarda as duas grandezas no banco e so o
+// mercado distingue — somar as duas produz numero sem sentido.
+const MES_CURTO = ["","jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+const mesRotulo = m => { const [a,x]=String(m).split("-"); return MES_CURTO[Number(x)]+"/"+a.slice(2); };
+
 async function fcZeragem(sinacor){
   const alvo = el("fcZeragem"); if(!alvo || !sinacor) return;
   const {data,error} = await sb.rpc("zeragem_mensal",{p_sinacor:String(sinacor)});
   if(error){ alvo.innerHTML=""; return; }
-  const d=data||{}, linhas=d.linhas||[];
+  const d=data||{}, linhas=d.linhas||[], dias=d.dias||[];
   if(!linhas.length){
     alvo.innerHTML = `<div class="dr-sec">Zeragem</div>
       <div class="empty" style="padding:18px">Nunca foi zerado pela mesa.</div>`;
     return;
   }
   const temBov = linhas.some(l=>Number(l.financeiro_bov)>0);
+  const valor = x => x.mercado==='BOVESPA' ? brl(x.quantidade) : nf(x.quantidade)+" ct";
+
   alvo.innerHTML = `
     <div class="dr-sec">Zeragem</div>
     <div class="dr-stats">
@@ -6694,20 +6712,38 @@ async function fcZeragem(sinacor){
       <div class="dr-stat"><div class="l">Última</div>
         <div class="v" style="font-size:14px">${fmtData(d.ultima)}</div></div>
     </div>
-    <table style="margin-top:12px"><thead><tr>
-      <th>Mês</th><th class="num">Contratos BMF</th><th class="num">Vezes</th><th class="num">Pregões</th>
-      ${temBov?'<th class="num">Financeiro Bovespa</th>':''}</tr></thead>
-    <tbody>${linhas.map(l=>{
-      const [a,m] = l.mes.split("-");
-      return `<tr>
-        <td>${["","jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"][Number(m)]}/${a.slice(2)}</td>
-        <td class="num">${nf(l.contratos)}</td>
-        <td class="num">${nf(l.vezes)}</td>
-        <td class="num">${nf(l.pregoes)}</td>
-        ${temBov?`<td class="num">${Number(l.financeiro_bov)?brl(l.financeiro_bov):"—"}</td>`:''}
-      </tr>`;
-    }).join("")}</tbody></table>
-    <div class="stack-cap" style="margin-top:8px">${nf(d.meses)} ${d.meses===1?"mês":"meses"} com zeragem.${temBov?" Contratos e financeiro são grandezas diferentes — não somam." :""}</div>`;
+    <div style="margin-top:12px">${linhas.map((l,ix)=>{
+      const doMes = dias.filter(x=>x.mes===l.mes);
+      return `
+      <div class="zg-mes">
+        <button class="zg-cab" onclick="zgAbrir(${ix})">
+          <span class="zg-seta" id="zgSeta${ix}">▸</span>
+          <span class="zg-nome">${mesRotulo(l.mes)}</span>
+          <span class="zg-num">${nf(l.contratos)} ct</span>
+          <span class="zg-sub">${nf(l.vezes)} ${l.vezes===1?"vez":"vezes"} · ${nf(l.pregoes)} ${l.pregoes===1?"pregão":"pregões"}${
+            Number(l.financeiro_bov)?" · "+brl(l.financeiro_bov)+" Bovespa":""}</span>
+        </button>
+        <div class="zg-dias hidden" id="zgDias${ix}">
+          <table><thead><tr><th>Dia</th><th>Ativo</th><th>Mercado</th><th>Plataforma</th><th class="num">Quantidade</th></tr></thead>
+          <tbody>${doMes.map(x=>`<tr>
+            <td>${fmtData(x.data)}</td>
+            <td>${x.ativo||"—"}</td>
+            <td>${x.mercado}</td>
+            <td>${x.plataforma||"—"}</td>
+            <td class="num">${valor(x)}</td></tr>`).join("")}</tbody></table>
+        </div>
+      </div>`;
+    }).join("")}</div>
+    <div class="stack-cap" style="margin-top:8px">Clique no mês para ver o dia a dia.${
+      temBov?" Contratos e financeiro são grandezas diferentes — não somam.":""}</div>`;
+}
+
+function zgAbrir(ix){
+  const bloco = el("zgDias"+ix), seta = el("zgSeta"+ix);
+  if(!bloco) return;
+  const fechado = bloco.classList.contains("hidden");
+  bloco.classList.toggle("hidden", !fechado);
+  seta.textContent = fechado ? "▾" : "▸";
 }
 
 // ---------- COMPLETAR CADASTRO E REGISTRAR CONTATO ----------
