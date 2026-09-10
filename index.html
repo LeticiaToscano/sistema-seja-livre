@@ -1134,6 +1134,7 @@
       <button class="nav-item" data-view="fila"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h10M4 12h10M4 18h7" stroke-linecap="round"/><path d="M17 15l2.2 2.2L23 13" stroke-linecap="round" stroke-linejoin="round"/></svg>Fila de ação</button>
       <button class="nav-item" data-view="aniversariantes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20h16v-8H4z"/><path d="M4 14c2 0 2-1.3 4-1.3s2 1.3 4 1.3 2-1.3 4-1.3 2 1.3 4 1.3" stroke-linecap="round"/><path d="M12 8V5" stroke-linecap="round"/></svg>Aniversariantes</button>
       <button class="nav-item" data-view="vencimentos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4" stroke-linecap="round"/><path d="M12 13v3.5l2 1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Vencimentos</button>
+      <button class="nav-item" data-view="zeragem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 17l5-5 4 3 5-7" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 21h18" stroke-linecap="round"/></svg>Zeragem</button>
       <button class="nav-item" data-view="solicitacoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h16v14H4z"/><path d="M4 9h16M9 5v4" stroke-linecap="round"/><path d="M8 14l2.5 2.5L16 11" stroke-linecap="round" stroke-linejoin="round"/></svg>Solicitações</button>
 
       <div class="nav-label">Atendimento</div>
@@ -1364,6 +1365,7 @@ const TITLES={
   publico:["CARTEIRA","Público · quem são os nossos clientes"],
   fila:["CARTEIRA","Fila de ação"], aniversariantes:["CARTEIRA","Aniversariantes"],
   vencimentos:["CARTEIRA","Vencimentos · renda fixa"],
+  zeragem:["CARTEIRA","Zeragem · quem a mesa zerou"],
   solicitacoes:["CARTEIRA","Solicitações"],
   fluxos:["ATENDIMENTO","Fluxos"], assessores:["ATENDIMENTO","Assessores"],
   config:["GESTÃO","Configurações"], auditoria:["GESTÃO","Auditoria"],
@@ -1386,7 +1388,7 @@ const RESERVADAS={
   ia:{icon:"ia",desc:"O diagnóstico estratégico da operação em linguagem natural, e o copiloto de IA por assessor — cada um enxergando apenas a própria carteira."},
   integracoes:{icon:"integracoes",desc:"As conexões do sistema — Volume Operado (operação), RD Conversas (atendimento), Gmail/Genial (entrada de clientes) e IA. Ligadas e a ligar."}
 };
-const VIEWS={sdr:vSDR,radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,multiconta:vMulticonta,publico:vPublico,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes,auditoria:vAuditoria,diagnostico:vDiagnostico,legenda:vLegenda,leads:vLeads,importacoes:vImportacoes,saidas:vSaidas,plataformas:vPlataformas,custos:vCustos,conferencia:vConferencia,ranking:vRanking,assessores:vAssessores,vencimentos:vVencimentos};
+const VIEWS={sdr:vSDR,radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,multiconta:vMulticonta,publico:vPublico,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes,auditoria:vAuditoria,diagnostico:vDiagnostico,legenda:vLegenda,leads:vLeads,importacoes:vImportacoes,saidas:vSaidas,plataformas:vPlataformas,custos:vCustos,conferencia:vConferencia,ranking:vRanking,assessores:vAssessores,vencimentos:vVencimentos,zeragem:vZeragem};
 document.querySelectorAll(".nav-item").forEach(b=>b.addEventListener("click",()=>{
   document.querySelectorAll(".nav-item").forEach(x=>x.classList.remove("active"));
   b.classList.add("active"); fecharMenu(); render(b.dataset.view);
@@ -5929,6 +5931,105 @@ async function dgAbrir(codigo, manterPosicao){
       o CSV leva o que estiver neste filtro</div>`;
 }
 
+
+
+// ---------- ZERAGEM ----------
+// DUAS MEDIDAS, de proposito. Um cliente zerado 39 vezes com 8 contratos
+// e outro zerado 9 vezes com 3.277 sao problemas diferentes; um numero
+// so esconderia um deles.
+//
+// A coluna Bovespa e FINANCEIRO em R$, nao contratos — na tabela
+// `zeragem` a mesma coluna guarda as duas grandezas e so o mercado
+// distingue. Nunca somar as duas.
+//
+// TERCEIRA SEXTA DO MES = vencimento de opcoes: a mesa zera dezenas de
+// clientes de uma vez (21/08 teve 64 contra 3-8 num dia normal). Isso e
+// mercado, nao erro de importacao, e a tela avisa para ninguem abrir
+// chamado todo mes.
+let zerState={de:"",ate:"",barra:"todas",ordem:"contratos"};
+
+function terceiraSexta(ano, mes){            // mes 1-12
+  const d=new Date(ano, mes-1, 1);
+  let sextas=0;
+  while(d.getMonth()===mes-1){
+    if(d.getDay()===5){ sextas++; if(sextas===3) return new Date(d); }
+    d.setDate(d.getDate()+1);
+  }
+  return null;
+}
+
+async function vZeragem(){
+  if(!zerState.de){                          // padrao: mes corrente ate hoje
+    const hj=new Date();
+    zerState.de=new Date(hj.getFullYear(),hj.getMonth(),1).toISOString().slice(0,10);
+    zerState.ate=hojeISO();
+  }
+  el("content").innerHTML=`
+    <div class="venc-periodo" style="margin-bottom:16px">
+      <div class="vp-atalhos">
+        <button class="vp-btn ${zerState.ordem==='contratos'?'on':''}" onclick="zerOrdem('contratos')">Por contratos</button>
+        <button class="vp-btn ${zerState.ordem==='vezes'?'on':''}" onclick="zerOrdem('vezes')">Por frequência</button>
+      </div>
+      <div class="vp-datas">
+        <label>de</label><input type="date" id="zerDe" value="${zerState.de}">
+        <label>até</label><input type="date" id="zerAte" value="${zerState.ate}">
+      </div>
+    </div>
+    <div id="zerResumo"></div>
+    <div class="panel" id="zerLista"><div class="loading"><div class="spinner"></div>Carregando…</div></div>`;
+  ["zerDe","zerAte"].forEach(id=>el(id).addEventListener("change",()=>{
+    zerState.de=el("zerDe").value; zerState.ate=el("zerAte").value; carregarZeragem();
+  }));
+  carregarZeragem();
+}
+
+function zerOrdem(o){
+  zerState.ordem=o;
+  document.querySelectorAll(".vp-btn").forEach(b=>
+    b.classList.toggle("on", b.getAttribute("onclick").includes("'"+o+"'")));
+  carregarZeragem();
+}
+
+async function carregarZeragem(){
+  const {data,error} = await sb.rpc("zeragem_ranking",{
+    p_de: zerState.de||null, p_ate: zerState.ate||null,
+    p_barra: null, p_ordem: zerState.ordem});
+  if(error){ return erro(error,"zerLista"); }
+  const d=data||{}, linhas=d.linhas||[];
+
+  // avisa se o periodo contem vencimento de opcoes
+  let aviso="";
+  if(zerState.de && zerState.ate){
+    const ini=new Date(zerState.de+"T12:00:00"), fim=new Date(zerState.ate+"T12:00:00");
+    const datas=[];
+    for(let a=ini.getFullYear(), m=ini.getMonth()+1;
+        new Date(a,m-1,1)<=fim; (m===12?(m=1,a++):m++)){
+      const t=terceiraSexta(a,m);
+      if(t && t>=ini && t<=fim) datas.push(t.toLocaleDateString("pt-BR"));
+    }
+    if(datas.length) aviso=`<div class="venc-stale">Este período inclui ${datas.length>1?"vencimentos de opções em":"o vencimento de opções de"} <b>${datas.join(", ")}</b> — a mesa zera dezenas de clientes de uma vez nesses dias. É o mercado, não erro de importação.</div>`;
+  }
+
+  el("zerResumo").innerHTML = aviso + `
+    <div class="venc-resumo">
+      <div class="vr-card"><div class="v">${nf(d.clientes)}</div><div class="k">clientes zerados</div></div>
+      <div class="vr-card"><div class="v">${nf(d.total_contratos)}</div><div class="k">contratos zerados (BMF)</div></div>
+      <div class="vr-card"><div class="v">${nf(d.total_vezes)}</div><div class="k">operações de zeragem</div></div>
+    </div>`;
+
+  if(!linhas.length){ el("zerLista").innerHTML='<div class="empty">Nenhuma zeragem no período.</div>'; return; }
+  el("zerLista").innerHTML=`
+    <table><thead><tr><th>Cliente</th><th>Barra</th><th class="num">Contratos BMF</th><th class="num">Vezes</th><th class="num">Pregões</th><th class="num">Financeiro Bovespa</th><th>Última</th></tr></thead>
+    <tbody>${linhas.map(l=>`<tr onclick="abrirFicha('${l.id}')">
+      <td><div class="cell-name"><span class="mini-av">${ini(l.cliente)}</span>${l.cliente||("Sinacor "+l.sinacor)}</div></td>
+      <td>${l.barra||"—"}</td>
+      <td class="num">${nf(l.contratos)}</td>
+      <td class="num">${nf(l.vezes)}</td>
+      <td class="num">${nf(l.pregoes)}</td>
+      <td class="num">${l.financeiro_bov?brl(l.financeiro_bov):"—"}</td>
+      <td>${fmtData(l.ultima)}</td></tr>`).join("")}</tbody></table>
+    <div class="stack-cap" style="margin-top:10px">Contratos e financeiro são grandezas diferentes — a coluna BMF conta contratos, a de Bovespa é em reais. Não somam.</div>`;
+}
 
 // ---------- VENCIMENTOS DE RENDA FIXA ----------
 // A posicao vem de um arquivo importado sem periodicidade fixa. Por isso
