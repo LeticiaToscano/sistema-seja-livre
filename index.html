@@ -1098,6 +1098,30 @@
     cursor:pointer;border:1px solid var(--line);background:#1A211D;color:var(--text)}
   .vpop-foot .ok{background:rgba(58,190,120,.12);border-color:rgba(58,190,120,.4);color:var(--green)}
   .vpop-foot .prim{background:var(--green);color:#0A0D0C;border-color:var(--green);font-weight:650}
+
+  /* ----- Parceiros ----- */
+  .pc-sum{display:flex;gap:11px;flex-wrap:wrap;margin-bottom:14px}
+  .pc-sum div{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+    padding:12px 15px;flex:1;min-width:120px}
+  .pc-sum .k{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-faint);font-weight:700}
+  .pc-sum .v{font-size:19px;font-weight:800;margin-top:5px}
+  .pc-link{font-size:11.5px;color:var(--text-dim);font-family:ui-monospace,monospace;
+    max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:middle}
+  .pc-cp{background:var(--surface-2);border:1px solid var(--border-strong);color:var(--text-dim);
+    border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;margin-left:8px}
+  .pc-cp:hover{border-color:var(--green);color:var(--green)}
+  .pc-cp.ok{border-color:var(--green);color:var(--green)}
+  .pc-add{background:var(--green);color:#04140d;border:none;border-radius:9px;padding:9px 15px;
+    font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap}
+  .pc-add:disabled{opacity:.5;cursor:not-allowed}
+  .pc-off{opacity:.45}
+  .pc-form label{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;
+    color:var(--text-faint);font-weight:700;margin:14px 0 6px}
+  .pc-form input,.pc-form textarea{width:100%;background:var(--bg);border:1px solid var(--border-strong);
+    border-radius:9px;padding:10px 12px;color:var(--text);font-size:13px;font-family:inherit}
+  .pc-form input:focus,.pc-form textarea:focus{outline:none;border-color:var(--green)}
+  .pc-form textarea{min-height:80px;resize:vertical}
+  .pc-hint{font-size:11px;color:var(--text-faint);margin-top:6px}
 </style>
 <!-- leitor de Excel: a planilha de custos vem em .xlsx, e converter para
      CSV todo mês seria um passo a mais sem motivo -->
@@ -1151,6 +1175,7 @@
       <div class="nav-label">Atendimento</div>
       <button class="nav-item" data-view="fluxos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="6" cy="6" r="2.2"/><circle cx="6" cy="18" r="2.2"/><circle cx="18" cy="12" r="2.2"/><path d="M8 6h4a4 4 0 0 1 4 4v0M8 18h4a4 4 0 0 0 4-4v0" stroke-linecap="round"/></svg>Fluxos</button>
       <button class="nav-item" data-view="assessores"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="9" r="2.6"/><circle cx="16" cy="9" r="2.6"/><path d="M3 18c.5-2.6 2.4-4 5-4s4.5 1.4 5 4M13.5 14.2c2.2-.2 3.9 1.1 4.5 3.8" stroke-linecap="round"/></svg>Assessores</button>
+      <button class="nav-item" data-view="parceiros"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10.5 13.5a4.5 4.5 0 0 0 6.7.4l2-2a4.5 4.5 0 0 0-6.4-6.4l-1.1 1.1" stroke-linecap="round" stroke-linejoin="round"/><path d="M13.5 10.5a4.5 4.5 0 0 0-6.7-.4l-2 2a4.5 4.5 0 0 0 6.4 6.4l1.1-1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>Parceiros</button>
 
       <div class="nav-label">Comercial</div>
       <button class="nav-item" data-view="saidas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" stroke-linecap="round" stroke-linejoin="round"/></svg>Saíram</button>
@@ -1314,6 +1339,7 @@ function abrirRD(nome){
   window.open("https://app.tallos.com.br/app/chat","_blank");
 }
 const el = id => document.getElementById(id);
+let PAPEL = "—";
 const ini = n => (n||"?").trim().split(/\s+/).slice(0,2).map(w=>w[0]).join("").toUpperCase();
 const nf = n => (n==null?"—":Number(n).toLocaleString("pt-BR"));
 // Aceita tanto data pura ("2026-07-30") quanto data com hora vinda de um
@@ -1360,6 +1386,7 @@ async function mostrarApp(session){
   let nome=email, papel="—";
   const {data:a} = await sb.from("assessores").select("nome,papel").eq("auth_user_id",session.user.id).maybeSingle();
   if(a){ nome=a.nome||email; papel=a.papel; }
+  PAPEL = papel;
   el("userName").textContent=nome; el("avatar").textContent=ini(nome);
   el("userRole").textContent = papel==="admin"?"Administrador":papel==="gerencia"?"Gerência":"Assessor";
   render("radar");
@@ -1390,7 +1417,8 @@ const TITLES={
   importacoes:["GESTÃO","Importações · os relatórios da corretora"],
   legenda:["SISTEMA","Legenda · o que cada etiqueta significa"],
   diagnostico:["GESTÃO","Diagnóstico"], ia:["GESTÃO","CEO de IA"],
-  integracoes:["SISTEMA","Integrações"]
+  integracoes:["SISTEMA","Integrações"],
+  parceiros:["ATENDIMENTO","Parceiros · barras e links de abertura"]
 };
 const RESERVADAS={
   fluxos:{icon:"fluxos",desc:"As réguas de atendimento automatizadas — boas-vindas, ativação, manutenção, reengajamento e aniversário. Toda automação roda primeiro em modo sombra (simula sem enviar) antes de ir ao ar, em lotes controlados."},
@@ -1399,7 +1427,7 @@ const RESERVADAS={
   ia:{icon:"ia",desc:"O diagnóstico estratégico da operação em linguagem natural, e o copiloto de IA por assessor — cada um enxergando apenas a própria carteira."},
   integracoes:{icon:"integracoes",desc:"As conexões do sistema — Volume Operado (operação), RD Conversas (atendimento), Gmail/Genial (entrada de clientes) e IA. Ligadas e a ligar."}
 };
-const VIEWS={sdr:vSDR,radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,multiconta:vMulticonta,publico:vPublico,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes,auditoria:vAuditoria,diagnostico:vDiagnostico,legenda:vLegenda,leads:vLeads,importacoes:vImportacoes,saidas:vSaidas,plataformas:vPlataformas,custos:vCustos,conferencia:vConferencia,ranking:vRanking,assessores:vAssessores,vencimentos:vVencimentos,zeragem:vZeragem};
+const VIEWS={sdr:vSDR,radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,multiconta:vMulticonta,publico:vPublico,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes,auditoria:vAuditoria,diagnostico:vDiagnostico,legenda:vLegenda,leads:vLeads,importacoes:vImportacoes,saidas:vSaidas,plataformas:vPlataformas,custos:vCustos,conferencia:vConferencia,ranking:vRanking,assessores:vAssessores,vencimentos:vVencimentos,zeragem:vZeragem,parceiros:vParceiros};
 document.querySelectorAll(".nav-item").forEach(b=>b.addEventListener("click",()=>{
   document.querySelectorAll(".nav-item").forEach(x=>x.classList.remove("active"));
   b.classList.add("active"); fecharMenu(); render(b.dataset.view);
@@ -8097,6 +8125,257 @@ async function sdrBoletados(){
 function erro(e,alvo){
   const html=`<div class="empty">Não foi possível carregar os dados.<br><span style="font-size:11px;color:var(--text-faint)">${(e.message||e).toString()}</span><br><br>Se você acabou de criar seu acesso, confira se rodou o passo que vincula seu login como administrador.</div>`;
   el(alvo||"content").innerHTML=html;
+}
+
+
+// ---------- PARCEIROS (barras e links de abertura) ----------
+// A barra é o que a Genial usa para saber de quem é a conta aberta. Cada uma
+// tem um link próprio (abrir-conta?idAssessor=N) que o comercial manda para o
+// cliente. Aqui ficam todas, com o link à mão para copiar.
+let pcState = { busca:"", filtro:"todas", lista:[] };
+
+async function vParceiros(){
+  el("content").innerHTML = `
+    <div class="sec-title">Barras e links de abertura<span class="rule"></span></div>
+    <div class="pc-sum" id="pcSum"></div>
+    <div class="panel">
+      <div class="toolbar">
+        <input class="search" id="pcBusca" placeholder="Buscar por barra, parceiro ou id da Genial…">
+        <select class="search select" id="pcFiltro" style="flex:0 0 200px">
+          <option value="todas">Todas</option>
+          <option value="com">Com link</option>
+          <option value="sem">Sem link</option>
+          <option value="ativas">Só ativas</option>
+          <option value="inativas">Só inativas</option>
+        </select>
+        <button class="pc-add" id="pcNova">+ Nova barra</button>
+      </div>
+      <div id="pcLista"><div class="loading"><div class="spinner"></div>Carregando…</div></div>
+    </div>`;
+
+  el("pcBusca").addEventListener("input", e => { pcState.busca = e.target.value; pcPintar(); });
+  el("pcFiltro").addEventListener("change", e => { pcState.filtro = e.target.value; pcPintar(); });
+  el("pcNova").addEventListener("click", () => pcFormNova());
+
+  const { data, error } = await sb.from("vw_barras_painel")
+    .select("*").order("nome");
+  if(error){ return erro(error, "pcLista"); }
+  pcState.lista = data || [];
+  pcResumo();
+  pcPintar();
+}
+
+function pcResumo(){
+  const L = pcState.lista;
+  const comLink = L.filter(b => b.link_abertura).length;
+  const ativas  = L.filter(b => b.ativa !== false).length;
+  const clientes = L.reduce((s,b) => s + Number(b.clientes || 0), 0);
+  el("pcSum").innerHTML = `
+    <div><div class="k">Barras cadastradas</div><div class="v">${nf(L.length)}</div></div>
+    <div><div class="k">Com link de abertura</div><div class="v">${nf(comLink)}</div></div>
+    <div><div class="k">Sem link</div><div class="v">${nf(L.length - comLink)}</div></div>
+    <div><div class="k">Ativas</div><div class="v">${nf(ativas)}</div></div>
+    <div><div class="k">Clientes nas barras</div><div class="v">${nf(clientes)}</div></div>`;
+}
+
+function pcFiltrar(){
+  const q = pcState.busca.trim().toLowerCase();
+  return pcState.lista.filter(b => {
+    if(pcState.filtro === "com"      && !b.link_abertura) return false;
+    if(pcState.filtro === "sem"      &&  b.link_abertura) return false;
+    if(pcState.filtro === "ativas"   &&  b.ativa === false) return false;
+    if(pcState.filtro === "inativas" &&  b.ativa !== false) return false;
+    if(!q) return true;
+    return [b.nome, b.parceiro_pagamento, b.id_genial]
+      .some(v => (v||"").toString().toLowerCase().includes(q));
+  });
+}
+
+function pcPintar(){
+  const linhas = pcFiltrar();
+  if(!linhas.length){
+    el("pcLista").innerHTML = '<div class="empty">Nenhuma barra encontrada.</div>';
+    return;
+  }
+  el("pcLista").innerHTML = `<table><thead><tr>
+      <th>Barra</th><th>Id Genial</th><th>Parceiro</th><th>Clientes</th><th>Link de abertura</th>
+    </tr></thead><tbody>` +
+    linhas.map((b,i) => `<tr class="${b.ativa===false?'pc-off':''}" onclick="pcFicha('${b.id}')">
+      <td style="font-weight:700">${b.nome}${b.ativa===false?' <span class="tag" style="background:var(--surface-2);color:var(--text-faint)">inativa</span>':''}</td>
+      <td style="color:var(--text-dim)">${b.id_genial || "—"}</td>
+      <td style="color:var(--text-dim)">${b.parceiro_pagamento || "—"}</td>
+      <td>${nf(b.clientes)}</td>
+      <td onclick="event.stopPropagation()">${
+        b.link_abertura
+          ? `<span class="pc-link" title="${b.link_abertura}">${b.link_abertura}</span>
+             <button class="pc-cp" onclick="pcCopiar(this,'${b.link_abertura}')">copiar</button>`
+          : '<span style="color:var(--text-faint)">sem link</span>'
+      }</td>
+    </tr>`).join("") + "</tbody></table>";
+}
+
+// Copiar precisa funcionar também em conexão sem HTTPS e em navegador antigo,
+// por isso o caminho alternativo com textarea escondida.
+function pcCopiar(btn, texto){
+  const feito = () => {
+    const antes = btn.textContent;
+    btn.textContent = "copiado"; btn.classList.add("ok");
+    setTimeout(() => { btn.textContent = antes; btn.classList.remove("ok"); }, 1800);
+  };
+  if(navigator.clipboard && window.isSecureContext){
+    navigator.clipboard.writeText(texto).then(feito).catch(() => pcCopiarFallback(texto, feito));
+  } else {
+    pcCopiarFallback(texto, feito);
+  }
+}
+function pcCopiarFallback(texto, feito){
+  const t = document.createElement("textarea");
+  t.value = texto; t.style.position = "fixed"; t.style.opacity = "0";
+  document.body.appendChild(t); t.select();
+  try { document.execCommand("copy"); feito(); }
+  catch(e){ toast("Não consegui copiar", "Selecione o link e copie à mão."); }
+  document.body.removeChild(t);
+}
+
+// ---------- ficha da barra ----------
+async function pcFicha(id){
+  const b = pcState.lista.find(x => String(x.id) === String(id));
+  if(!b) return;
+  el("overlay").classList.add("open"); el("drawer").classList.add("open");
+  el("drName").textContent = b.nome;
+  el("drSub").innerHTML = b.id_genial ? `Id Genial ${b.id_genial}` : "Sem id da Genial";
+  el("drStatus").innerHTML = b.ativa === false
+    ? '<span class="tag" style="background:var(--surface-2);color:var(--text-faint)">inativa</span>'
+    : '<span class="tag" style="background:var(--green-deep);color:var(--green)">ativa</span>';
+  el("drActions").innerHTML = b.link_abertura
+    ? `<button class="pc-add" onclick="pcCopiar(this,'${b.link_abertura}')">Copiar link de abertura</button>`
+    : "";
+  el("drBody").innerHTML = `
+    <div class="dr-stats">
+      <div class="dr-stat"><div class="l">Clientes na barra</div><div class="v">${nf(b.clientes)}</div></div>
+      <div class="dr-stat"><div class="l">Último cadastro</div><div class="v" style="font-size:14px">${fmtData(b.ultimo_cadastro)}</div></div>
+      <div class="dr-stat"><div class="l">Parceiro de pagamento</div><div class="v" style="font-size:14px">${b.parceiro_pagamento || "—"}</div></div>
+    </div>
+
+    <div class="dr-sec">Link de abertura de conta</div>
+    ${b.link_abertura
+      ? `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;
+           font-family:ui-monospace,monospace;font-size:12px;color:var(--text-dim);word-break:break-all">${b.link_abertura}</div>
+         <div class="pc-hint">É este link que o cliente deve usar para a conta nascer nesta barra.</div>`
+      : `<div class="empty" style="padding:18px">Esta barra não tem link cadastrado.</div>`}
+
+    ${b.instrucao_troca ? `
+      <div class="dr-sec">Como pedir troca de assessoria</div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;
+        font-size:12.5px;line-height:1.6;color:var(--text-dim)">${b.instrucao_troca}</div>
+      <div style="margin-top:10px"><button class="pc-cp" onclick="pcCopiar(this,${JSON.stringify(b.instrucao_troca)})">copiar instrução</button></div>
+    ` : ""}
+
+    <div class="dr-sec">Cadastro</div>
+    <div class="dr-stats">
+      <div class="dr-stat"><div class="l">Criada em</div><div class="v" style="font-size:14px">${fmtData(b.criada_em)}</div></div>
+      <div class="dr-stat"><div class="l">Criada por</div><div class="v" style="font-size:13px">${b.criada_por || "—"}</div></div>
+      <div class="dr-stat"><div class="l">Usa parceiros</div><div class="v" style="font-size:14px">${b.usa_parceiros ? "sim" : "não"}</div></div>
+    </div>
+
+    <div class="dr-sec">Observações</div>
+    <div class="pc-form">
+      <textarea id="pcObs" placeholder="Anotações sobre esta barra…">${b.observacoes || ""}</textarea>
+      <div style="margin-top:10px"><button class="pc-add" id="pcSalvarObs">Salvar observação</button></div>
+    </div>
+
+    <div class="dr-sec">Clientes nesta barra</div>
+    <div id="pcClientes"><div class="loading"><div class="spinner"></div>Carregando…</div></div>`;
+
+  el("pcSalvarObs").addEventListener("click", () => pcSalvarObs(b));
+  pcCarregarClientes(b.nome);
+}
+
+async function pcCarregarClientes(nome){
+  const { data, error } = await sb.from("clientes")
+    .select("id,nome,sinacor,data_cadastro,situacao_conta")
+    .eq("barra", nome).order("data_cadastro", { ascending:false }).limit(25);
+  if(error){ el("pcClientes").innerHTML = '<div class="empty">Não consegui carregar os clientes.</div>'; return; }
+  if(!data || !data.length){ el("pcClientes").innerHTML = '<div class="empty">Nenhum cliente nesta barra ainda.</div>'; return; }
+  el("pcClientes").innerHTML = `<div class="panel"><table><thead><tr>
+      <th>Cliente</th><th>Sinacor</th><th>Cadastro</th>
+    </tr></thead><tbody>` +
+    data.map(c => `<tr onclick="fecharFicha();setTimeout(()=>abrirFicha('${c.id}'),220)">
+      <td>${c.nome}</td><td style="color:var(--text-dim)">${c.sinacor || "—"}</td>
+      <td style="color:var(--text-dim)">${fmtData(c.data_cadastro)}</td></tr>`).join("") +
+    `</tbody></table></div>
+     <div class="pc-hint">Mostrando os 25 cadastros mais recentes.</div>`;
+}
+
+async function pcSalvarObs(b){
+  const txt = el("pcObs").value.trim();
+  const { error } = await sb.from("barras").update({ observacoes: txt || null }).eq("id", b.id);
+  if(error){ toast("Não consegui salvar", error.message, true); return; }
+  b.observacoes = txt;
+  toast("Observação salva", b.nome);
+}
+
+// ---------- nova barra ----------
+function pcFormNova(){
+  el("overlay").classList.add("open"); el("drawer").classList.add("open");
+  el("drName").textContent = "Nova barra";
+  el("drSub").textContent = "Cadastre a barra e o link de abertura";
+  el("drStatus").innerHTML = ""; el("drActions").innerHTML = "";
+  el("drBody").innerHTML = `
+    <div class="pc-form">
+      <label>Nome da barra</label>
+      <input id="pcNome" placeholder="SEJA LIVRE 237" autocomplete="off">
+      <div class="pc-hint">Escreva exatamente como a Genial manda nos relatórios, senão os clientes não vão casar com ela.</div>
+
+      <label>Id da Genial</label>
+      <input id="pcId" placeholder="16013" inputmode="numeric" autocomplete="off">
+      <div class="pc-hint">É o número que aparece no fim do link de abertura.</div>
+
+      <label>Link de abertura (opcional)</label>
+      <input id="pcLink" placeholder="deixe vazio para montar a partir do id" autocomplete="off">
+
+      <label>Instrução de troca de assessoria (opcional)</label>
+      <textarea id="pcInstr" placeholder="Abra o aplicativo da Genial → …"></textarea>
+
+      <div style="margin-top:18px;display:flex;gap:10px">
+        <button class="pc-add" id="pcCriar">Criar barra</button>
+        <button class="pc-cp" onclick="fecharFicha()">Cancelar</button>
+      </div>
+    </div>`;
+  el("pcCriar").addEventListener("click", pcCriar);
+  el("pcId").addEventListener("input", () => {
+    const id = el("pcId").value.replace(/\D/g, "");
+    if(id && !el("pcLink").dataset.tocado)
+      el("pcLink").value = "https://app.genialinvestimentos.com.br/abrir-conta?idAssessor=" + id;
+  });
+  el("pcLink").addEventListener("input", () => { el("pcLink").dataset.tocado = "1"; });
+}
+
+async function pcCriar(){
+  const nome  = el("pcNome").value.trim().toUpperCase();
+  const idg   = el("pcId").value.replace(/\D/g, "");
+  const link  = el("pcLink").value.trim();
+  const instr = el("pcInstr").value.trim();
+
+  if(!nome){ toast("Falta o nome", "A barra precisa de um nome."); return; }
+  const jaTem = pcState.lista.find(b =>
+    (b.nome||"").trim().toUpperCase() === nome ||
+    (idg && String(b.id_genial||"") === idg));
+  if(jaTem){ toast("Essa barra já existe", jaTem.nome, true); return; }
+
+  el("pcCriar").disabled = true;
+  const { error } = await sb.from("barras").insert({
+    nome, ativa:true, usa_parceiros:false,
+    id_genial: idg || null,
+    link_abertura: link || null,
+    instrucao_troca: instr || null,
+    criada_por: "painel"
+  });
+  el("pcCriar").disabled = false;
+  if(error){ toast("Não consegui criar", error.message, true); return; }
+  toast("Barra criada", nome);
+  fecharFicha();
+  vParceiros();
 }
 
 boot();
