@@ -2276,6 +2276,8 @@ async function vExplorar(){
             <option value="BMF">Só BM&F</option><option value="BOVESPA">Só Bovespa</option><option value="ambos">Os dois</option>
           </select>
           <select class="search select" id="exBarra">${opcoesBarra}</select>
+          <button class="sol-tab" id="exExp" onclick="exExportar()" style="white-space:nowrap"
+            title="Baixa a lista inteira do filtro atual, nao so a pagina na tela">Exportar planilha</button>
         </div>
       </div>
       <div id="exTab"><div class="loading"><div class="spinner"></div>Carregando…</div></div>
@@ -2329,6 +2331,60 @@ async function carregarExplorar(){
         <button class="pg-btn" ${page>=totalPags-1?"disabled":""} onclick="mudarExplorar(1)">Próxima →</button>
       </div>
     </div>`;
+}
+
+// Exporta a lista INTEIRA do filtro atual, nao so a pagina na tela.
+// Busca de mil em mil porque o Supabase corta em mil linhas por chamada.
+async function exExportar(){
+  const btn = el("exExp");
+  if(btn){ btn.disabled = true; btn.textContent = "Preparando..."; }
+  try{
+    const ord = {contratos:["contratos_periodo",false], volume:["volume_bov_periodo",false],
+                 ops:["qtd_op_periodo",false], recente:["ultima_op_periodo",false],
+                 antigo:["ultima_op_periodo",true]}[exState.ordem];
+    const tudo = [];
+    for(let p = 0; p < 100; p++){
+      let q = sb.rpc("fn_explorar",{dt_ini:exState.ini, dt_fim:exState.fim});
+      if(exState.faixa!=="todas")    q = q.eq("faixa", exState.faixa);
+      if(exState.situacao!=="todas") q = q.eq("status_operacao", exState.situacao);
+      if(exState.barra!=="todas")    q = q.eq("barra", exState.barra);
+      if(exState.mercado!=="todos")  q = q.eq("mercado", exState.mercado);
+      q = q.order(ord[0],{ascending:ord[1],nullsFirst:false}).range(p*1000, p*1000+999);
+      const {data,error} = await q;
+      if(error) throw error;
+      if(!data || !data.length) break;
+      tudo.push.apply(tudo, data);
+      if(btn) btn.textContent = "Preparando... " + nf(tudo.length);
+      if(data.length < 1000) break;
+    }
+    if(!tudo.length){ toast("Nada para exportar","Nenhum cliente com esses filtros no periodo.",true); return; }
+
+    // numero com virgula: e o que o Excel em portugues le como numero
+    const num = v => (v==null||v==="") ? "" : String(v).replace(".",",");
+    const dt  = v => v ? fmtData(v) : "";
+    const SIT = {operando:"Operando", parou:"Parou", nunca_operou:"Nunca operou"};
+    const cols = [
+      ["Cliente",         c=>c.nome],
+      ["Sinacor",         c=>c.sinacor||""],
+      ["Telefone",        c=>c.telefone||""],
+      ["Faixa",           c=>c.faixa ? (c.faixa.charAt(0).toUpperCase()+c.faixa.slice(1)+(c.grau?" "+c.grau:"")) : "Sem faixa"],
+      ["Barra",           c=>c.barra||""],
+      ["Parceiro",        c=>c.parceiros||""],
+      ["Situacao",        c=>SIT[c.status_operacao]||c.status_operacao||""],
+      ["Contratos BMF",   c=>num(c.contratos_periodo??0)],
+      ["Volume Bovespa",  c=>num(c.volume_bov_periodo??0)],
+      ["Operacoes",       c=>c.qtd_op_periodo??0],
+      ["Ultima operacao", c=>dt(c.ultima_op_periodo)]
+    ];
+    const lim = s => String(s).replace(/\s+/g,"_").toLowerCase();
+    baixarCSV("explorar_" + lim(exState.situacao) + "_" + lim(exState.barra)
+              + "_" + exState.ini + "_a_" + exState.fim, cols, tudo);
+    toast("Pronto", nf(tudo.length) + " cliente(s) exportado(s).");
+  }catch(e){
+    toast("Nao deu para exportar", (e && e.message) || "Erro ao buscar a lista.", true);
+  }finally{
+    if(btn){ btn.disabled = false; btn.textContent = "Exportar planilha"; }
+  }
 }
 
 // ---------- CONFIGURAÇÕES ----------
