@@ -3197,9 +3197,10 @@ async function asMudanca(){
     </div>`;
 }
 
-/** Monta e baixa um CSV. Ponto e virgula e BOM, para o Excel brasileiro
- *  abrir sem pedir nada. */
-function baixarCSV(nome, cabecalho, linhas){
+/** Monta e baixa um CSV a partir de LINHAS ja prontas (matriz de valores).
+ *  Nao confundir com baixarCSV, que recebe pares [rotulo, funcao] e a lista
+ *  de objetos. Ponto e virgula e BOM, para o Excel brasileiro. */
+function baixarCSVLinhas(nome, cabecalho, linhas){
   const esc = v => {
     v = (v == null ? "" : String(v));
     return /[";\r\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v;
@@ -3239,7 +3240,7 @@ async function asBaixar(){
   (sal.data||[]).forEach(p => { if(!(p.sinacor in saldo)) saldo[p.sinacor] = p.saldo; });
 
   const rotulo = {carteira:"carteira", barra:"barra", pessoal:"contato_pessoal", rd:"atendidos_rd"}[asF.origem] || "carteira";
-  baixarCSV(
+  baixarCSVLinhas(
     rotulo + "_" + asF.assessor.replace(/\s+/g,"_").toLowerCase() + "_" + hojeISO() + ".csv",
     ["nome","sinacor","barra","parceiro","origem","saldo na corretora","situacao",
      "faixa","contratos BMF","ultima operacao","ele falou em","dias desde",
@@ -3263,7 +3264,7 @@ function asBaixarGrupo(tipo, rotulo){
   const todos = window.__asMud || [];
   const lista = todos.filter(c => c.tipo === tipo);
   if(!lista.length){ toast("Nada neste grupo","",true); return; }
-  baixarCSV(
+  baixarCSVLinhas(
     rotulo.replace(/\s+/g,"_") + "_" + asF.assessor.replace(/\s+/g,"_").toLowerCase()
       + "_" + hojeISO() + ".csv",
     ["nome","sinacor","barra","origem","mes anterior","mes atual","diferenca","variacao %"],
@@ -3279,7 +3280,7 @@ async function asBaixarMudanca(){
   if(error){ toast("Não deu para baixar", error.message, true); return; }
   if(!data || !data.length){ toast("Nada para baixar","",true); return; }
 
-  baixarCSV(
+  baixarCSVLinhas(
     "variacao_" + asF.assessor.replace(/\s+/g,"_").toLowerCase() + "_" + hojeISO() + ".csv",
     ["nome","sinacor","barra","origem","mes anterior","mes atual","diferenca","variacao %","o que houve"],
     data.map(c => [
@@ -8128,7 +8129,7 @@ async function sdrVerAcao(tipo){
 function sdrExportar(tipo){
   const lista = window.__sdrFila || [];
   if(!lista.length){ toast("Nada para exportar","",true); return; }
-  baixarCSV(
+  baixarCSVLinhas(
     "reativacao_" + tipo + "_" + hojeISO() + ".csv",
     ["nome","sinacor","barra","telefone","parou em","dias parado","contratos","ultima conversa"],
     lista.map(x => [x.nome, x.sinacor, x.barra, x.telefone,
