@@ -1181,6 +1181,7 @@
       <button class="nav-item" data-view="saidas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" stroke-linecap="round" stroke-linejoin="round"/></svg>Saíram</button>
       <button class="nav-item" data-view="leads"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" stroke-linecap="round"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6" stroke-linecap="round"/></svg>Leads</button>
       <button class="nav-item" data-view="sdr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 17l5-5 4 3 6-7" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 8h4v4" stroke-linecap="round" stroke-linejoin="round"/></svg>SDR</button>
+      <button class="nav-item" data-view="exportrd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" stroke-linecap="round" stroke-linejoin="round"/></svg>Exportar para o RD</button>
 
       <div class="nav-label">Gestão</div>
       <button class="nav-item" data-view="conferencia"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l3 3 8-8M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9" stroke-linecap="round" stroke-linejoin="round"/></svg>Conferência</button>
@@ -1196,7 +1197,7 @@
       <button class="nav-item" data-view="integracoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 7V4M15 7V4M8 7h8v4a4 4 0 0 1-8 0z" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15v5" stroke-linecap="round"/></svg>Integrações</button>
     </nav>
     <div class="foot">
-      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v11/08 14:50</div></div></div>
+      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v15/09 exportar RD</div></div></div>
       <button class="btn-logout" id="logoutBtn">Sair</button>
     </div>
   </aside>
@@ -1409,6 +1410,7 @@ const TITLES={
   config:["GESTÃO","Configurações"], auditoria:["GESTÃO","Auditoria"],
   leads:["COMERCIAL","Leads · falaram no RD e não são clientes"],
   sdr:["COMERCIAL","SDR · reativação e leads que abriram conta"],
+  exportrd:["COMERCIAL","Exportar para o RD · clientes com faixa"],
   ranking:["CARTEIRA","Ranking do dia"],
   plataformas:["CARTEIRA","Plataformas · o que a carteira contrata e usa"],
   saidas:["COMERCIAL","Saíram da assessoria"],
@@ -1427,7 +1429,7 @@ const RESERVADAS={
   ia:{icon:"ia",desc:"O diagnóstico estratégico da operação em linguagem natural, e o copiloto de IA por assessor — cada um enxergando apenas a própria carteira."},
   integracoes:{icon:"integracoes",desc:"As conexões do sistema — Volume Operado (operação), RD Conversas (atendimento), Gmail/Genial (entrada de clientes) e IA. Ligadas e a ligar."}
 };
-const VIEWS={sdr:vSDR,radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,multiconta:vMulticonta,publico:vPublico,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes,auditoria:vAuditoria,diagnostico:vDiagnostico,legenda:vLegenda,leads:vLeads,importacoes:vImportacoes,saidas:vSaidas,plataformas:vPlataformas,custos:vCustos,conferencia:vConferencia,ranking:vRanking,assessores:vAssessores,vencimentos:vVencimentos,zeragem:vZeragem,parceiros:vParceiros};
+const VIEWS={exportrd:vExportRD,sdr:vSDR,radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,multiconta:vMulticonta,publico:vPublico,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes,auditoria:vAuditoria,diagnostico:vDiagnostico,legenda:vLegenda,leads:vLeads,importacoes:vImportacoes,saidas:vSaidas,plataformas:vPlataformas,custos:vCustos,conferencia:vConferencia,ranking:vRanking,assessores:vAssessores,vencimentos:vVencimentos,zeragem:vZeragem,parceiros:vParceiros};
 document.querySelectorAll(".nav-item").forEach(b=>b.addEventListener("click",()=>{
   document.querySelectorAll(".nav-item").forEach(x=>x.classList.remove("active"));
   b.classList.add("active"); fecharMenu(); render(b.dataset.view);
@@ -8433,6 +8435,130 @@ async function pcCriar(){
   toast("Barra criada", nome);
   fecharFicha();
   vParceiros();
+}
+
+// ---------- EXPORTAR PARA O RD (clientes com faixa) ----------
+// Gera a planilha no formato de importacao do RD, com a etiqueta da faixa.
+// A lista vem da fn_export_rd_faixas, que so responde para gestor: e CPF e
+// telefone de centenas de pessoas. Cada download fica registrado na Trilha.
+let erState = {faixa:"todas", dados:[]};
+const ER_COLS = ["Nome","Telefone ","country code","Tags","E-mail","Data nascimento","Rg","Cpf",
+  "Código","Cep","Bairro","Estado","Cidade","Rua","Número","Complemento","País","Cargo",
+  "Departamento","Empresa","Cnpj","Telefone Empresa","E-mail Empresa","Descrição",
+  "Nome de usuário","bsuid"];
+
+async function vExportRD(){
+  el("content").innerHTML='<div class="loading"><div class="spinner"></div>Montando a lista…</div>';
+  const {data,error} = await sb.rpc("fn_export_rd_faixas");
+  if(error){
+    el("content").innerHTML = /gestores/i.test(error.message||"")
+      ? '<div class="empty">Esta exportação é restrita a gestores.</div>'
+      : `<div class="empty">Não foi possível montar a lista.<br>
+         <span style="font-size:11px;color:var(--text-faint)">${error.message}</span></div>`;
+    return;
+  }
+  erState.dados = data || [];
+  erPintar();
+}
+
+function erVer(f){ erState.faixa = f; erPintar(); }
+
+function erSelecao(){
+  const ok = erState.dados.filter(x => x.situacao === "ok");
+  return erState.faixa === "todas" ? ok : ok.filter(x => x.faixa === erState.faixa);
+}
+
+function erPintar(){
+  const ok    = erState.dados.filter(x => x.situacao === "ok");
+  const inval = erState.dados.filter(x => x.situacao !== "ok");
+  const dup   = ok.filter(x => x.fone_compartilhado)
+                  .sort((a,b) => String(a.telefone).localeCompare(String(b.telefone)));
+  const sel   = erSelecao();
+
+  const chips = ["todas"].concat(FAIXA_ORDEM).map(f => {
+    const n = f === "todas" ? ok.length : ok.filter(x => x.faixa === f).length;
+    if(f !== "todas" && !n) return "";
+    return `<button class="sol-tab ${erState.faixa===f?"on":""}" onclick="erVer('${f}')">${
+      f==="todas" ? "Todas as faixas" : "Faixa "+FAIXA_NOME[f]} · ${nf(n)}</button>`;
+  }).join("");
+
+  el("content").innerHTML = `
+    <div class="note" style="border-left-color:var(--green);margin-bottom:16px">
+      Clientes com faixa no Clube Trader, no formato de importação do RD Conversas.
+      Sai <b>uma linha por CPF</b>, com a faixa mais alta entre as contas, e cada um
+      recebe a etiqueta da faixa (ex.: "Faixa Azul").
+      <br><br><b>O RD acrescenta a etiqueta nova e não tira a antiga.</b> Quem mudou de
+      faixa desde a última importação fica com as duas.
+      <br><br>O arquivo tem CPF e telefone. Apague dos Downloads depois de importar.
+    </div>
+
+    <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
+      <div class="kpi"><div class="k-label">Prontos para importar</div>
+        <div class="k-val" style="color:var(--green)">${nf(ok.length)}</div>
+        <div class="k-sub">telefone válido</div></div>
+      <div class="kpi"><div class="k-label">Telefone inválido</div>
+        <div class="k-val" style="color:${inval.length?"var(--red)":"var(--text-faint)"}">${nf(inval.length)}</div>
+        <div class="k-sub">ficam fora do arquivo</div></div>
+      <div class="kpi"><div class="k-label">Telefone repetido</div>
+        <div class="k-val" style="color:${dup.length?"var(--amber)":"var(--text-faint)"}">${nf(dup.length)}</div>
+        <div class="k-sub">pessoas diferentes, mesmo número</div></div>
+    </div>
+
+    <div class="sol-tabs">${chips}</div>
+
+    <div class="panel" style="padding:16px 18px;margin-bottom:22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <div style="flex:1;font-size:13.5px">
+        <b>${nf(sel.length)}</b> contato(s) ${erState.faixa==="todas" ? "de todas as faixas" : "da faixa "+FAIXA_NOME[erState.faixa]}
+      </div>
+      <button class="cfg-save" onclick="erBaixar()">Baixar planilha do RD</button>
+    </div>
+
+    <div class="sec-title">Telefone inválido · corrigir no cadastro<span class="rule"></span></div>
+    <div class="panel" style="margin-bottom:22px">${!inval.length
+      ? '<div class="empty">Nenhum. Todos os clientes com faixa têm telefone válido.</div>'
+      : `<table><thead><tr><th>Cliente</th><th>Faixa</th><th>Telefone no cadastro</th></tr></thead>
+         <tbody>${inval.map(x=>`<tr onclick="abrirFicha('${x.cliente_id}')" title="Abrir a ficha para corrigir">
+           <td><div class="cell-name"><span class="mini-av">${ini(x.nome||"?")}</span>${x.nome||"—"}</div></td>
+           <td>${faixaBadge(x.faixa,0)}</td>
+           <td class="num" style="color:var(--red)">${x.telefone_original||"vazio"}</td>
+         </tr>`).join("")}</tbody></table>
+         <div style="padding:11px 16px;font-size:11px;color:var(--text-faint)">
+           Clique no cliente e use "Editar cadastro". Na próxima exportação ele já entra.</div>`}
+    </div>
+
+    <div class="sec-title">Telefone repetido · o RD junta num contato só<span class="rule"></span></div>
+    <div class="panel">${!dup.length
+      ? '<div class="empty">Nenhum telefone repetido.</div>'
+      : `<table><thead><tr><th>Telefone</th><th>Cliente</th><th>Faixa</th></tr></thead>
+         <tbody>${dup.map(x=>`<tr onclick="abrirFicha('${x.cliente_id}')">
+           <td class="num">${x.telefone}</td>
+           <td><div class="cell-name"><span class="mini-av">${ini(x.nome||"?")}</span>${x.nome||"—"}</div></td>
+           <td>${faixaBadge(x.faixa,0)}</td>
+         </tr>`).join("")}</tbody></table>
+         <div style="padding:11px 16px;font-size:11px;color:var(--text-faint)">
+           O RD identifica o contato pelo número: fica o nome e a etiqueta do último importado.</div>`}
+    </div>`;
+}
+
+function erBaixar(){
+  const sel = erSelecao();
+  if(!sel.length){ toast("Nada para exportar","",true); return; }
+  // tudo como texto: CPF e telefone nao podem perder o zero da frente
+  const linhas = sel.map(x => {
+    const l = new Array(ER_COLS.length).fill("");
+    l[0] = x.nome || ""; l[1] = x.telefone || ""; l[2] = "55";
+    l[3] = x.tags || "";  l[4] = x.email || "";   l[7] = x.cpf || "";
+    return l;
+  });
+  const ws = XLSX.utils.aoa_to_sheet([ER_COLS].concat(linhas));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Planilha1");
+  XLSX.writeFile(wb, "importacao_rd_" +
+    (erState.faixa==="todas" ? "faixas" : "faixa_"+erState.faixa) + "_" + hojeISO() + ".xlsx");
+  sb.rpc("registrar_evento",{p_acao:"exportou_rd",
+    p_resumo:"Exportou "+sel.length+" contatos com faixa para o RD",
+    p_detalhe:{faixa:erState.faixa, linhas:sel.length}});
+  toast("Planilha gerada", nf(sel.length)+" contatos");
 }
 
 boot();
