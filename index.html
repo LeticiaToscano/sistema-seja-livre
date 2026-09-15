@@ -1197,7 +1197,7 @@
       <button class="nav-item" data-view="integracoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 7V4M15 7V4M8 7h8v4a4 4 0 0 1-8 0z" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15v5" stroke-linecap="round"/></svg>Integrações</button>
     </nav>
     <div class="foot">
-      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v15/09 exportar RD</div></div></div>
+      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v15/09 RD nome+sinacor</div></div></div>
       <button class="btn-logout" id="logoutBtn">Sair</button>
     </div>
   </aside>
@@ -8458,7 +8458,28 @@ async function vExportRD(){
     return;
   }
   erState.dados = data || [];
+  await erSinacores();
   erPintar();
+}
+
+// A funcao nao devolve o Sinacor; busca na tabela de clientes, em lotes
+// (lista grande de ids nao cabe numa URL so). O id e o da conta de faixa
+// mais alta do CPF, entao o Sinacor e o dessa conta.
+async function erSinacores(){
+  const ids = [...new Set(erState.dados.map(x => x.cliente_id).filter(Boolean))];
+  const mapa = {};
+  for(let i = 0; i < ids.length; i += 150){
+    const {data} = await sb.from("clientes").select("id,sinacor").in("id", ids.slice(i, i+150));
+    (data||[]).forEach(c => { mapa[c.id] = c.sinacor; });
+  }
+  erState.dados.forEach(x => { x.sinacor = mapa[x.cliente_id] || ""; });
+}
+
+// "GEOVANA DA SILVA" + 123456 -> "Geovana 123456", o padrao usado no RD
+function erNomeRD(x){
+  const p = String(x.nome||"").trim().split(/\s+/)[0] || "";
+  const primeiro = p ? p.charAt(0).toLocaleUpperCase("pt-BR") + p.slice(1).toLocaleLowerCase("pt-BR") : "";
+  return (primeiro + " " + (x.sinacor||"")).trim();
 }
 
 function erVer(f){ erState.faixa = f; erPintar(); }
@@ -8485,7 +8506,8 @@ function erPintar(){
   el("content").innerHTML = `
     <div class="note" style="border-left-color:var(--green);margin-bottom:16px">
       Clientes com faixa no Clube Trader, no formato de importação do RD Conversas.
-      Sai <b>uma linha por CPF</b>, com a faixa mais alta entre as contas, e cada um
+      Sai <b>uma linha por CPF</b>, com a faixa mais alta entre as contas. O nome vai como
+      <b>primeiro nome + Sinacor</b> (ex.: "Geovana 123456"), e cada um
       recebe a etiqueta da faixa (ex.: "Faixa Azul").
       <br><br><b>O RD acrescenta a etiqueta nova e não tira a antiga.</b> Quem mudou de
       faixa desde a última importação fica com as duas.
@@ -8546,7 +8568,7 @@ function erBaixar(){
   // tudo como texto: CPF e telefone nao podem perder o zero da frente
   const linhas = sel.map(x => {
     const l = new Array(ER_COLS.length).fill("");
-    l[0] = x.nome || ""; l[1] = x.telefone || ""; l[2] = "55";
+    l[0] = erNomeRD(x);  l[1] = x.telefone || ""; l[2] = "55";
     l[3] = x.tags || "";  l[4] = x.email || "";   l[7] = x.cpf || "";
     return l;
   });
