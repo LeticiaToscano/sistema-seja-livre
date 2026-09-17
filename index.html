@@ -8346,7 +8346,7 @@ async function cpNovaFrase(){
   cpIniciar();
 }
 
-let pcState = { busca:"", filtro:"todas", lista:[] };
+let pcState = { busca:"", filtro:"todas", lista:[], tudo:false };
 
 async function vParceiros(){
   el("content").innerHTML = `
@@ -8369,8 +8369,8 @@ async function vParceiros(){
     <div class="sec-title" style="margin-top:26px">Campanhas de parceiros<span class="rule"></span></div>
     <div id="cpBox"><div class="loading"><div class="spinner"></div>Carregando…</div></div>`;
 
-  el("pcBusca").addEventListener("input", e => { pcState.busca = e.target.value; pcPintar(); });
-  el("pcFiltro").addEventListener("change", e => { pcState.filtro = e.target.value; pcPintar(); });
+  el("pcBusca").addEventListener("input", e => { pcState.busca = e.target.value; pcState.tudo = false; pcPintar(); });
+  el("pcFiltro").addEventListener("change", e => { pcState.filtro = e.target.value; pcState.tudo = false; pcPintar(); });
   el("pcNova").addEventListener("click", () => pcFormNova());
 
   const { data, error } = await sb.from("vw_barras_painel")
@@ -8408,8 +8408,18 @@ function pcFiltrar(){
   });
 }
 
+// A lista de barras é longa e empurrava a seção de Campanhas para baixo.
+// Sem busca e sem filtro, mostra só as 10 com mais clientes; buscar ou
+// filtrar já reduz a lista, então aí mostra tudo.
+function pcVerTodas(){ pcState.tudo = true; pcPintar(); }
+
 function pcPintar(){
-  const linhas = pcFiltrar();
+  let linhas = pcFiltrar();
+  const total = linhas.length;
+  const encurtar = !pcState.tudo && !pcState.busca.trim() && pcState.filtro === "todas" && total > 10;
+  if(encurtar){
+    linhas = linhas.slice().sort((a,b) => Number(b.clientes||0) - Number(a.clientes||0)).slice(0,10);
+  }
   if(!linhas.length){
     el("pcLista").innerHTML = '<div class="empty">Nenhuma barra encontrada.</div>';
     return;
@@ -8428,7 +8438,12 @@ function pcPintar(){
              <button class="pc-cp" onclick="pcCopiar(this,'${b.link_abertura}')">copiar</button>`
           : '<span style="color:var(--text-faint)">sem link</span>'
       }</td>
-    </tr>`).join("") + "</tbody></table>";
+    </tr>`).join("") + "</tbody></table>" +
+    (encurtar
+      ? `<div style="text-align:center;padding:12px">
+           <button class="pc-cp" style="margin:0" onclick="pcVerTodas()">Ver todas as ${nf(total)} barras</button>
+         </div>`
+      : "");
 }
 
 // Copiar precisa funcionar também em conexão sem HTTPS e em navegador antigo,
