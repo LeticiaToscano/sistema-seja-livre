@@ -4673,12 +4673,37 @@ async function impProcessar(nome, texto){
   if(error){ impCartao(nome, null, linhas.length-1, colunas, error.message); return; }
 
   // guarda as linhas para o processamento, quando o formato tiver destino
-  if(data && data.formato === "chegou_na_livre"){
-    const idx = n => colunas.findIndex(c=>c.trim().toUpperCase() === n);
-    const iS=idx("CONTA_SINACOR_SEM_DIGITO"), iA=idx("ASSESSOR_CONTA"), iD=idx("DT_PARTITION");
+  if(data && (data.formato === "chegou_na_livre" || data.formato === "habilitacao")){
+    // O HABILITACAO traz as mesmas tres informacoes que o CHEGOU_NA_LIVRE
+    // — conta, barra e data — so que com outros nomes de coluna. Ele entra
+    // pela mesma porta: a receber_chegadas. Sem isso, conta aberta so vira
+    // ficha quando o Diversificador passa, e quem abriu depois da ultima
+    // foto fica sem ficha nenhuma.
+    const acha = (...nomes) => {
+      for(const n of nomes){
+        const i = colunas.findIndex(c=>c.trim().toUpperCase() === n.toUpperCase());
+        if(i >= 0) return i;
+      }
+      return -1;
+    };
+    // A data vem em ISO nos arquivos novos e em DD/MM/AAAA nos antigos.
+    // A receber_chegadas so aceita ISO — normalizar aqui evita o erro
+    // "date/time field value out of range" no meio do lote.
+    const dataISO = v => {
+      const t = String(v||"").trim();
+      if(!t) return null;
+      if(/^\d{4}-\d{2}-\d{2}/.test(t)) return t.slice(0,10);
+      const m = t.match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})/);
+      return m ? `${m[3]}-${m[2]}-${m[1]}` : null;
+    };
+    // CD_CONTA vem SEM digito no HABILITACAO; o com digito fica de fora
+    // de proposito, porque a tabela clientes guarda sem.
+    const iS = acha("CONTA_SINACOR_SEM_DIGITO","CD_CONTA","CT_SEM_DIGITO"),
+          iA = acha("ASSESSOR_CONTA","NM_ASSESSOR"),
+          iD = acha("DT_PARTITION","DATA_CRIACAO");
     const itens = linhas.slice(1).map(l=>{
       const p = l.split(sep).map(x=>x.replace(/^"|"$/g,"").trim());
-      return { sinacor:p[iS], barra: iA>=0?p[iA]:null, data: iD>=0?p[iD]:null };
+      return { sinacor:p[iS], barra: iA>=0?p[iA]:null, data: iD>=0?dataISO(p[iD]):null };
     }).filter(x=>x.sinacor);
     window.__impCheg = {arquivo:nome, itens:itens};
     impCartao(nome, data, linhas.length-1, colunas, null, null, null, null, null, itens.length);
