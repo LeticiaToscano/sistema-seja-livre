@@ -1197,7 +1197,7 @@
       <button class="nav-item" data-view="integracoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 7V4M15 7V4M8 7h8v4a4 4 0 0 1-8 0z" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15v5" stroke-linecap="round"/></svg>Integrações</button>
     </nav>
     <div class="foot">
-      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v15/09 RD nome+sinacor</div></div></div>
+      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v17/09 campanhas parceiros</div></div></div>
       <button class="btn-logout" id="logoutBtn">Sair</button>
     </div>
   </aside>
@@ -8191,6 +8191,161 @@ function erro(e,alvo){
 // A barra é o que a Genial usa para saber de quem é a conta aberta. Cada uma
 // tem um link próprio (abrir-conta?idAssessor=N) que o comercial manda para o
 // cliente. Aqui ficam todas, com o link à mão para copiar.
+
+// =====================================================================
+// CAMPANHAS DE PARCEIROS
+// Quem chamou no WhatsApp com a frase fixa do parceiro, num período.
+// A varredura roda sozinha (Edge Function varrer-campanhas); aqui só se lê.
+// A lista tem nome e telefone: vem da fn_campanha_chamados, que só
+// responde para gestor.
+// O nome vem do WhatsApp da pessoa, então é texto de fora: sempre escapar.
+// =====================================================================
+const cpEsc = v => String(v == null ? "" : v)
+  .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+  .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+const cpISO = d => new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,10);
+let cpState = { frases:[], frase:"", de:null, ate:null, linhas:[], tipo:"todos" };
+
+async function cpIniciar(){
+  const hoje = new Date();
+  if(!cpState.ate) cpState.ate = cpISO(hoje);
+  if(!cpState.de)  cpState.de  = cpISO(new Date(hoje.getTime() - 6*864e5));
+
+  const { data, error } = await sb.from("parceiro_frases")
+    .select("id,parceiro,frase,barras,ativa").order("parceiro");
+  if(error){ return erro(error, "cpBox"); }
+  cpState.frases = data || [];
+  if(!cpState.frase && cpState.frases.length) cpState.frase = String(cpState.frases[0].id);
+
+  const opcoes = cpState.frases.map(f =>
+    `<option value="${cpEsc(f.id)}">${cpEsc(f.parceiro)} — “${cpEsc(f.frase)}”${f.ativa===false?" (inativa)":""}</option>`).join("");
+
+  el("cpBox").innerHTML = `
+    <div class="panel">
+      <div class="toolbar">
+        <select class="search select" id="cpFrase" style="flex:1 1 320px">
+          ${opcoes || '<option value="">Nenhuma frase cadastrada</option>'}
+        </select>
+        <input class="search" type="date" id="cpDe"  value="${cpState.de}"  style="flex:0 0 150px" title="De">
+        <input class="search" type="date" id="cpAte" value="${cpState.ate}" style="flex:0 0 150px" title="Até">
+        <select class="search select" id="cpTipo" style="flex:0 0 170px">
+          <option value="todos">Todos</option>
+          <option value="clientes">Só clientes</option>
+          <option value="nao">Só não clientes</option>
+        </select>
+        <button class="pc-cp" id="cpExport" style="margin-left:0">Exportar planilha</button>
+        <button class="pc-add" id="cpNova">+ Nova frase</button>
+      </div>
+      <div class="pc-hint" style="margin:0 0 10px">A varredura começou em 14/09/2026 e roda sozinha (fila às 21h, lotes a cada 10 min). Mensagens de hoje podem levar algumas horas para aparecer.</div>
+      <div class="pc-sum" id="cpSum"></div>
+      <div id="cpLista"></div>
+    </div>`;
+
+  el("cpFrase").value = cpState.frase;
+  el("cpTipo").value  = cpState.tipo;
+  el("cpFrase").addEventListener("change", e => { cpState.frase = e.target.value; cpCarregar(); });
+  el("cpDe").addEventListener("change",    e => { cpState.de  = e.target.value; cpCarregar(); });
+  el("cpAte").addEventListener("change",   e => { cpState.ate = e.target.value; cpCarregar(); });
+  el("cpTipo").addEventListener("change",  e => { cpState.tipo = e.target.value; cpPintar(); });
+  el("cpExport").addEventListener("click", cpExportar);
+  el("cpNova").addEventListener("click", cpNovaFrase);
+  cpCarregar();
+}
+
+async function cpCarregar(){
+  if(!cpState.frase){ el("cpSum").innerHTML=""; el("cpLista").innerHTML='<div class="empty">Cadastre uma frase para começar.</div>'; return; }
+  if(!cpState.de || !cpState.ate || cpState.de > cpState.ate){
+    el("cpLista").innerHTML = '<div class="empty">Escolha um período válido.</div>'; return;
+  }
+  el("cpLista").innerHTML = '<div class="loading"><div class="spinner"></div>Carregando…</div>';
+  const { data, error } = await sb.rpc("fn_campanha_chamados",
+    { p_frase_id: cpState.frase, p_de: cpState.de, p_ate: cpState.ate });
+  if(error){
+    el("cpSum").innerHTML = "";
+    if(/gestores/i.test(error.message||"")){
+      el("cpLista").innerHTML = '<div class="empty">Os chamados de campanha são restritos a gestores.</div>';
+      return;
+    }
+    return erro(error, "cpLista");
+  }
+  cpState.linhas = data || [];
+  cpPintar();
+}
+
+function cpFiltradas(){
+  return cpState.linhas.filter(l =>
+    cpState.tipo === "clientes" ? !!l.cliente_id :
+    cpState.tipo === "nao"      ? !l.cliente_id  : true);
+}
+
+function cpPintar(){
+  const L = cpState.linhas;
+  const cli = L.filter(l => l.cliente_id).length;
+  el("cpSum").innerHTML = `
+    <div><div class="k">Pessoas que chamaram</div><div class="v">${nf(L.length)}</div></div>
+    <div><div class="k">Já são clientes</div><div class="v">${nf(cli)}</div></div>
+    <div><div class="k">Não clientes</div><div class="v">${nf(L.length - cli)}</div></div>`;
+
+  const linhas = cpFiltradas();
+  if(!linhas.length){
+    el("cpLista").innerHTML = '<div class="empty">Ninguém chamou com essa frase no período.</div>';
+    return;
+  }
+  el("cpLista").innerHTML = `<table><thead><tr>
+      <th>Nome</th><th>Telefone</th><th>Primeira mensagem</th><th>Vezes</th><th>Cliente</th><th>Barra</th>
+    </tr></thead><tbody>` +
+    linhas.map(l => {
+      const abre = l.cliente_id ? ` onclick="abrirFicha('${cpEsc(l.cliente_id)}')" style="cursor:pointer"` : "";
+      const quando = l.primeira_msg ? new Date(l.primeira_msg).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"}) : "—";
+      return `<tr${abre}>
+        <td style="font-weight:650">${cpEsc(l.nome || "—")}</td>
+        <td style="color:var(--text-dim)">${cpEsc(l.telefone || "—")}</td>
+        <td style="color:var(--text-dim)">${quando}</td>
+        <td>${nf(l.mensagens)}</td>
+        <td>${l.cliente_id
+          ? `<span class="tag" style="background:var(--green-deep);color:var(--green)">cliente${l.sinacor?" · "+cpEsc(l.sinacor):""}</span>`
+          : '<span class="tag" style="background:var(--surface-2);color:var(--text-faint)">não cliente</span>'}</td>
+        <td style="color:var(--text-dim)">${cpEsc(l.barra || "—")}</td>
+      </tr>`;
+    }).join("") + "</tbody></table>";
+}
+
+function cpExportar(){
+  const linhas = cpFiltradas();
+  if(!linhas.length){ toast("Nada para exportar", "A lista está vazia no período."); return; }
+  const f = cpState.frases.find(x => String(x.id) === String(cpState.frase));
+  const nome = "campanha_" + (f ? f.parceiro : "parceiro").toLowerCase().replace(/[^a-z0-9]+/g,"_") +
+               "_" + cpState.de + "_a_" + cpState.ate;
+  baixarCSV(nome, [
+    ["Nome",               l => l.nome],
+    ["Telefone",           l => l.telefone],
+    ["Primeira mensagem",  l => l.primeira_msg ? new Date(l.primeira_msg).toLocaleString("pt-BR") : ""],
+    ["Vezes",              l => l.mensagens],
+    ["Cliente",            l => l.cliente_id ? "sim" : "não"],
+    ["Sinacor",            l => l.sinacor],
+    ["Barra",              l => l.barra],
+    ["Status",             l => l.status]
+  ], linhas);
+}
+
+async function cpNovaFrase(){
+  const parceiro = (prompt("Nome do parceiro (ex.: Coringa):") || "").trim();
+  if(!parceiro) return;
+  const frase = (prompt("Frase fixa que a pessoa manda no WhatsApp:\n(maiúscula, acento e pontuação não importam)") || "").trim();
+  if(!frase) return;
+  const barrasTxt = prompt("Barras do parceiro, separadas por vírgula (pode deixar vazio):") || "";
+  const barras = barrasTxt.split(",").map(b => b.trim().toUpperCase()).filter(Boolean);
+  const { error } = await sb.from("parceiro_frases").insert({ parceiro, frase, barras, ativa:true });
+  if(error){
+    toast("Não consegui salvar", /permission|policy|row-level/i.test(error.message||"")
+      ? "Só gestores podem cadastrar frases." : error.message, true);
+    return;
+  }
+  toast("Frase cadastrada", "Vale a partir da varredura das 21h de hoje. Mensagens anteriores ao cadastro não são relidas.");
+  cpState.frase = "";
+  cpIniciar();
+}
+
 let pcState = { busca:"", filtro:"todas", lista:[] };
 
 async function vParceiros(){
@@ -8210,7 +8365,9 @@ async function vParceiros(){
         <button class="pc-add" id="pcNova">+ Nova barra</button>
       </div>
       <div id="pcLista"><div class="loading"><div class="spinner"></div>Carregando…</div></div>
-    </div>`;
+    </div>
+    <div class="sec-title" style="margin-top:26px">Campanhas de parceiros<span class="rule"></span></div>
+    <div id="cpBox"><div class="loading"><div class="spinner"></div>Carregando…</div></div>`;
 
   el("pcBusca").addEventListener("input", e => { pcState.busca = e.target.value; pcPintar(); });
   el("pcFiltro").addEventListener("change", e => { pcState.filtro = e.target.value; pcPintar(); });
@@ -8222,6 +8379,7 @@ async function vParceiros(){
   pcState.lista = data || [];
   pcResumo();
   pcPintar();
+  cpIniciar();
 }
 
 function pcResumo(){
