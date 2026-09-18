@@ -1197,7 +1197,7 @@
       <button class="nav-item" data-view="integracoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 7V4M15 7V4M8 7h8v4a4 4 0 0 1-8 0z" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15v5" stroke-linecap="round"/></svg>Integrações</button>
     </nav>
     <div class="foot">
-      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v17/09 campanhas em aba</div></div></div>
+      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v18/09 nome nas plataformas</div></div></div>
       <button class="btn-logout" id="logoutBtn">Sair</button>
     </div>
   </aside>
@@ -4878,11 +4878,12 @@ async function impProcessar(nome, texto){
   } else if(data && data.formato === "plataformas"){
     const idx = n => colunas.findIndex(c=>new RegExp("^"+n+"$","i").test(c));
     const iC=idx("CD_CONTA_COM_DIGITO"), iD=idx("DATA_INICIO"), iF=idx("NOME_FERRAMENTA"),
-          iS=idx("SITUACAO_ADESAO"), iT=idx("TP_PESSOA"), iA=idx("NOME_ASSESSOR_ATUAL");
+          iS=idx("SITUACAO_ADESAO"), iT=idx("TP_PESSOA"), iA=idx("NOME_ASSESSOR_ATUAL"),
+          iN=idx("NOME_CLIENTE");
     const itens = linhas.slice(1).map(l=>{
       const p = l.split(sep).map(x=>x.replace(/^"|"$/g,"").trim());
       return { conta:p[iC], data:p[iD], ferramenta:p[iF],
-               situacao:p[iS], tp_pessoa:p[iT], assessor:p[iA] };
+               situacao:p[iS], tp_pessoa:p[iT], assessor:p[iA], nome:p[iN] };
     }).filter(x=>x.conta && x.ferramenta);
     window.__impPlat = {arquivo:nome, itens:itens};
     impCartao(nome, data, linhas.length-1, colunas, null, null, itens.length);
