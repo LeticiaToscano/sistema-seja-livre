@@ -1144,6 +1144,7 @@
       <button class="btn-primary" id="loginBtn" type="submit">Entrar</button>
       <div class="login-err" id="loginErr"></div>
     </form>
+    <div id="mfaBox" class="hidden"></div>
   </div>
 </div>
 
@@ -1197,7 +1198,7 @@
       <button class="nav-item" data-view="integracoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 7V4M15 7V4M8 7h8v4a4 4 0 0 1-8 0z" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15v5" stroke-linecap="round"/></svg>Integrações</button>
     </nav>
     <div class="foot">
-      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v18/09 nome nas plataformas</div></div></div>
+      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v21/09 código no celular</div></div></div>
       <button class="btn-logout" id="logoutBtn">Sair</button>
     </div>
   </aside>
@@ -1366,7 +1367,7 @@ const fmtDesde = d => {
 // ---------- AUTH ----------
 async function boot(){
   const {data:{session}} = await sb.auth.getSession();
-  if(session){ mostrarApp(session); } else { el("login").classList.remove("hidden"); el("app").classList.add("hidden"); }
+  if(session){ portao(); } else { el("login").classList.remove("hidden"); el("app").classList.add("hidden"); }
 }
 el("loginForm").addEventListener("submit", async e=>{
   e.preventDefault();
@@ -1374,9 +1375,64 @@ el("loginForm").addEventListener("submit", async e=>{
   const {data,error}=await sb.auth.signInWithPassword({email:el("email").value.trim(),password:el("password").value});
   btn.disabled=false; btn.textContent="Entrar";
   if(error){ el("loginErr").textContent = error.message.includes("Invalid")?"E-mail ou senha incorretos.":error.message; return; }
-  sb.rpc("registrar_evento",{p_acao:"acesso",p_resumo:"Entrou no sistema"});
-  mostrarApp(data.session);
+  portao(true);
 });
+
+/* ---------- SEGUNDO FATOR (código do aplicativo no celular) ----------
+   Depois da senha, todo usuário passa pelo código de 6 dígitos. No primeiro
+   acesso, cadastra o celular pelo QR code. */
+async function portao(novoLogin){
+  el("login").classList.remove("hidden"); el("app").classList.add("hidden");
+  const a=await sb.auth.mfa.getAuthenticatorAssuranceLevel();
+  if(a.error){ el("loginErr").textContent=a.error.message; return; }
+  if(a.data.currentLevel==="aal2"){
+    const {data:{session}}=await sb.auth.getSession();
+    if(novoLogin) sb.rpc("registrar_evento",{p_acao:"acesso",p_resumo:"Entrou no sistema"});
+    return mostrarApp(session);
+  }
+  const f=await sb.auth.mfa.listFactors();
+  if(f.error){ el("loginErr").textContent=f.error.message; return; }
+  const ok=(f.data.totp||[]).find(x=>x.status==="verified");
+  if(ok) return pedirCodigo(ok.id, null);
+  for(const x of (f.data.all||[])) if(x.factor_type==="totp" && x.status!=="verified") await sb.auth.mfa.unenroll({factorId:x.id});
+  const e=await sb.auth.mfa.enroll({factorType:"totp", friendlyName:"CRM "+Date.now()});
+  if(e.error){ el("loginErr").textContent=e.error.message; return; }
+  pedirCodigo(e.data.id, e.data.totp);
+}
+
+function pedirCodigo(factorId, novo){
+  el("loginForm").classList.add("hidden");
+  const bx=el("mfaBox"); bx.classList.remove("hidden");
+  bx.innerHTML=(novo
+    ? '<p><b>Primeiro acesso com código.</b> Abra o Google Authenticator ou o Microsoft Authenticator no celular, toque em adicionar e escaneie o QR code.</p>'+
+      '<div style="background:#fff;border-radius:12px;padding:12px;width:fit-content;margin:14px auto"><img id="mfaQr" alt="QR code" style="width:180px;height:180px;display:block"></div>'+
+      '<p style="font-size:11px;color:#ff6b6b;font-weight:700">Não tire print nem envie esta tela para ninguém: quem tiver o QR consegue gerar os seus códigos.</p>'+
+      '<p style="font-size:11px;word-break:break-all">Sem câmera? <a href="#" id="mfaVerChave" style="color:inherit;text-decoration:underline">mostrar a chave para digitar</a><b id="mfaChave" class="hidden"> '+novo.secret+'</b></p>'
+    : '<p>Digite o código de 6 dígitos que aparece no aplicativo do seu celular.</p>')+
+    '<div class="field"><label>Código</label><input id="mfaCod" inputmode="numeric" autocomplete="one-time-code" maxlength="6" style="letter-spacing:8px;text-align:center;font-size:20px"></div>'+
+    '<button class="btn-primary" id="mfaOk" type="button">Confirmar</button>'+
+    '<div class="login-err" id="mfaErro"></div>'+
+    '<p style="margin-top:12px;text-align:center"><a href="#" id="mfaSair" style="color:inherit;font-size:12px">Voltar</a></p>';
+  if(novo){
+    const q=String(novo.qr_code||"");
+    el("mfaQr").src=q.trim().startsWith("<") ? "data:image/svg+xml;charset=utf-8,"+encodeURIComponent(q) : q;
+  }
+  if(el("mfaVerChave")) el("mfaVerChave").onclick=ev=>{ ev.preventDefault(); el("mfaChave").classList.remove("hidden"); ev.target.remove(); };
+  const i=el("mfaCod"); i.focus();
+  i.addEventListener("input",()=>{ i.value=i.value.replace(/[^0-9]/g,"").slice(0,6); });
+  const enviar=async()=>{
+    if(i.value.length!==6){ el("mfaErro").textContent="O código tem 6 dígitos."; return; }
+    const b=el("mfaOk"); b.disabled=true; b.textContent="Conferindo…";
+    const v=await sb.auth.mfa.challengeAndVerify({factorId, code:i.value});
+    b.disabled=false; b.textContent="Confirmar";
+    if(v.error){ el("mfaErro").textContent="Código inválido ou vencido. Use o código que está aparecendo agora."; i.value=""; i.focus(); return; }
+    bx.classList.add("hidden"); el("loginForm").classList.remove("hidden");
+    portao(true);
+  };
+  el("mfaOk").onclick=enviar;
+  i.addEventListener("keydown",ev=>{ if(ev.key==="Enter") enviar(); });
+  el("mfaSair").onclick=async ev=>{ ev.preventDefault(); await sb.auth.signOut(); location.reload(); };
+}
 el("logoutBtn").addEventListener("click", async ()=>{ await sb.auth.signOut(); location.reload(); });
 
 async function mostrarApp(session){
