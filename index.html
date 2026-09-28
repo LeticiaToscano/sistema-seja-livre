@@ -1171,6 +1171,7 @@
       <button class="nav-item" data-view="aniversariantes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20h16v-8H4z"/><path d="M4 14c2 0 2-1.3 4-1.3s2 1.3 4 1.3 2-1.3 4-1.3 2 1.3 4 1.3" stroke-linecap="round"/><path d="M12 8V5" stroke-linecap="round"/></svg>Aniversariantes</button>
       <button class="nav-item" data-view="vencimentos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4" stroke-linecap="round"/><path d="M12 13v3.5l2 1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Vencimentos</button>
       <button class="nav-item" data-view="zeragem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 17l5-5 4 3 5-7" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 21h18" stroke-linecap="round"/></svg>Zeragem</button>
+      <button class="nav-item" data-view="automacao"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 7V4M9 12h.01M15 12h.01M9.5 15.5h5" stroke-linecap="round"/></svg>Automação</button>
       <button class="nav-item" data-view="solicitacoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h16v14H4z"/><path d="M4 9h16M9 5v4" stroke-linecap="round"/><path d="M8 14l2.5 2.5L16 11" stroke-linecap="round" stroke-linejoin="round"/></svg>Solicitações</button>
 
       <div class="nav-label">Atendimento</div>
@@ -1444,6 +1445,7 @@ async function mostrarApp(session){
   const {data:a} = await sb.from("assessores").select("nome,papel").eq("auth_user_id",session.user.id).maybeSingle();
   if(a){ nome=a.nome||email; papel=a.papel; }
   PAPEL = papel;
+  { const bAuto=document.querySelector('.nav-item[data-view="automacao"]'); if(bAuto && !ehGestor()) bAuto.style.display="none"; }
   el("userName").textContent=nome; el("avatar").textContent=ini(nome);
   el("userRole").textContent = papel==="admin"?"Administrador":papel==="gerencia"?"Gerência":"Assessor";
   render("radar");
@@ -1461,6 +1463,7 @@ const TITLES={
   fila:["CARTEIRA","Fila de ação"], aniversariantes:["CARTEIRA","Aniversariantes"],
   vencimentos:["CARTEIRA","Vencimentos · renda fixa"],
   zeragem:["CARTEIRA","Zeragem · quem a mesa zerou"],
+  automacao:["CARTEIRA","Automação · planos e metas"],
   solicitacoes:["CARTEIRA","Solicitações"],
   fluxos:["ATENDIMENTO","Fluxos"], assessores:["ATENDIMENTO","Assessores"],
   config:["GESTÃO","Configurações"], auditoria:["GESTÃO","Auditoria"],
@@ -1485,7 +1488,7 @@ const RESERVADAS={
   ia:{icon:"ia",desc:"O diagnóstico estratégico da operação em linguagem natural, e o copiloto de IA por assessor — cada um enxergando apenas a própria carteira."},
   integracoes:{icon:"integracoes",desc:"As conexões do sistema — Volume Operado (operação), RD Conversas (atendimento), Gmail/Genial (entrada de clientes) e IA. Ligadas e a ligar."}
 };
-const VIEWS={exportrd:vExportRD,sdr:vSDR,radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,multiconta:vMulticonta,publico:vPublico,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes,auditoria:vAuditoria,diagnostico:vDiagnostico,legenda:vLegenda,leads:vLeads,importacoes:vImportacoes,saidas:vSaidas,plataformas:vPlataformas,custos:vCustos,conferencia:vConferencia,ranking:vRanking,assessores:vAssessores,vencimentos:vVencimentos,zeragem:vZeragem,parceiros:vParceiros};
+const VIEWS={exportrd:vExportRD,sdr:vSDR,radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,multiconta:vMulticonta,publico:vPublico,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes,auditoria:vAuditoria,diagnostico:vDiagnostico,legenda:vLegenda,leads:vLeads,importacoes:vImportacoes,saidas:vSaidas,plataformas:vPlataformas,custos:vCustos,conferencia:vConferencia,ranking:vRanking,assessores:vAssessores,vencimentos:vVencimentos,zeragem:vZeragem,automacao:vAutomacao,parceiros:vParceiros};
 document.querySelectorAll(".nav-item").forEach(b=>b.addEventListener("click",()=>{
   document.querySelectorAll(".nav-item").forEach(x=>x.classList.remove("active"));
   b.classList.add("active"); fecharMenu(); render(b.dataset.view);
@@ -1666,6 +1669,8 @@ async function vRadar(){
 
     <div class="sec-title">Vencimentos de hoje e amanhã<span class="rule"></span></div>
     <div class="panel" id="vencRadar"><div class="loading"><div class="spinner"></div>Carregando…</div></div>
+    ${ehGestor()?`<div class="sec-title">Automação abaixo da meta<span class="rule"></span></div>
+    <div class="panel" id="autoRadar"><div class="loading"><div class="spinner"></div>Carregando…</div></div>`:""}
 
     <div class="radar-lower">
       <div>
@@ -1682,6 +1687,7 @@ async function vRadar(){
   carregarFila();
   carregarAniversariantes();
   carregarVencRadar();
+  carregarAutoRadar();
   carregarMovimentoHoje();
 }
 function hojeISO(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
@@ -6209,6 +6215,137 @@ async function carregarZeragem(){
       <td class="num">${l.financeiro_bov?brl(l.financeiro_bov):"—"}</td>
       <td>${fmtData(l.ultima)}</td></tr>`).join("")}</tbody></table>
     <div class="stack-cap" style="margin-top:10px">Contratos e financeiro são grandezas diferentes — a coluna BMF conta contratos, a de Bovespa é em reais. Não somam.</div>`;
+}
+
+
+// ---------- AUTOMAÇÃO (Nelógica) ----------
+// Fonte: automacao_eventos, alimentada pelo LEITOR AUTOMACAO (só as
+// respostas do Jonas contam). As duas RPCs respondem apenas para gestor;
+// para os demais devolvem lista vazia, e o menu nem aparece.
+const ehGestor = () => PAPEL==="admin" || PAPEL==="gerencia";
+// nomes vêm de e-mail externo: escapar antes de pôr na tela
+const escA = s => String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let autoState = {aba:"meta", mes:"", de:"", ate:""};
+
+function isoMes(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-01"; }
+function mesFechadoISO(){ const d=new Date(); return isoMes(new Date(d.getFullYear(), d.getMonth()-1, 1)); }
+function nomeMes(iso){ const [a,m]=iso.split("-"); return new Date(+a,+m-1,1).toLocaleDateString("pt-BR",{month:"long",year:"numeric"}); }
+const planoFmt = p => p ? p[0]+p.slice(1).toLowerCase() : "—";
+
+function tabelaMeta(l){
+  return `<table><thead><tr><th>Cliente</th><th>Barra</th><th>Plano</th><th class="num">Meta</th><th class="num">Contratos BMF</th><th class="num">Faltou</th><th>Abertura</th></tr></thead>
+    <tbody>${l.map(x=>`<tr>
+      <td><div class="cell-name"><span class="mini-av">${escA(ini(x.nome))}</span>${escA(x.nome||("CPF "+x.cpf))}</div></td>
+      <td>${escA(x.barra||"—")}</td>
+      <td>${planoFmt(x.plano)}</td>
+      <td class="num">${nf(x.meta)}</td>
+      <td class="num">${nf(x.contratos)}</td>
+      <td class="num" style="color:var(--amber)">${nf(x.falta)}</td>
+      <td>${fmtData(x.abertura)}</td></tr>`).join("")}</tbody></table>`;
+}
+
+// ---- bloco no Radar: último mês fechado ----
+async function carregarAutoRadar(){
+  if(!el("autoRadar")) return;
+  const mes=mesFechadoISO();
+  const {data,error}=await sb.rpc("automacao_alerta_meta",{p_mes:mes});
+  if(error) return erro(error,"autoRadar");
+  const l=data||[];
+  if(!l.length){ el("autoRadar").innerHTML=`<div class="empty">Todos os clientes com Automação bateram a meta em ${nomeMes(mes)}.</div>`; return; }
+  el("autoRadar").innerHTML=`
+    <div class="venc-resumo">
+      <div class="vr-card"><div class="v" style="color:var(--amber)">${nf(l.length)}</div><div class="k">abaixo da meta em ${nomeMes(mes)}</div></div>
+      <div class="vr-card"><div class="v">${nf(l.filter(x=>!Number(x.contratos)).length)}</div><div class="k">não operaram nada</div></div>
+    </div>
+    ${tabelaMeta(l.slice(0,6))}
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px">
+      <span class="stack-cap">${l.length>6?`e mais ${nf(l.length-6)} na aba Automação`:""}</span>
+      <button class="vp-btn on" onclick="irParaAutomacao()">Abrir Automação</button>
+    </div>`;
+}
+
+function irParaAutomacao(){
+  autoState.aba="meta"; autoState.mes=mesFechadoISO();
+  document.querySelectorAll(".nav-item").forEach(x=>x.classList.remove("active"));
+  const b=document.querySelector('.nav-item[data-view="automacao"]');
+  if(b) b.classList.add("active");
+  render("automacao");
+}
+
+// ---- aba Automação ----
+async function vAutomacao(){
+  if(!ehGestor()){ el("content").innerHTML='<div class="empty">Esta área é só para a gestão.</div>'; return; }
+  if(!autoState.mes) autoState.mes=mesFechadoISO();
+  if(!autoState.de){ autoState.de=isoMes(new Date()); autoState.ate=hojeISO(); }
+  const meta = autoState.aba==="meta";
+  el("content").innerHTML=`
+    <div class="venc-periodo" style="margin-bottom:16px">
+      <div class="vp-atalhos">
+        <button class="vp-btn ${meta?"on":""}" onclick="autoAba('meta')">Abaixo da meta</button>
+        <button class="vp-btn ${!meta?"on":""}" onclick="autoAba('periodo')">Ativos no período</button>
+      </div>
+      <div class="vp-datas">${meta
+        ? `<label>mês</label><input type="month" id="autoMes" value="${autoState.mes.slice(0,7)}">`
+        : `<label>de</label><input type="date" id="autoDe" value="${autoState.de}"><label>até</label><input type="date" id="autoAte" value="${autoState.ate}">`}
+      </div>
+    </div>
+    <div id="autoResumo"></div>
+    <div class="panel" id="autoLista"><div class="loading"><div class="spinner"></div>Carregando…</div></div>`;
+  if(meta){
+    el("autoMes").addEventListener("change",()=>{ if(el("autoMes").value){ autoState.mes=el("autoMes").value+"-01"; carregarAutoMeta(); } });
+    carregarAutoMeta();
+  } else {
+    ["autoDe","autoAte"].forEach(id=>el(id).addEventListener("change",()=>{
+      autoState.de=el("autoDe").value; autoState.ate=el("autoAte").value; carregarAutoPeriodo(); }));
+    carregarAutoPeriodo();
+  }
+}
+function autoAba(a){ autoState.aba=a; vAutomacao(); }
+
+async function carregarAutoMeta(){
+  const mes=autoState.mes;
+  el("autoLista").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
+  const {data,error}=await sb.rpc("automacao_alerta_meta",{p_mes:mes});
+  if(error) return erro(error,"autoLista");
+  const l=data||[];
+  const emAndamento = mes===isoMes(new Date());
+  const porPlano = ["BASIC","PLUS","PREMIUM"].map(p=>`${planoFmt(p)} ${nf(l.filter(x=>x.plano===p).length)}`).join(" · ");
+  el("autoResumo").innerHTML =
+    (emAndamento?`<div class="venc-stale">${nomeMes(mes)} ainda está em andamento — os contratos contam só até hoje.</div>`:"") + `
+    <div class="venc-resumo">
+      <div class="vr-card"><div class="v" style="color:var(--amber)">${nf(l.length)}</div><div class="k">abaixo da meta · ${porPlano}</div></div>
+      <div class="vr-card"><div class="v">${nf(l.filter(x=>!Number(x.contratos)).length)}</div><div class="k">não operaram nada</div></div>
+    </div>`;
+  el("autoLista").innerHTML = (l.length ? tabelaMeta(l) : `<div class="empty">Ninguém abaixo da meta em ${nomeMes(mes)}.</div>`) +
+    `<div class="stack-cap" style="margin-top:10px">Metas no mês: Basic 200 · Plus 300 · Premium 500 contratos BMF, somando todas as contas do CPF. Entra quem tinha Automação ativa no último dia do mês e conta aberta há 30 dias ou mais.</div>`;
+}
+
+async function carregarAutoPeriodo(){
+  const {de,ate}=autoState;
+  if(!de || !ate || de>ate){ el("autoResumo").innerHTML=""; el("autoLista").innerHTML='<div class="empty">Escolha um período válido.</div>'; return; }
+  el("autoLista").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
+  const {data,error}=await sb.rpc("automacao_ativos_periodo",{p_de:de,p_ate:ate});
+  if(error) return erro(error,"autoLista");
+  const l=data||[];
+  const seguem=l.filter(x=>!x.fim).length;
+  const porPlano = ["BASIC","PLUS","PREMIUM"].map(p=>`${planoFmt(p)} ${nf(l.filter(x=>x.plano===p).length)}`).join(" · ");
+  el("autoResumo").innerHTML=`
+    <div class="venc-resumo">
+      <div class="vr-card"><div class="v">${nf(l.length)}</div><div class="k">com Automação no período · ${porPlano}</div></div>
+      <div class="vr-card"><div class="v" style="color:var(--green)">${nf(seguem)}</div><div class="k">seguem ativos</div></div>
+      <div class="vr-card"><div class="v">${nf(l.length-seguem)}</div><div class="k">encerraram depois</div></div>
+    </div>`;
+  if(!l.length){ el("autoLista").innerHTML='<div class="empty">Ninguém com Automação ativa neste período.</div>'; return; }
+  el("autoLista").innerHTML=`
+    <table><thead><tr><th>Cliente</th><th>Sinacor</th><th>Barra</th><th>Plano</th><th>Início</th><th>Fim</th></tr></thead>
+    <tbody>${l.map(x=>`<tr>
+      <td><div class="cell-name"><span class="mini-av">${escA(ini(x.nome))}</span>${escA(x.nome||("CPF "+x.cpf))}</div></td>
+      <td>${x.sinacor?escA(x.sinacor):'<span style="color:var(--text-faint)">sem ficha no CRM</span>'}</td>
+      <td>${escA(x.barra||"—")}</td>
+      <td>${planoFmt(x.plano)}</td>
+      <td>${x.inicio?fmtData(x.inicio):'<span style="color:var(--text-faint)">antes do histórico</span>'}</td>
+      <td>${x.fim?fmtData(x.fim):'<span class="tag t-green">ativo</span>'}</td></tr>`).join("")}</tbody></table>
+    <div class="stack-cap" style="margin-top:10px">Entra quem teve Automação liberada em algum dia do período, pela confirmação da Nelógica. "Antes do histórico" é cliente cuja liberação é anterior aos e-mails lidos.</div>`;
 }
 
 // ---------- VENCIMENTOS DE RENDA FIXA ----------
