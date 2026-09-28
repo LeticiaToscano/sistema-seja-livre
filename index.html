@@ -6220,27 +6220,66 @@ async function carregarZeragem(){
 
 // ---------- AUTOMAÇÃO (Nelógica) ----------
 // Fonte: automacao_eventos, alimentada pelo LEITOR AUTOMACAO (só as
-// respostas do Jonas contam). As duas RPCs respondem apenas para gestor;
-// para os demais devolvem lista vazia, e o menu nem aparece.
+// respostas do Jonas contam). As RPCs respondem apenas para gestor; para
+// os demais devolvem lista vazia, e o menu nem aparece.
+// "fim" = cancelamento confirmado. Troca de plano NÃO encerra o ciclo.
 const ehGestor = () => PAPEL==="admin" || PAPEL==="gerencia";
 // nomes vêm de e-mail externo: escapar antes de pôr na tela
 const escA = s => String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-let autoState = {aba:"meta", mes:"", de:"", ate:""};
+const AUTO_PLANOS = [
+  {k:"BASIC",   nome:"Basic",   meta:200, cor:"#7C8A83"},
+  {k:"PLUS",    nome:"Plus",    meta:300, cor:"var(--green)"},
+  {k:"PREMIUM", nome:"Premium", meta:500, cor:"var(--amber)"}
+];
+let autoState = {aba:"ativos", atalho:"mes", de:"", ate:"", mes:"",
+  busca:"", plano:"todos", barra:"todas",
+  hoje:null, periodo:null, meta:null, erroHoje:null, erroPeriodo:null, erroMeta:null};
 
-function isoMes(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-01"; }
+function isoDia(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function isoMes(d){ return isoDia(new Date(d.getFullYear(), d.getMonth(), 1)); }
 function mesFechadoISO(){ const d=new Date(); return isoMes(new Date(d.getFullYear(), d.getMonth()-1, 1)); }
 function nomeMes(iso){ const [a,m]=iso.split("-"); return new Date(+a,+m-1,1).toLocaleDateString("pt-BR",{month:"long",year:"numeric"}); }
-const planoFmt = p => p ? p[0]+p.slice(1).toLowerCase() : "—";
+function diasEntre(a,b){ return Math.round((new Date(b+"T12:00:00")-new Date(a+"T12:00:00"))/86400000); }
+function fmtDur(d){
+  if(d==null) return "—";
+  if(d<1) return "menos de 1 dia";
+  if(d<60) return d+(d===1?" dia":" dias");
+  return Math.round(d/30.4)+" meses";
+}
+const semAcento = s => String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+
+function tagPlano(p){
+  if(p==="PREMIUM") return '<span class="tag t-amber">Premium</span>';
+  if(p==="PLUS")    return '<span class="tag t-green">Plus</span>';
+  if(p==="BASIC")   return '<span class="tag" style="background:#1F2622;color:#B9C4BE">Basic</span>';
+  return '<span style="color:var(--text-faint);font-size:12px">sem plano</span>';
+}
+// linha clicável só quando o cliente tem ficha (id validado antes de ir para o onclick)
+function linhaCli(x){
+  return /^[0-9a-f-]{36}$/i.test(x.cliente_id||"") ? `onclick="abrirFicha('${x.cliente_id}')" style="cursor:pointer"` : "";
+}
+function celCliente(x){
+  const sub = x.sinacor ? "Sinacor "+escA(x.sinacor) : "sem ficha no CRM";
+  return `<td><div class="cell-name"><span class="mini-av">${escA(ini(x.nome))}</span>
+    <div>${escA(x.nome||("CPF "+x.cpf))}<div style="font-size:11px;color:var(--text-faint);font-weight:500;margin-top:1px">${sub}</div></div></div></td>`;
+}
+function barraProgresso(c, meta){
+  const pct=Math.max(0,Math.min(100, meta? c/meta*100 : 0));
+  const cor = pct<50 ? "#ff9aa6" : "var(--amber)";
+  return `<div style="display:flex;align-items:center;gap:10px;min-width:180px">
+    <div style="flex:1;height:7px;border-radius:4px;background:#1F2622;overflow:hidden"><div style="width:${pct}%;height:100%;background:${cor}"></div></div>
+    <span style="font-size:12px;white-space:nowrap;color:var(--text-dim)"><b style="color:var(--text)">${nf(c)}</b> / ${nf(meta)}</span></div>`;
+}
+const pctMeta = x => x.meta ? Number(x.contratos||0)/x.meta : 0;
 
 function tabelaMeta(l){
-  return `<table><thead><tr><th>Cliente</th><th>Barra</th><th>Plano</th><th class="num">Meta</th><th class="num">Contratos BMF</th><th class="num">Faltou</th><th>Abertura</th></tr></thead>
-    <tbody>${l.map(x=>`<tr>
-      <td><div class="cell-name"><span class="mini-av">${escA(ini(x.nome))}</span>${escA(x.nome||("CPF "+x.cpf))}</div></td>
+  return `<table><thead><tr><th>Cliente</th><th>Barra</th><th>Plano</th><th>Contratos BMF no mês</th><th class="num">Faltou</th><th>Conta aberta em</th></tr></thead>
+    <tbody>${l.map(x=>`<tr ${linhaCli(x)}>
+      ${celCliente(x)}
       <td>${escA(x.barra||"—")}</td>
-      <td>${planoFmt(x.plano)}</td>
-      <td class="num">${nf(x.meta)}</td>
-      <td class="num">${nf(x.contratos)}</td>
-      <td class="num" style="color:var(--amber)">${nf(x.falta)}</td>
+      <td>${tagPlano(x.plano)}</td>
+      <td>${barraProgresso(Number(x.contratos||0), x.meta)}</td>
+      <td class="num" style="color:var(--amber);font-weight:700">${nf(x.falta)}</td>
       <td>${fmtData(x.abertura)}</td></tr>`).join("")}</tbody></table>`;
 }
 
@@ -6250,7 +6289,7 @@ async function carregarAutoRadar(){
   const mes=mesFechadoISO();
   const {data,error}=await sb.rpc("automacao_alerta_meta",{p_mes:mes});
   if(error) return erro(error,"autoRadar");
-  const l=data||[];
+  const l=(data||[]).slice().sort((a,b)=>pctMeta(a)-pctMeta(b));
   if(!l.length){ el("autoRadar").innerHTML=`<div class="empty">Todos os clientes com Automação bateram a meta em ${nomeMes(mes)}.</div>`; return; }
   el("autoRadar").innerHTML=`
     <div class="venc-resumo">
@@ -6272,80 +6311,234 @@ function irParaAutomacao(){
   render("automacao");
 }
 
+// ---- carregamento ----
+async function autoCarregarHoje(){
+  const h=hojeISO();
+  const {data,error}=await sb.rpc("automacao_ativos_periodo",{p_de:h,p_ate:h});
+  autoState.erroHoje=error||null;
+  autoState.hoje = error ? null : (data||[]).filter(x=>!x.fim);
+}
+async function autoCarregarPeriodo(){
+  const {de,ate}=autoState;
+  autoState.erroPeriodo=null;
+  if(!de || !ate || de>ate){ autoState.periodo=[]; return; }
+  const {data,error}=await sb.rpc("automacao_ativos_periodo",{p_de:de,p_ate:ate});
+  autoState.erroPeriodo=error||null;
+  autoState.periodo = error ? null : (data||[]);
+}
+async function autoCarregarMeta(){
+  const {data,error}=await sb.rpc("automacao_alerta_meta",{p_mes:autoState.mes});
+  autoState.erroMeta=error||null;
+  autoState.meta = error ? null : (data||[]).slice().sort((a,b)=>pctMeta(a)-pctMeta(b));
+}
+
 // ---- aba Automação ----
 async function vAutomacao(){
   if(!ehGestor()){ el("content").innerHTML='<div class="empty">Esta área é só para a gestão.</div>'; return; }
   if(!autoState.mes) autoState.mes=mesFechadoISO();
-  if(!autoState.de){ autoState.de=isoMes(new Date()); autoState.ate=hojeISO(); }
-  const meta = autoState.aba==="meta";
+  if(!autoState.de) autoDefinirAtalho(autoState.atalho||"mes");
   el("content").innerHTML=`
+    <div class="panel" id="autoHoje" style="padding:18px 20px;margin-bottom:22px"><div class="loading"><div class="spinner"></div>Carregando…</div></div>
     <div class="venc-periodo" style="margin-bottom:16px">
-      <div class="vp-atalhos">
-        <button class="vp-btn ${meta?"on":""}" onclick="autoAba('meta')">Abaixo da meta</button>
-        <button class="vp-btn ${!meta?"on":""}" onclick="autoAba('periodo')">Ativos no período</button>
-      </div>
-      <div class="vp-datas">${meta
-        ? `<label>mês</label><input type="month" id="autoMes" value="${autoState.mes.slice(0,7)}">`
-        : `<label>de</label><input type="date" id="autoDe" value="${autoState.de}"><label>até</label><input type="date" id="autoAte" value="${autoState.ate}">`}
-      </div>
+      <div class="vp-atalhos" id="autoAbas"></div>
+      <div class="vp-datas" id="autoDatas"></div>
     </div>
     <div id="autoResumo"></div>
-    <div class="panel" id="autoLista"><div class="loading"><div class="spinner"></div>Carregando…</div></div>`;
-  if(meta){
-    el("autoMes").addEventListener("change",()=>{ if(el("autoMes").value){ autoState.mes=el("autoMes").value+"-01"; carregarAutoMeta(); } });
-    carregarAutoMeta();
+    <div class="panel" id="autoPainel"><div class="loading"><div class="spinner"></div>Carregando…</div></div>`;
+  await Promise.all([autoCarregarHoje(), autoCarregarPeriodo(), autoCarregarMeta()]);
+  autoPintarHoje();
+  autoPintar();
+}
+
+function autoPintarHoje(){
+  if(autoState.erroHoje) return erro(autoState.erroHoje,"autoHoje");
+  const H=autoState.hoje||[], tot=H.length||1;
+  const cont=AUTO_PLANOS.map(p=>({...p, n:H.filter(x=>x.plano===p.k).length}));
+  const semPlano=H.filter(x=>!AUTO_PLANOS.some(p=>p.k===x.plano)).length;
+  el("autoHoje").innerHTML=`
+    <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+      <span style="font-size:32px;font-weight:800;letter-spacing:-1px">${nf(H.length)}</span>
+      <span style="color:var(--text-dim);font-size:13px">clientes com Automação ativa hoje</span>
+    </div>
+    <div class="stack">${cont.map(p=>`<div style="width:${p.n/tot*100}%;background:${p.cor}"></div>`).join("")}${semPlano?`<div style="width:${semPlano/tot*100}%;background:#2a332e"></div>`:""}</div>
+    <div class="stack-legend">${cont.map(p=>`<span class="lg"><span class="sw" style="background:${p.cor}"></span>${p.nome} · ${nf(p.n)} <span style="font-weight:500;color:var(--text-faint)">meta ${p.meta} contratos/mês</span></span>`).join("")}${semPlano?`<span class="lg"><span class="sw" style="background:#2a332e"></span>Sem plano · ${nf(semPlano)}</span>`:""}</div>`;
+}
+
+// separa o período em quem segue e quem encerrou
+function autoSeparar(){
+  const P=autoState.periodo||[], ate=autoState.ate;
+  return {
+    ativos: P.filter(x=>!x.fim || x.fim>ate),
+    encerrados: P.filter(x=>x.fim && x.fim<=ate)
+  };
+}
+
+function autoPintar(){
+  const {aba}=autoState, {ativos,encerrados}=autoSeparar();
+  const n = v => v==null ? "—" : nf(v);
+  el("autoAbas").innerHTML=[
+    ["ativos","Carteira ativa", autoState.periodo?ativos.length:null],
+    ["encerrados","Encerrados", autoState.periodo?encerrados.length:null],
+    ["meta","Abaixo da meta", autoState.meta?autoState.meta.length:null]
+  ].map(([k,t,c])=>`<button class="vp-btn ${aba===k?"on":""}" onclick="autoAba('${k}')">${t} <b style="margin-left:5px">${n(c)}</b></button>`).join("");
+
+  // controles de data
+  if(aba==="meta"){
+    el("autoDatas").innerHTML=`<label>mês</label><input type="month" id="autoMes" value="${autoState.mes.slice(0,7)}">`;
+    el("autoMes").addEventListener("change",async()=>{
+      if(!el("autoMes").value) return;
+      autoState.mes=el("autoMes").value+"-01";
+      el("autoPainel").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
+      await autoCarregarMeta(); autoPintar();
+    });
   } else {
-    ["autoDe","autoAte"].forEach(id=>el(id).addEventListener("change",()=>{
-      autoState.de=el("autoDe").value; autoState.ate=el("autoAte").value; carregarAutoPeriodo(); }));
-    carregarAutoPeriodo();
+    el("autoDatas").innerHTML=`
+      <div class="vp-atalhos">${[["mes","Este mês"],["anterior","Mês passado"],["90","90 dias"]]
+        .map(([k,t])=>`<button class="vp-btn ${autoState.atalho===k?"on":""}" onclick="autoAtalho('${k}')">${t}</button>`).join("")}</div>
+      <label>de</label><input type="date" id="autoDe" value="${autoState.de}">
+      <label>até</label><input type="date" id="autoAte" value="${autoState.ate}">`;
+    ["autoDe","autoAte"].forEach(id=>el(id).addEventListener("change",async()=>{
+      autoState.de=el("autoDe").value; autoState.ate=el("autoAte").value; autoState.atalho="";
+      el("autoPainel").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
+      await autoCarregarPeriodo(); autoPintar();
+    }));
+  }
+
+  autoPintarResumo(ativos, encerrados);
+  autoPintarPainel();
+}
+
+function autoPintarResumo(ativos, encerrados){
+  const card=(v,k,cor,acao)=>`<div class="vr-card" ${acao?`onclick="${acao}" style="cursor:pointer"`:""}>
+    <div class="v" ${cor?`style="color:${cor}"`:""}>${v}</div><div class="k">${k}</div></div>`;
+  if(autoState.aba==="meta"){
+    const M=autoState.meta;
+    if(!M){ el("autoResumo").innerHTML=""; return; }
+    const emAndamento = autoState.mes===isoMes(new Date());
+    const porPlano=AUTO_PLANOS.map(p=>`${p.nome} ${nf(M.filter(x=>x.plano===p.k).length)}`).join(" · ");
+    el("autoResumo").innerHTML=
+      (emAndamento?`<div class="venc-stale">${nomeMes(autoState.mes)} ainda está em andamento — os contratos contam só até hoje.</div>`:"")+
+      `<div class="venc-resumo">
+        ${card(nf(M.length), `abaixo da meta em ${nomeMes(autoState.mes)} · ${porPlano}`, "var(--amber)")}
+        ${card(nf(M.filter(x=>!Number(x.contratos)).length), "não operaram nada no mês")}
+        ${card(nf(M.filter(x=>pctMeta(x)>=0.5).length), "passaram da metade da meta")}
+      </div>`;
+    return;
+  }
+  if(!autoState.periodo){ el("autoResumo").innerHTML=""; return; }
+  const P=autoState.periodo, de=autoState.de;
+  const novas=P.filter(x=>x.inicio && x.inicio>=de).length;
+  el("autoResumo").innerHTML=`<div class="venc-resumo">
+    ${card(nf(P.length), "tiveram Automação no período")}
+    ${card(nf(novas), "novas liberações no período", "var(--green)")}
+    ${card(nf(ativos.length), "seguem ativos", "", "autoAba('ativos')")}
+    ${card(nf(encerrados.length), "encerrados no período", encerrados.length?"#ff9aa6":"", "autoAba('encerrados')")}
+  </div>`;
+}
+
+function autoPintarPainel(){
+  const aba=autoState.aba;
+  const err = aba==="meta" ? autoState.erroMeta : autoState.erroPeriodo;
+  if(err) return erro(err,"autoPainel");
+  if(aba!=="meta" && autoState.de>autoState.ate){ el("autoPainel").innerHTML='<div class="empty">Escolha um período válido.</div>'; return; }
+  const base = autoBase();
+  const barras=[...new Set(base.flatMap(x=>String(x.barra||"").split(", ").filter(Boolean)))].sort();
+  if(autoState.barra!=="todas" && !barras.includes(autoState.barra)) autoState.barra="todas";
+  el("autoPainel").innerHTML=`
+    <div class="toolbar">
+      <input class="search" id="autoBusca" placeholder="Buscar por nome, Sinacor ou CPF…" value="${escA(autoState.busca)}">
+      <select class="search select" id="autoPlano">
+        <option value="todos">Todos os planos</option>
+        ${AUTO_PLANOS.map(p=>`<option value="${p.k}" ${autoState.plano===p.k?"selected":""}>${p.nome}</option>`).join("")}
+      </select>
+      <select class="search select" id="autoBarra">
+        <option value="todas">Todas as barras</option>
+        ${barras.map(b=>`<option value="${escA(b)}" ${autoState.barra===b?"selected":""}>${escA(b)}</option>`).join("")}
+      </select>
+    </div>
+    <div id="autoTabela"></div>`;
+  el("autoBusca").addEventListener("input",e=>{ autoState.busca=e.target.value; autoTabela(); });
+  el("autoPlano").addEventListener("change",e=>{ autoState.plano=e.target.value; autoTabela(); });
+  el("autoBarra").addEventListener("change",e=>{ autoState.barra=e.target.value; autoTabela(); });
+  autoTabela();
+}
+
+function autoBase(){
+  if(autoState.aba==="meta") return autoState.meta||[];
+  const {ativos,encerrados}=autoSeparar();
+  if(autoState.aba==="encerrados")
+    return encerrados.slice().sort((a,b)=>String(b.fim).localeCompare(String(a.fim)));
+  return ativos.slice().sort((a,b)=>String(b.inicio||"").localeCompare(String(a.inicio||"")));
+}
+
+function autoTabela(){
+  const base=autoBase(), aba=autoState.aba, hoje=hojeISO();
+  const termo=semAcento(autoState.busca.trim()), dig=autoState.busca.replace(/\D/g,"");
+  const l=base.filter(x=>{
+    if(autoState.plano!=="todos" && x.plano!==autoState.plano) return false;
+    if(autoState.barra!=="todas" && !String(x.barra||"").split(", ").includes(autoState.barra)) return false;
+    if(!termo) return true;
+    return semAcento(x.nome).includes(termo)
+      || (dig && (String(x.sinacor||"").replace(/\D/g,"").includes(dig) || String(x.cpf||"").includes(dig)));
+  });
+  const conta = l.length===base.length ? `${nf(l.length)} clientes` : `${nf(l.length)} de ${nf(base.length)} clientes`;
+  const faint = t => `<span style="color:var(--text-faint)">${t}</span>`;
+  let html="";
+
+  if(!base.length){
+    const vazio = aba==="meta" ? `Ninguém abaixo da meta em ${nomeMes(autoState.mes)}.`
+                : aba==="encerrados" ? "Nenhum cancelamento confirmado neste período."
+                : "Ninguém com Automação ativa neste período.";
+    el("autoTabela").innerHTML=`<div class="empty">${vazio}</div>`; return;
+  }
+  if(!l.length){ el("autoTabela").innerHTML='<div class="empty">Nenhum cliente com esses filtros.</div>'; return; }
+
+  if(aba==="meta"){
+    html = tabelaMeta(l) +
+      `<div class="stack-cap" style="margin-top:10px">${conta} · ordenados de quem está mais longe da meta. Metas no mês: Basic 200 · Plus 300 · Premium 500 contratos BMF, somando todas as contas do CPF. Entra quem tinha Automação ativa no último dia do mês e conta aberta há 30 dias ou mais.</div>`;
+  } else if(aba==="encerrados"){
+    html = `<table><thead><tr><th>Cliente</th><th>Barra</th><th>Plano</th><th>Período com Automação</th><th>Duração</th><th>Encerrado</th></tr></thead>
+      <tbody>${l.map(x=>`<tr ${linhaCli(x)}>
+        ${celCliente(x)}
+        <td>${escA(x.barra||"—")}</td>
+        <td>${tagPlano(x.plano)}</td>
+        <td>${x.inicio?fmtData(x.inicio):faint("antes do histórico")} <span style="color:var(--text-faint)">→</span> <b>${fmtData(x.fim)}</b></td>
+        <td>${x.inicio?fmtDur(diasEntre(x.inicio,x.fim)):"—"}</td>
+        <td>${(()=>{const d=diasEntre(x.fim,hoje); return d<=0?"hoje":"há "+fmtDur(d);})()}</td></tr>`).join("")}</tbody></table>
+      <div class="stack-cap" style="margin-top:10px">${conta} · mais recentes primeiro. Só entra cancelamento confirmado pela Nelógica; troca de plano não conta como encerramento.</div>`;
+  } else {
+    const de=autoState.de;
+    html = `<table><thead><tr><th>Cliente</th><th>Barra</th><th>Plano</th><th>Ativo desde</th><th>Tempo com Automação</th></tr></thead>
+      <tbody>${l.map(x=>`<tr ${linhaCli(x)}>
+        ${celCliente(x)}
+        <td>${escA(x.barra||"—")}</td>
+        <td>${tagPlano(x.plano)}</td>
+        <td>${x.inicio?fmtData(x.inicio):faint("antes do histórico")}${x.inicio && x.inicio>=de?' <span class="tag t-green" style="margin-left:6px">novo</span>':""}</td>
+        <td>${x.fim?`<span style="color:var(--amber)">encerrou depois, em ${fmtData(x.fim)}</span>`:(x.inicio?fmtDur(diasEntre(x.inicio,hoje)):"—")}</td></tr>`).join("")}</tbody></table>
+      <div class="stack-cap" style="margin-top:10px">${conta} · liberações mais recentes primeiro. <b>novo</b> = liberado dentro do período. Clique no cliente para abrir a ficha.</div>`;
+  }
+  el("autoTabela").innerHTML=html;
+}
+
+function autoAba(k){ autoState.aba=k; autoPintar(); }
+
+function autoDefinirAtalho(k){
+  const hj=new Date();
+  autoState.atalho=k;
+  if(k==="anterior"){
+    autoState.de=isoDia(new Date(hj.getFullYear(), hj.getMonth()-1, 1));
+    autoState.ate=isoDia(new Date(hj.getFullYear(), hj.getMonth(), 0));
+  } else if(k==="90"){
+    autoState.de=isoDia(new Date(hj.getFullYear(), hj.getMonth(), hj.getDate()-89));
+    autoState.ate=hojeISO();
+  } else {
+    autoState.de=isoMes(hj); autoState.ate=hojeISO();
   }
 }
-function autoAba(a){ autoState.aba=a; vAutomacao(); }
-
-async function carregarAutoMeta(){
-  const mes=autoState.mes;
-  el("autoLista").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
-  const {data,error}=await sb.rpc("automacao_alerta_meta",{p_mes:mes});
-  if(error) return erro(error,"autoLista");
-  const l=data||[];
-  const emAndamento = mes===isoMes(new Date());
-  const porPlano = ["BASIC","PLUS","PREMIUM"].map(p=>`${planoFmt(p)} ${nf(l.filter(x=>x.plano===p).length)}`).join(" · ");
-  el("autoResumo").innerHTML =
-    (emAndamento?`<div class="venc-stale">${nomeMes(mes)} ainda está em andamento — os contratos contam só até hoje.</div>`:"") + `
-    <div class="venc-resumo">
-      <div class="vr-card"><div class="v" style="color:var(--amber)">${nf(l.length)}</div><div class="k">abaixo da meta · ${porPlano}</div></div>
-      <div class="vr-card"><div class="v">${nf(l.filter(x=>!Number(x.contratos)).length)}</div><div class="k">não operaram nada</div></div>
-    </div>`;
-  el("autoLista").innerHTML = (l.length ? tabelaMeta(l) : `<div class="empty">Ninguém abaixo da meta em ${nomeMes(mes)}.</div>`) +
-    `<div class="stack-cap" style="margin-top:10px">Metas no mês: Basic 200 · Plus 300 · Premium 500 contratos BMF, somando todas as contas do CPF. Entra quem tinha Automação ativa no último dia do mês e conta aberta há 30 dias ou mais.</div>`;
-}
-
-async function carregarAutoPeriodo(){
-  const {de,ate}=autoState;
-  if(!de || !ate || de>ate){ el("autoResumo").innerHTML=""; el("autoLista").innerHTML='<div class="empty">Escolha um período válido.</div>'; return; }
-  el("autoLista").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
-  const {data,error}=await sb.rpc("automacao_ativos_periodo",{p_de:de,p_ate:ate});
-  if(error) return erro(error,"autoLista");
-  const l=data||[];
-  const seguem=l.filter(x=>!x.fim).length;
-  const porPlano = ["BASIC","PLUS","PREMIUM"].map(p=>`${planoFmt(p)} ${nf(l.filter(x=>x.plano===p).length)}`).join(" · ");
-  el("autoResumo").innerHTML=`
-    <div class="venc-resumo">
-      <div class="vr-card"><div class="v">${nf(l.length)}</div><div class="k">com Automação no período · ${porPlano}</div></div>
-      <div class="vr-card"><div class="v" style="color:var(--green)">${nf(seguem)}</div><div class="k">seguem ativos</div></div>
-      <div class="vr-card"><div class="v">${nf(l.length-seguem)}</div><div class="k">encerraram depois</div></div>
-    </div>`;
-  if(!l.length){ el("autoLista").innerHTML='<div class="empty">Ninguém com Automação ativa neste período.</div>'; return; }
-  el("autoLista").innerHTML=`
-    <table><thead><tr><th>Cliente</th><th>Sinacor</th><th>Barra</th><th>Plano</th><th>Início</th><th>Fim</th></tr></thead>
-    <tbody>${l.map(x=>`<tr>
-      <td><div class="cell-name"><span class="mini-av">${escA(ini(x.nome))}</span>${escA(x.nome||("CPF "+x.cpf))}</div></td>
-      <td>${x.sinacor?escA(x.sinacor):'<span style="color:var(--text-faint)">sem ficha no CRM</span>'}</td>
-      <td>${escA(x.barra||"—")}</td>
-      <td>${planoFmt(x.plano)}</td>
-      <td>${x.inicio?fmtData(x.inicio):'<span style="color:var(--text-faint)">antes do histórico</span>'}</td>
-      <td>${x.fim?fmtData(x.fim):'<span class="tag t-green">ativo</span>'}</td></tr>`).join("")}</tbody></table>
-    <div class="stack-cap" style="margin-top:10px">Entra quem teve Automação liberada em algum dia do período, pela confirmação da Nelógica. "Antes do histórico" é cliente cuja liberação é anterior aos e-mails lidos.</div>`;
+async function autoAtalho(k){
+  autoDefinirAtalho(k);
+  el("autoPainel").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
+  await autoCarregarPeriodo(); autoPintar();
 }
 
 // ---------- VENCIMENTOS DE RENDA FIXA ----------
