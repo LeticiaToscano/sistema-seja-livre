@@ -6231,7 +6231,7 @@ const AUTO_PLANOS = [
   {k:"PLUS",    nome:"Plus",    meta:300, cor:"var(--green)"},
   {k:"PREMIUM", nome:"Premium", meta:500, cor:"var(--amber)"}
 ];
-let autoState = {aba:"ativos", atalho:"mes", de:"", ate:"", mes:"",
+let autoState = {aba:"ativos", atalho:"mes", de:"", ate:"",
   busca:"", plano:"todos", barra:"todas",
   hoje:null, periodo:null, meta:null, erroHoje:null, erroPeriodo:null, erroMeta:null};
 
@@ -6273,27 +6273,28 @@ function barraProgresso(c, meta){
 const pctMeta = x => x.meta ? Number(x.contratos||0)/x.meta : 0;
 
 function tabelaMeta(l){
-  return `<table><thead><tr><th>Cliente</th><th>Barra</th><th>Plano</th><th>Contratos BMF no mês</th><th class="num">Faltou</th><th>Conta aberta em</th></tr></thead>
+  return `<table><thead><tr><th>Cliente</th><th>Barra</th><th>Plano</th><th>Janela avaliada</th><th>Contratos BMF na janela</th><th class="num">Faltou</th><th>Automação desde</th></tr></thead>
     <tbody>${l.map(x=>`<tr ${linhaCli(x)}>
       ${celCliente(x)}
       <td>${escA(x.barra||"—")}</td>
       <td>${tagPlano(x.plano)}</td>
+      <td style="white-space:nowrap">${fmtData(x.janela_ini)} <span style="color:var(--text-faint)">→</span> ${fmtData(x.janela_fim)}<div style="font-size:11px;color:var(--text-faint)">${nf(x.mes_n)}º mês de Automação</div></td>
       <td>${barraProgresso(Number(x.contratos||0), x.meta)}</td>
       <td class="num" style="color:var(--amber);font-weight:700">${nf(x.falta)}</td>
-      <td>${fmtData(x.abertura)}</td></tr>`).join("")}</tbody></table>`;
+      <td>${fmtData(x.ativacao)}</td></tr>`).join("")}</tbody></table>`;
 }
 
 // ---- bloco no Radar: último mês fechado ----
 async function carregarAutoRadar(){
   if(!el("autoRadar")) return;
-  const mes=mesFechadoISO();
-  const {data,error}=await sb.rpc("automacao_alerta_meta",{p_mes:mes});
+  const hj=new Date(), de=isoDia(new Date(hj.getFullYear(),hj.getMonth(),hj.getDate()-29));
+  const {data,error}=await sb.rpc("automacao_alerta_meta",{p_de:de,p_ate:hojeISO()});
   if(error) return erro(error,"autoRadar");
   const l=(data||[]).slice().sort((a,b)=>pctMeta(a)-pctMeta(b));
-  if(!l.length){ el("autoRadar").innerHTML=`<div class="empty">Todos os clientes com Automação bateram a meta em ${nomeMes(mes)}.</div>`; return; }
+  if(!l.length){ el("autoRadar").innerHTML=`<div class="empty">Nenhuma janela de Automação fechou abaixo da meta nos últimos 30 dias.</div>`; return; }
   el("autoRadar").innerHTML=`
     <div class="venc-resumo">
-      <div class="vr-card"><div class="v" style="color:var(--amber)">${nf(l.length)}</div><div class="k">abaixo da meta em ${nomeMes(mes)}</div></div>
+      <div class="vr-card"><div class="v" style="color:var(--amber)">${nf(l.length)}</div><div class="k">abaixo da meta · janelas fechadas nos últimos 30 dias</div></div>
       <div class="vr-card"><div class="v">${nf(l.filter(x=>!Number(x.contratos)).length)}</div><div class="k">não operaram nada</div></div>
     </div>
     ${tabelaMeta(l.slice(0,6))}
@@ -6304,7 +6305,7 @@ async function carregarAutoRadar(){
 }
 
 function irParaAutomacao(){
-  autoState.aba="meta"; autoState.mes=mesFechadoISO();
+  autoState.aba="meta"; autoDefinirAtalho("30");
   document.querySelectorAll(".nav-item").forEach(x=>x.classList.remove("active"));
   const b=document.querySelector('.nav-item[data-view="automacao"]');
   if(b) b.classList.add("active");
@@ -6327,7 +6328,10 @@ async function autoCarregarPeriodo(){
   autoState.periodo = error ? null : (data||[]);
 }
 async function autoCarregarMeta(){
-  const {data,error}=await sb.rpc("automacao_alerta_meta",{p_mes:autoState.mes});
+  const {de,ate}=autoState;
+  autoState.erroMeta=null;
+  if(!de || !ate || de>ate){ autoState.meta=[]; return; }
+  const {data,error}=await sb.rpc("automacao_alerta_meta",{p_de:de,p_ate:ate});
   autoState.erroMeta=error||null;
   autoState.meta = error ? null : (data||[]).slice().sort((a,b)=>pctMeta(a)-pctMeta(b));
 }
@@ -6335,7 +6339,6 @@ async function autoCarregarMeta(){
 // ---- aba Automação ----
 async function vAutomacao(){
   if(!ehGestor()){ el("content").innerHTML='<div class="empty">Esta área é só para a gestão.</div>'; return; }
-  if(!autoState.mes) autoState.mes=mesFechadoISO();
   if(!autoState.de) autoDefinirAtalho(autoState.atalho||"mes");
   el("content").innerHTML=`
     <div class="panel" id="autoHoje" style="padding:18px 20px;margin-bottom:22px"><div class="loading"><div class="spinner"></div>Carregando…</div></div>
@@ -6382,27 +6385,17 @@ function autoPintar(){
     ["meta","Abaixo da meta", autoState.meta?autoState.meta.length:null]
   ].map(([k,t,c])=>`<button class="vp-btn ${aba===k?"on":""}" onclick="autoAba('${k}')">${t} <b style="margin-left:5px">${n(c)}</b></button>`).join("");
 
-  // controles de data
-  if(aba==="meta"){
-    el("autoDatas").innerHTML=`<label>mês</label><input type="month" id="autoMes" value="${autoState.mes.slice(0,7)}">`;
-    el("autoMes").addEventListener("change",async()=>{
-      if(!el("autoMes").value) return;
-      autoState.mes=el("autoMes").value+"-01";
-      el("autoPainel").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
-      await autoCarregarMeta(); autoPintar();
-    });
-  } else {
-    el("autoDatas").innerHTML=`
-      <div class="vp-atalhos">${[["mes","Este mês"],["anterior","Mês passado"],["90","90 dias"]]
-        .map(([k,t])=>`<button class="vp-btn ${autoState.atalho===k?"on":""}" onclick="autoAtalho('${k}')">${t}</button>`).join("")}</div>
-      <label>de</label><input type="date" id="autoDe" value="${autoState.de}">
-      <label>até</label><input type="date" id="autoAte" value="${autoState.ate}">`;
-    ["autoDe","autoAte"].forEach(id=>el(id).addEventListener("change",async()=>{
-      autoState.de=el("autoDe").value; autoState.ate=el("autoAte").value; autoState.atalho="";
-      el("autoPainel").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
-      await autoCarregarPeriodo(); autoPintar();
-    }));
-  }
+  // controles de data: o mesmo período vale para as três abas
+  el("autoDatas").innerHTML=`
+    <div class="vp-atalhos">${[["mes","Este mês"],["anterior","Mês passado"],["30","30 dias"],["90","90 dias"]]
+      .map(([k,t])=>`<button class="vp-btn ${autoState.atalho===k?"on":""}" onclick="autoAtalho('${k}')">${t}</button>`).join("")}</div>
+    <label>de</label><input type="date" id="autoDe" value="${autoState.de}">
+    <label>até</label><input type="date" id="autoAte" value="${autoState.ate}">`;
+  ["autoDe","autoAte"].forEach(id=>el(id).addEventListener("change",async()=>{
+    autoState.de=el("autoDe").value; autoState.ate=el("autoAte").value; autoState.atalho="";
+    el("autoPainel").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
+    await Promise.all([autoCarregarPeriodo(), autoCarregarMeta()]); autoPintar();
+  }));
 
   autoPintarResumo(ativos, encerrados);
   autoPintarPainel();
@@ -6414,13 +6407,11 @@ function autoPintarResumo(ativos, encerrados){
   if(autoState.aba==="meta"){
     const M=autoState.meta;
     if(!M){ el("autoResumo").innerHTML=""; return; }
-    const emAndamento = autoState.mes===isoMes(new Date());
     const porPlano=AUTO_PLANOS.map(p=>`${p.nome} ${nf(M.filter(x=>x.plano===p.k).length)}`).join(" · ");
     el("autoResumo").innerHTML=
-      (emAndamento?`<div class="venc-stale">${nomeMes(autoState.mes)} ainda está em andamento — os contratos contam só até hoje.</div>`:"")+
       `<div class="venc-resumo">
-        ${card(nf(M.length), `abaixo da meta em ${nomeMes(autoState.mes)} · ${porPlano}`, "var(--amber)")}
-        ${card(nf(M.filter(x=>!Number(x.contratos)).length), "não operaram nada no mês")}
+        ${card(nf(M.length), `janelas abaixo da meta · ${porPlano}`, "var(--amber)")}
+        ${card(nf(M.filter(x=>!Number(x.contratos)).length), "não operaram nada na janela")}
         ${card(nf(M.filter(x=>pctMeta(x)>=0.5).length), "passaram da metade da meta")}
       </div>`;
     return;
@@ -6486,7 +6477,7 @@ function autoTabela(){
   let html="";
 
   if(!base.length){
-    const vazio = aba==="meta" ? `Ninguém abaixo da meta em ${nomeMes(autoState.mes)}.`
+    const vazio = aba==="meta" ? "Nenhuma janela fechou abaixo da meta neste período."
                 : aba==="encerrados" ? "Nenhum cancelamento confirmado neste período."
                 : "Ninguém com Automação ativa neste período.";
     el("autoTabela").innerHTML=`<div class="empty">${vazio}</div>`; return;
@@ -6495,7 +6486,7 @@ function autoTabela(){
 
   if(aba==="meta"){
     html = tabelaMeta(l) +
-      `<div class="stack-cap" style="margin-top:10px">${conta} · ordenados de quem está mais longe da meta. Metas no mês: Basic 200 · Plus 300 · Premium 500 contratos BMF, somando todas as contas do CPF. Entra quem tinha Automação ativa no último dia do mês e conta aberta há 30 dias ou mais.</div>`;
+      `<div class="stack-cap" style="margin-top:10px">${conta} · ordenados de quem está mais longe da meta. Cada cliente é avaliado em janelas de um mês contadas da ativação (ex.: ativou em 28/08 → janela de 28/08 a 27/09). Entra a janela que <b>fechou dentro do período</b> abaixo da meta: Basic 200 · Plus 300 · Premium 500 contratos BMF, somando todas as contas do CPF.</div>`;
   } else if(aba==="encerrados"){
     html = `<table><thead><tr><th>Cliente</th><th>Barra</th><th>Plano</th><th>Período com Automação</th><th>Duração</th><th>Encerrado</th></tr></thead>
       <tbody>${l.map(x=>`<tr ${linhaCli(x)}>
@@ -6528,6 +6519,9 @@ function autoDefinirAtalho(k){
   if(k==="anterior"){
     autoState.de=isoDia(new Date(hj.getFullYear(), hj.getMonth()-1, 1));
     autoState.ate=isoDia(new Date(hj.getFullYear(), hj.getMonth(), 0));
+  } else if(k==="30"){
+    autoState.de=isoDia(new Date(hj.getFullYear(), hj.getMonth(), hj.getDate()-29));
+    autoState.ate=hojeISO();
   } else if(k==="90"){
     autoState.de=isoDia(new Date(hj.getFullYear(), hj.getMonth(), hj.getDate()-89));
     autoState.ate=hojeISO();
@@ -6538,7 +6532,7 @@ function autoDefinirAtalho(k){
 async function autoAtalho(k){
   autoDefinirAtalho(k);
   el("autoPainel").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
-  await autoCarregarPeriodo(); autoPintar();
+  await Promise.all([autoCarregarPeriodo(), autoCarregarMeta()]); autoPintar();
 }
 
 // ---------- VENCIMENTOS DE RENDA FIXA ----------
