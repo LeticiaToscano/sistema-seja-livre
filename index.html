@@ -381,6 +381,15 @@
   .sol-modo .sm{background:transparent;border:none;color:var(--text-dim);border-radius:7px;padding:7px 13px;font-size:12.5px;font-weight:600}
   .sol-modo .sm.on{background:var(--surface-2);color:var(--green)}
   .sol-inputs{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .sol-rank{margin-bottom:16px}
+  .sol-rank .sr-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:12px 14px 4px;flex-wrap:wrap}
+  .sol-rank .sr-t{font-size:13px;font-weight:700;color:var(--text)}
+  .sol-rank .sr-s{font-size:11.5px;color:var(--text-faint)}
+  .sol-rank .sr-pos{width:34px;color:var(--text-faint);font-weight:700}
+  .sol-rank tr.sr-top1 .sr-pos{color:var(--green)}
+  .sol-rank tr.sr-sel td{background:var(--surface-2)}
+  .sol-rank .sr-bar{display:inline-block;height:6px;border-radius:3px;background:var(--green);vertical-align:middle;margin-right:8px;opacity:.75}
+  .sol-rank tbody tr{cursor:pointer}
   .sol-date select{background:var(--surface-2);border:1px solid var(--border-strong);color:var(--text);border-radius:8px;padding:8px 11px;font-size:13px;color-scheme:dark;max-width:260px}
   .spinner{width:22px;height:22px;border:2.5px solid var(--border-strong);border-top-color:var(--green);
     border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 12px}
@@ -2191,6 +2200,7 @@ function vSolicitacoes(){
   el("content").innerHTML=`
     <div class="sec-title">Solicitações<span class="rule"></span></div>
     <div class="sol-resumo" id="solResumo"></div>
+    <div class="panel sol-rank" id="solRank"><div class="loading"><div class="spinner"></div>Carregando ranking…</div></div>
     <div class="sol-date">
       <div class="sol-modo">
         <button class="sm ${solState.modo==='dia'?'on':''}" onclick="solModo('dia',this)">Por dia</button>
@@ -2246,6 +2256,39 @@ function aplicarData(q){
   if(solState.modo==="intervalo"){ if(solState.ini) q=q.gte("data_movimento",solState.ini); if(solState.fim) q=q.lte("data_movimento",solState.fim); return q; }
   return q.gte("data_movimento",mesInicioISO()); // mês
 }
+async function carregarRankSolic(){
+  const box=el("solRank"); if(!box) return;
+  const linhas=[]; const passo=1000;
+  for(let de=0; de<50000; de+=passo){
+    const {data,error}=await aplicarData(sb.from("notificacoes").select("tipo,barra")).range(de,de+passo-1);
+    if(error){ box.innerHTML=`<div class="empty">Não foi possível montar o ranking.</div>`; return; }
+    linhas.push(...(data||[])); if(!data||data.length<passo) break;
+  }
+  const mapa={};
+  linhas.forEach(r=>{ const b=(r.barra||"").trim()||"Sem barra";
+    const m=mapa[b]||(mapa[b]={barra:b,habilitacao:0,entrada:0,saida:0});
+    if(m[r.tipo]!==undefined) m[r.tipo]++; });
+  const rank=Object.values(mapa).map(m=>({...m,total:m.habilitacao+m.entrada}))
+    .filter(m=>m.total>0||m.saida>0)
+    .sort((a,b)=>b.total-a.total||b.habilitacao-a.habilitacao||a.saida-b.saida||a.barra.localeCompare(b.barra,"pt-BR"));
+  if(!rank.length){ box.innerHTML=`<div class="empty">Nenhuma abertura ou troca neste período.</div>`; return; }
+  const max=Math.max(...rank.map(m=>m.total),1);
+  box.innerHTML=`<div class="sr-head"><span class="sr-t">Ranking por barra</span><span class="sr-s">Aberturas + trocas de entrada no período escolhido · clique numa barra para filtrar a lista</span></div>
+    <table><thead><tr><th>#</th><th>Barra</th><th class="num">Aberturas</th><th class="num">Trocas de entrada</th><th class="num">Total</th><th class="num">Saídas</th></tr></thead>
+    <tbody>${rank.map((m,i)=>`<tr class="${i===0&&m.total>0?"sr-top1":""} ${m.barra===solState.barra?"sr-sel":""}" data-barra="${escSol(m.barra)}">
+      <td class="sr-pos">${i+1}º</td>
+      <td><span class="sr-bar" style="width:${Math.round(60*m.total/max)}px"></span>${escSol(m.barra)}</td>
+      <td class="num" style="color:#5B9BE0">${nf(m.habilitacao)}</td>
+      <td class="num" style="color:var(--green)">${nf(m.entrada)}</td>
+      <td class="num"><b>${nf(m.total)}</b></td>
+      <td class="num" style="color:var(--red)">${nf(m.saida)}</td></tr>`).join("")}</tbody></table>`;
+  box.querySelectorAll("tbody tr").forEach(tr=>tr.onclick=()=>{
+    const b=tr.dataset.barra; if(b==="Sem barra") return;
+    solState.barra = solState.barra===b ? "todas" : b;
+    const sel=el("solBarra"); if(sel){ if(![...sel.options].some(o=>o.value===solState.barra)) sel.add(new Option(solState.barra,solState.barra)); sel.value=solState.barra; }
+    carregarSolic();
+  });
+}
 function aplicarBarra(q){ return solState.barra!=="todas" ? q.eq("barra",solState.barra) : q; }
 async function contarTipoSolic(t){
   let q=sb.from("notificacoes").select("id",{count:"exact",head:true}).eq("tipo",t);
@@ -2258,6 +2301,7 @@ async function carregarSolic(){
     <div class="sol-chip"><span class="sc-n" style="color:var(--red)">${nf(saida)}</span><span class="sc-l">Saídas</span></div>
     <div class="sol-chip"><span class="sc-n" style="color:var(--green)">${nf(entrada)}</span><span class="sc-l">Entradas</span></div>
     <div class="sol-chip"><span class="sc-n" style="color:#5B9BE0">${nf(habilitacao)}</span><span class="sc-l">Aberturas</span></div>`;
+  carregarRankSolic();
   let q=sb.from("notificacoes").select("*").order("criado_em",{ascending:false});
   if(solState.tipo!=="todas") q=q.eq("tipo",solState.tipo);
   q=aplicarBarra(aplicarData(q));
