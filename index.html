@@ -1353,6 +1353,10 @@ function abrirRD(nome){
 }
 const el = id => document.getElementById(id);
 let PAPEL = "—";
+// Abas que o papel "assessor" (e qualquer conta sem papel definido) pode abrir.
+// Gestão (admin/gerencia) vê tudo. O que não está aqui fica escondido e bloqueado.
+const ABAS_ASSESSOR = ["radar","clientes","fila","aniversariantes","vencimentos","automacao","solicitacoes","parceiros"];
+function podeVer(v){ return ehGestor() || ABAS_ASSESSOR.indexOf(v) >= 0; }
 const ini = n => (n||"?").trim().split(/\s+/).slice(0,2).map(w=>w[0]).join("").toUpperCase();
 const nf = n => (n==null?"—":Number(n).toLocaleString("pt-BR"));
 // Aceita tanto data pura ("2026-07-30") quanto data com hora vinda de um
@@ -1455,7 +1459,13 @@ async function mostrarApp(session){
   const {data:a} = await sb.from("assessores").select("nome,papel").eq("auth_user_id",session.user.id).maybeSingle();
   if(a){ nome=a.nome||email; papel=a.papel; }
   PAPEL = papel;
-  { const bAuto=document.querySelector('.nav-item[data-view="automacao"]'); if(bAuto && !ehGestor()) bAuto.style.display="none"; }
+  document.querySelectorAll(".nav-item[data-view]").forEach(b=>{ if(!podeVer(b.dataset.view)) b.remove(); });
+  // tira os títulos de grupo que ficaram sem nenhuma aba embaixo
+  document.querySelectorAll(".nav .nav-label").forEach(l=>{
+    let n=l.nextElementSibling, tem=false;
+    while(n && !n.classList.contains("nav-label")){ if(n.classList.contains("nav-item")) tem=true; n=n.nextElementSibling; }
+    if(!tem) l.remove();
+  });
   el("userName").textContent=nome; el("avatar").textContent=ini(nome);
   el("userRole").textContent = papel==="admin"?"Administrador":papel==="gerencia"?"Gerência":"Assessor";
   render("radar");
@@ -1504,6 +1514,7 @@ document.querySelectorAll(".nav-item").forEach(b=>b.addEventListener("click",()=
   b.classList.add("active"); fecharMenu(); render(b.dataset.view);
 }));
 function render(view){
+  if(!podeVer(view)) view="radar";
   el("crumb").textContent=TITLES[view][0]; el("pageTitle").textContent=TITLES[view][1];
   el("content").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
   if(VIEWS[view]) VIEWS[view](); else vReservada(view);
@@ -1683,10 +1694,10 @@ async function vRadar(){
     <div class="panel" id="autoRadar"><div class="loading"><div class="spinner"></div>Carregando…</div></div>`:""}
 
     <div class="radar-lower">
-      <div>
+      ${ehGestor()?`<div>
         <div class="sec-title">Fila de ação · maior volume parado<span class="rule"></span></div>
         <div class="panel" id="filaAcao"><div class="loading"><div class="spinner"></div>Carregando…</div></div>
-      </div>
+      </div>`:""}
       <div>
         <div class="sec-title">Aniversariantes de hoje<span class="rule"></span></div>
         <div class="panel" id="aniversariantes"><div class="loading"><div class="spinner"></div>Carregando…</div></div>
@@ -1694,7 +1705,7 @@ async function vRadar(){
     </div>
     <div class="note">A saúde cruza dois eixos: <b>operação</b> e <b>contato</b>. O eixo de contato usa o que está registrado no RD Conversas — atendimento feito por fora da plataforma (telefone pessoal, presencial) não aparece aqui. Então "negligenciado" e "crítico" querem dizer <b>sem contato registrado</b>, que não é exatamente o mesmo que sem contato.</div>`;
 
-  carregarFila();
+  if(ehGestor()) carregarFila();
   carregarAniversariantes();
   carregarVencRadar();
   carregarAutoRadar();
@@ -6417,7 +6428,7 @@ async function autoCarregarPeriodo(){
 
 // ---- aba Automação ----
 async function vAutomacao(){
-  if(!ehGestor()){ el("content").innerHTML='<div class="empty">Esta área é só para a gestão.</div>'; return; }
+  if(!podeVer("automacao")){ el("content").innerHTML='<div class="empty">Esta área é só para a gestão.</div>'; return; }
   if(!autoState.de) autoDefinirAtalho(autoState.atalho||"mes");
   el("content").innerHTML=`
     <div class="panel" id="autoHoje" style="padding:18px 20px;margin-bottom:22px"><div class="loading"><div class="spinner"></div>Carregando…</div></div>
