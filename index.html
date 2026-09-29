@@ -3333,6 +3333,7 @@ async function asMudanca(){
  *  Nao confundir com baixarCSV, que recebe pares [rotulo, funcao] e a lista
  *  de objetos. Ponto e virgula e BOM, para o Excel brasileiro. */
 function baixarCSVLinhas(nome, cabecalho, linhas){
+  if(!ehGestor()){ toast("Exportação restrita","Só a gestão pode baixar planilhas.",true); return; }
   const esc = v => {
     v = (v == null ? "" : String(v));
     return /[";\r\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v;
@@ -5283,6 +5284,7 @@ let ldState = {tipo:"conversou", termo:"", recentes:false, page:0, size:50, tota
 // colunas ja separadas. Virgula e sem BOM sai tudo numa coluna so e com
 // acento quebrado.
 function baixarCSV(nome, colunas, linhas){
+  if(!ehGestor()){ toast("Exportação restrita","Só a gestão pode baixar planilhas.",true); return; }
   const esc = v => {
     if(v === null || v === undefined) return "";
     const t = String(v).replace(/"/g,'""');
