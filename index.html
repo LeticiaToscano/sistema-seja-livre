@@ -43,6 +43,9 @@
     padding:12px;font-size:14px;font-weight:700;margin-top:8px}
   .btn-primary:disabled{opacity:.6}
   .login-err{color:var(--red);font-size:12.5px;margin-top:12px;min-height:16px}
+  .login-link{display:block;margin-top:14px;font-size:12px;color:var(--text-dim);text-align:center;text-decoration:underline;cursor:pointer}
+  .login-link:hover{color:var(--green)}
+  .login-ok{color:var(--green);font-size:12.5px;margin-top:12px;line-height:1.5}
 
   /* ---------- APP SHELL ---------- */
   #app{display:grid;grid-template-columns:210px 1fr;min-height:100vh}
@@ -65,6 +68,10 @@
     font-size:12px;font-weight:700;color:var(--green)}
   .user-chip .u-name{font-size:12.5px;font-weight:600;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .user-chip .u-role{font-size:10px;color:var(--text-faint)}
+  .btn-vercomo{margin-top:8px;width:100%;background:none;border:1px solid var(--amber);color:var(--amber);border-radius:8px;padding:8px;font-size:12px;font-weight:600;cursor:pointer}
+  .btn-vercomo.on{background:var(--amber);color:#1a1304}
+  .aviso-vercomo{margin:0 0 16px;padding:10px 14px;border:1px solid var(--amber);border-radius:10px;color:var(--amber);font-size:12.5px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+  .aviso-vercomo button{background:var(--amber);color:#1a1304;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer}
   .btn-logout{margin-top:8px;width:100%;background:none;border:1px solid var(--border-strong);color:var(--text-dim);
     border-radius:9px;padding:8px;font-size:12px;font-weight:600}
   .btn-logout:hover{color:var(--text);border-color:var(--red)}
@@ -1153,6 +1160,14 @@
       <div class="field"><label>Senha</label><input type="password" id="password" autocomplete="current-password" required></div>
       <button class="btn-primary" id="loginBtn" type="submit">Entrar</button>
       <div class="login-err" id="loginErr"></div>
+      <a class="login-link" id="esqueciLink">Esqueci minha senha / primeiro acesso</a>
+    </form>
+    <form id="novaSenhaForm" class="hidden">
+      <p style="margin-bottom:14px">Defina sua senha. Mínimo de 12 caracteres, com letras maiúsculas, minúsculas e números.</p>
+      <div class="field"><label>Nova senha</label><input type="password" id="novaSenha1" autocomplete="new-password" required></div>
+      <div class="field"><label>Repita a nova senha</label><input type="password" id="novaSenha2" autocomplete="new-password" required></div>
+      <button class="btn-primary" id="novaSenhaBtn" type="submit">Salvar senha</button>
+      <div class="login-err" id="novaSenhaErr"></div>
     </form>
     <div id="mfaBox" class="hidden"></div>
   </div>
@@ -1210,6 +1225,7 @@
     </nav>
     <div class="foot">
       <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v21/09 código no celular</div></div></div>
+      <button class="btn-vercomo hidden" id="verComoBtn" type="button">Ver como assessor</button>
       <button class="btn-logout" id="logoutBtn">Sair</button>
     </div>
   </aside>
@@ -1239,6 +1255,7 @@
         <div class="live"><span class="dot"></span>Dados ao vivo</div>
       </div>
     </div>
+    <div class="aviso-vercomo hidden" id="avisoVerComo"><span>Você está vendo o sistema como um assessor enxerga. Nada muda para eles.</span><button type="button" onclick="alternarVerComo()">Voltar à visão da gestão</button></div>
     <div class="content" id="content"><div class="loading"><div class="spinner"></div>Carregando…</div></div>
     <div id="toastWrap" class="toast-wrap"></div>
   </div>
@@ -1357,6 +1374,30 @@ let PAPEL = "—";
 // Gestão (admin/gerencia) vê tudo. O que não está aqui fica escondido e bloqueado.
 const ABAS_ASSESSOR = ["radar","clientes","fila","aniversariantes","vencimentos","automacao","solicitacoes","parceiros"];
 function podeVer(v){ return ehGestor() || ABAS_ASSESSOR.indexOf(v) >= 0; }
+// "Ver como assessor": só a gestão tem o botão. Muda apenas a tela desta
+// sessão; o banco continua respondendo com o papel real de quem está logado.
+let VER_COMO_ASSESSOR = false;
+let VIEW_ATUAL = "radar";
+function aplicarMenu(){
+  document.querySelectorAll(".nav-item[data-view]").forEach(b=>{ b.style.display = podeVer(b.dataset.view) ? "" : "none"; });
+  document.querySelectorAll(".nav .nav-label").forEach(l=>{
+    let n=l.nextElementSibling, tem=false;
+    while(n && !n.classList.contains("nav-label")){ if(n.classList.contains("nav-item") && n.style.display!=="none") tem=true; n=n.nextElementSibling; }
+    l.style.display = tem ? "" : "none";
+  });
+}
+function alternarVerComo(){
+  VER_COMO_ASSESSOR = !VER_COMO_ASSESSOR;
+  const vb=el("verComoBtn");
+  vb.classList.toggle("on", VER_COMO_ASSESSOR);
+  vb.textContent = VER_COMO_ASSESSOR ? "Voltar à visão da gestão" : "Ver como assessor";
+  el("avisoVerComo").classList.toggle("hidden", !VER_COMO_ASSESSOR);
+  el("userRole").textContent = VER_COMO_ASSESSOR ? "Vendo como assessor" : (PAPEL==="admin"?"Administrador":"Gerência");
+  aplicarMenu();
+  const alvo = podeVer(VIEW_ATUAL) ? VIEW_ATUAL : "radar";
+  document.querySelectorAll(".nav-item").forEach(x=>x.classList.toggle("active", x.dataset.view===alvo));
+  render(alvo);
+}
 const ini = n => (n||"?").trim().split(/\s+/).slice(0,2).map(w=>w[0]).join("").toUpperCase();
 const nf = n => (n==null?"—":Number(n).toLocaleString("pt-BR"));
 // Aceita tanto data pura ("2026-07-30") quanto data com hora vinda de um
@@ -1380,8 +1421,11 @@ const fmtDesde = d => {
 };
 
 // ---------- AUTH ----------
+// Link de "esqueci minha senha" chega com #...type=recovery na URL.
+const EM_RECUPERACAO = /type=recovery/.test(location.hash);
 async function boot(){
   const {data:{session}} = await sb.auth.getSession();
+  if(session && EM_RECUPERACAO){ mostrarNovaSenha(); return; }
   if(session){ portao(); } else { el("login").classList.remove("hidden"); el("app").classList.add("hidden"); }
 }
 el("loginForm").addEventListener("submit", async e=>{
@@ -1393,9 +1437,47 @@ el("loginForm").addEventListener("submit", async e=>{
   portao(true);
 });
 
+// ---------- ESQUECI MINHA SENHA / PRIMEIRO ACESSO ----------
+// A pessoa recebe um link no e-mail e define a senha ela mesma: ninguém
+// da gestão precisa saber ou repassar senha de ninguém.
+el("esqueciLink").addEventListener("click", async ()=>{
+  const email = el("email").value.trim();
+  const msg = el("loginErr");
+  if(!email){ msg.className="login-err"; msg.textContent="Digite seu e-mail acima e clique de novo."; return; }
+  msg.className="login-err"; msg.textContent="Enviando…";
+  const {error} = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
+  if(error){ msg.textContent = error.message; return; }
+  // mesma resposta exista ou não a conta: não entrega quem tem acesso
+  msg.className="login-ok";
+  msg.textContent="Se este e-mail tiver acesso, você vai receber um link para definir a senha. Confira também o spam.";
+});
+function mostrarNovaSenha(){
+  el("login").classList.remove("hidden"); el("app").classList.add("hidden");
+  el("loginForm").classList.add("hidden"); el("novaSenhaForm").classList.remove("hidden");
+}
+el("novaSenhaForm").addEventListener("submit", async e=>{
+  e.preventDefault();
+  const s1=el("novaSenha1").value, s2=el("novaSenha2").value, err=el("novaSenhaErr");
+  err.textContent="";
+  if(s1.length<12){ err.textContent="A senha precisa ter pelo menos 12 caracteres."; return; }
+  if(s1!==s2){ err.textContent="As duas senhas não são iguais."; return; }
+  const btn=el("novaSenhaBtn"); btn.disabled=true; btn.textContent="Salvando…";
+  const {error}=await sb.auth.updateUser({password:s1});
+  btn.disabled=false; btn.textContent="Salvar senha";
+  if(error){ err.textContent = /weak|characters|contain/i.test(error.message)
+      ? "Senha fraca: use 12 caracteres ou mais, com maiúsculas, minúsculas e números." : error.message; return; }
+  history.replaceState(null, "", location.pathname);
+  el("novaSenhaForm").classList.add("hidden"); el("loginForm").classList.remove("hidden");
+  portao(true);
+});
+
 /* ---------- SEGUNDO FATOR (código do aplicativo no celular) ----------
    Depois da senha, todo usuário passa pelo código de 6 dígitos. No primeiro
    acesso, cadastra o celular pelo QR code. */
+// TEMPORÁRIO: contas liberadas para entrar sem o código do celular,
+// só enquanto ainda não cadastraram o autenticador. Esvaziar a lista
+// depois da conferência — cada e-mail aqui é uma conta protegida só por senha.
+const LOGIN_SEM_CODIGO = ["joao.correa@sejalivreinvest.com"];
 async function portao(novoLogin){
   el("login").classList.remove("hidden"); el("app").classList.add("hidden");
   const a=await sb.auth.mfa.getAuthenticatorAssuranceLevel();
@@ -1409,6 +1491,14 @@ async function portao(novoLogin){
   if(f.error){ el("loginErr").textContent=f.error.message; return; }
   const ok=(f.data.totp||[]).find(x=>x.status==="verified");
   if(ok) return pedirCodigo(ok.id, null);
+  {
+    const {data:{session}}=await sb.auth.getSession();
+    const mail=((session&&session.user&&session.user.email)||"").toLowerCase();
+    if(LOGIN_SEM_CODIGO.includes(mail)){
+      if(novoLogin) sb.rpc("registrar_evento",{p_acao:"acesso",p_resumo:"Entrou sem codigo (liberacao temporaria)"});
+      return mostrarApp(session);
+    }
+  }
   for(const x of (f.data.all||[])) if(x.factor_type==="totp" && x.status!=="verified") await sb.auth.mfa.unenroll({factorId:x.id});
   const e=await sb.auth.mfa.enroll({factorType:"totp", friendlyName:"CRM "+Date.now()});
   if(e.error){ el("loginErr").textContent=e.error.message; return; }
@@ -1459,13 +1549,8 @@ async function mostrarApp(session){
   const {data:a} = await sb.from("assessores").select("nome,papel").eq("auth_user_id",session.user.id).maybeSingle();
   if(a){ nome=a.nome||email; papel=a.papel; }
   PAPEL = papel;
-  document.querySelectorAll(".nav-item[data-view]").forEach(b=>{ if(!podeVer(b.dataset.view)) b.remove(); });
-  // tira os títulos de grupo que ficaram sem nenhuma aba embaixo
-  document.querySelectorAll(".nav .nav-label").forEach(l=>{
-    let n=l.nextElementSibling, tem=false;
-    while(n && !n.classList.contains("nav-label")){ if(n.classList.contains("nav-item")) tem=true; n=n.nextElementSibling; }
-    if(!tem) l.remove();
-  });
+  if(ehGestorReal()){ const vb=el("verComoBtn"); vb.classList.remove("hidden"); vb.onclick=alternarVerComo; }
+  aplicarMenu();
   el("userName").textContent=nome; el("avatar").textContent=ini(nome);
   el("userRole").textContent = papel==="admin"?"Administrador":papel==="gerencia"?"Gerência":"Assessor";
   render("radar");
@@ -1515,6 +1600,7 @@ document.querySelectorAll(".nav-item").forEach(b=>b.addEventListener("click",()=
 }));
 function render(view){
   if(!podeVer(view)) view="radar";
+  VIEW_ATUAL = view;
   el("crumb").textContent=TITLES[view][0]; el("pageTitle").textContent=TITLES[view][1];
   el("content").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
   if(VIEWS[view]) VIEWS[view](); else vReservada(view);
@@ -6296,7 +6382,8 @@ async function carregarZeragem(){
 // Janela fechada abaixo da meta com Automação ainda ativa = FILA PARA CANCELAR.
 // Sai da fila sozinho quando a Nelógica confirma o cancelamento.
 // "fim" no período = cancelamento confirmado; troca de plano não encerra.
-const ehGestor = () => PAPEL==="admin" || PAPEL==="gerencia";
+const ehGestorReal = () => PAPEL==="admin" || PAPEL==="gerencia";
+const ehGestor = () => ehGestorReal() && !VER_COMO_ASSESSOR;
 // nomes vêm de e-mail externo: escapar antes de pôr na tela
 const escA = s => String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const AUTO_PLANOS = [
