@@ -381,6 +381,7 @@
   .sol-modo .sm{background:transparent;border:none;color:var(--text-dim);border-radius:7px;padding:7px 13px;font-size:12.5px;font-weight:600}
   .sol-modo .sm.on{background:var(--surface-2);color:var(--green)}
   .sol-inputs{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .sol-date select{background:var(--surface-2);border:1px solid var(--border-strong);color:var(--text);border-radius:8px;padding:8px 11px;font-size:13px;color-scheme:dark;max-width:260px}
   .spinner{width:22px;height:22px;border:2.5px solid var(--border-strong);border-top-color:var(--green);
     border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 12px}
   @keyframes spin{to{transform:rotate(360deg)}}
@@ -2182,7 +2183,8 @@ function toast(titulo,desc,crit){
 
 // ---------- SOLICITAÇÕES (aba) ----------
 function mesInicioISO(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-01"; }
-let solState={tipo:"todas",modo:"dia",data:"",ini:"",fim:""};
+let solState={tipo:"todas",modo:"dia",data:"",ini:"",fim:"",barra:"todas"};
+const escSol=v=>String(v==null?"":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 function vSolicitacoes(){
   if(!solState.data) solState.data=hojeISO();
   if(!solState.ini){ solState.ini=mesInicioISO(); solState.fim=hojeISO(); }
@@ -2196,6 +2198,7 @@ function vSolicitacoes(){
         <button class="sm ${solState.modo==='mes'?'on':''}" onclick="solModo('mes',this)">Mês inteiro</button>
       </div>
       <div class="sol-inputs" id="solInputs"></div>
+      <label>Barra: <select id="solBarra"><option value="todas">Todas as barras</option></select></label>
     </div>
     <div class="sol-tabs">
       <button class="sol-tab on" onclick="solFiltro('todas',this)">Todas</button>
@@ -2206,7 +2209,16 @@ function vSolicitacoes(){
     <div class="panel" id="solList"><div class="loading"><div class="spinner"></div>Carregando…</div></div>`;
   solState.tipo="todas";
   renderSolInputs();
+  carregarBarrasSolic();
   carregarSolic();
+}
+async function carregarBarrasSolic(){
+  const {data}=await sb.from("notificacoes").select("barra").not("barra","is",null).limit(10000);
+  const barras=[...new Set((data||[]).map(r=>(r.barra||"").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"pt-BR"));
+  const sel=el("solBarra"); if(!sel) return;
+  if(solState.barra!=="todas" && !barras.includes(solState.barra)) barras.unshift(solState.barra);
+  sel.innerHTML=`<option value="todas">Todas as barras</option>`+barras.map(b=>`<option value="${escSol(b)}"${b===solState.barra?" selected":""}>${escSol(b)}</option>`).join("");
+  sel.onchange=e=>{ solState.barra=e.target.value; carregarSolic(); };
 }
 function renderSolInputs(){
   var h="";
@@ -2234,9 +2246,10 @@ function aplicarData(q){
   if(solState.modo==="intervalo"){ if(solState.ini) q=q.gte("data_movimento",solState.ini); if(solState.fim) q=q.lte("data_movimento",solState.fim); return q; }
   return q.gte("data_movimento",mesInicioISO()); // mês
 }
+function aplicarBarra(q){ return solState.barra!=="todas" ? q.eq("barra",solState.barra) : q; }
 async function contarTipoSolic(t){
   let q=sb.from("notificacoes").select("id",{count:"exact",head:true}).eq("tipo",t);
-  const {count}=await aplicarData(q); return count||0;
+  const {count}=await aplicarBarra(aplicarData(q)); return count||0;
 }
 async function carregarSolic(){
   el("solList").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
@@ -2247,7 +2260,7 @@ async function carregarSolic(){
     <div class="sol-chip"><span class="sc-n" style="color:#5B9BE0">${nf(habilitacao)}</span><span class="sc-l">Aberturas</span></div>`;
   let q=sb.from("notificacoes").select("*").order("criado_em",{ascending:false});
   if(solState.tipo!=="todas") q=q.eq("tipo",solState.tipo);
-  q=aplicarData(q);
+  q=aplicarBarra(aplicarData(q));
   const {data,error}=await q.limit(400);
   if(error){ return erro(error,"solList"); }
   if(!data||!data.length){ el("solList").innerHTML=`<div class="empty">Nenhuma solicitação neste filtro.</div>`; return; }
