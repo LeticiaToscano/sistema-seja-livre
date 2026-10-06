@@ -9355,6 +9355,8 @@ function mkTag(st){
   const s = MK_ST[st] || [st, "var(--surface-2)", "var(--text-dim)"];
   return `<span class="tag" style="background:${s[1]};color:${s[2]}">${s[0]}</span>`;
 }
+// linha clicável que abre a ficha do cliente (quem não tem ficha não abre)
+function mkAbre(id){ return id ? ` onclick="abrirFicha('${cpEsc(id)}')" style="cursor:pointer" title="Abrir a ficha"` : ""; }
 function mkPct(a, b){ return b ? (100*a/b).toLocaleString("pt-BR",{maximumFractionDigits:1}) + "%" : "—"; }
 function mkKpi(rotulo, valor, sub, cor){
   return `<div class="kpi"><div class="k-label">${rotulo}</div>
@@ -9586,6 +9588,9 @@ async function mkDetalhe(id){
   let R;
   try { R = await mkRpcTudo("mkt_resultado", { p_campanha: c.id }); }
   catch(e){ el("content").innerHTML = `<div class="empty">${cpEsc(mkErroMsg(e))}</div>`; return; }
+  const { data: ids } = await sb.from("mkt_publico").select("sinacor,cliente_id").eq("campanha_id", c.id).limit(10000);
+  const mapa = {}; (ids || []).forEach(x => { mapa[String(x.sinacor)] = x.cliente_id; });
+  R.forEach(r => { r.cliente_id = mapa[String(r.sinacor)] || null; });
   mkState.res = R;
   mkPintarResultado();
 }
@@ -9616,7 +9621,7 @@ function mkCabecalho(c){
 // ---------- rascunho: conferir, baixar, marcar como enviada ----------
 async function mkRascunho(c){
   const { data, error } = await sb.from("mkt_publico")
-    .select("sinacor,nome,telefone,barra,faixa,ultima_op,dias_parado").eq("campanha_id", c.id).limit(10000);
+    .select("cliente_id,sinacor,nome,telefone,barra,faixa,ultima_op,dias_parado").eq("campanha_id", c.id).limit(10000);
   if(error){ el("content").innerHTML = `<div class="empty">${cpEsc(mkErroMsg(error))}</div>`; return; }
   mkState.publico = data || [];
   const slug = (c.nome||"campanha").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g,"").slice(0,14) || "campanha";
@@ -9650,7 +9655,7 @@ async function mkRascunho(c){
 function mkTabelaPublico(L){
   if(!L.length) return '<div class="empty">Ninguém na lista.</div>';
   return `<table><thead><tr><th>Cliente</th><th>Sinacor</th><th>Barra</th><th>Faixa</th><th>Última operação</th><th>Dias parado</th></tr></thead><tbody>
-    ${L.map(p => `<tr><td style="font-weight:650">${cpEsc(p.nome||"—")}</td><td style="color:var(--text-dim)">${cpEsc(p.sinacor)}</td>
+    ${L.map(p => `<tr${mkAbre(p.cliente_id)}><td style="font-weight:650">${cpEsc(p.nome||"—")}</td><td style="color:var(--text-dim)">${cpEsc(p.sinacor)}</td>
       <td style="color:var(--text-dim)">${cpEsc(p.barra||"—")}</td><td>${faixaBadge(p.faixa,0)}</td>
       <td style="color:var(--text-dim)">${p.ultima_op ? fmtData(p.ultima_op) : "nunca"}</td><td>${p.dias_parado ?? "—"}</td></tr>`).join("")}
   </tbody></table>`;
@@ -9798,7 +9803,7 @@ function mkPintarResultado(){
       <div class="toolbar" style="justify-content:flex-end"><button class="pc-cp" style="margin:0" onclick="mkExportar()">Exportar planilha</button></div>
       ${!lista.length ? '<div class="empty">Ninguém neste filtro.</div>' :
       `<table><thead><tr><th>Cliente</th><th>Barra</th><th>Dias parado no envio</th><th>Respondeu</th><th>Assessor</th><th>Voltou a operar</th><th>Contratos</th></tr></thead><tbody>
-      ${lista.slice(0,300).map(r => `<tr>
+      ${lista.slice(0,300).map(r => `<tr${mkAbre(r.cliente_id)}>
         <td style="font-weight:650">${cpEsc(r.nome||"—")} <span style="color:var(--text-faint);font-weight:400">${cpEsc(r.sinacor)}</span></td>
         <td style="color:var(--text-dim)">${cpEsc(r.barra||"—")}</td>
         <td>${r.dias_parado_no_envio ?? "—"}${r.ja_ativo_no_envio ? ' <span class="tag" style="background:var(--surface-2);color:var(--amber)">já operava</span>' : ""}</td>
