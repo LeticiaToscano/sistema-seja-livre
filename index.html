@@ -1210,6 +1210,9 @@
       <button class="nav-item" data-view="sdr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 17l5-5 4 3 6-7" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 8h4v4" stroke-linecap="round" stroke-linejoin="round"/></svg>SDR</button>
       <button class="nav-item" data-view="exportrd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" stroke-linecap="round" stroke-linejoin="round"/></svg>Exportar para o RD</button>
 
+      <div class="nav-label">Marketing</div>
+      <button class="nav-item" data-view="marketing"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 10v4a1 1 0 0 0 1 1h2l5 4V5L7 9H5a1 1 0 0 0-1 1z" stroke-linejoin="round"/><path d="M16 9a3.5 3.5 0 0 1 0 6M18.5 6.5a7 7 0 0 1 0 11" stroke-linecap="round"/></svg>Campanhas</button>
+
       <div class="nav-label">Gestão</div>
       <button class="nav-item" data-view="conferencia"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l3 3 8-8M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9" stroke-linecap="round" stroke-linejoin="round"/></svg>Conferência</button>
       <button class="nav-item" data-view="custos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v20M17 6.5c0-1.9-2.2-3-5-3s-5 1.1-5 3 2.2 2.8 5 3.3 5 1.4 5 3.4-2.2 3.3-5 3.3-5-1.3-5-3.3" stroke-linecap="round"/></svg>Custos</button>
@@ -1584,7 +1587,8 @@ const TITLES={
   legenda:["SISTEMA","Legenda · o que cada etiqueta significa"],
   diagnostico:["GESTÃO","Diagnóstico"], ia:["GESTÃO","CEO de IA"],
   integracoes:["SISTEMA","Integrações"],
-  parceiros:["ATENDIMENTO","Parceiros · barras e links de abertura"]
+  parceiros:["ATENDIMENTO","Parceiros · barras e links de abertura"],
+  marketing:["MARKETING","Campanhas · do público ao resultado"]
 };
 const RESERVADAS={
   fluxos:{icon:"fluxos",desc:"As réguas de atendimento automatizadas — boas-vindas, ativação, manutenção, reengajamento e aniversário. Toda automação roda primeiro em modo sombra (simula sem enviar) antes de ir ao ar, em lotes controlados."},
@@ -1593,7 +1597,7 @@ const RESERVADAS={
   ia:{icon:"ia",desc:"O diagnóstico estratégico da operação em linguagem natural, e o copiloto de IA por assessor — cada um enxergando apenas a própria carteira."},
   integracoes:{icon:"integracoes",desc:"As conexões do sistema — Volume Operado (operação), RD Conversas (atendimento), Gmail/Genial (entrada de clientes) e IA. Ligadas e a ligar."}
 };
-const VIEWS={exportrd:vExportRD,sdr:vSDR,radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,multiconta:vMulticonta,publico:vPublico,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes,auditoria:vAuditoria,diagnostico:vDiagnostico,legenda:vLegenda,leads:vLeads,importacoes:vImportacoes,saidas:vSaidas,plataformas:vPlataformas,custos:vCustos,conferencia:vConferencia,ranking:vRanking,assessores:vAssessores,vencimentos:vVencimentos,zeragem:vZeragem,automacao:vAutomacao,parceiros:vParceiros};
+const VIEWS={marketing:vMarketing,exportrd:vExportRD,sdr:vSDR,radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,multiconta:vMulticonta,publico:vPublico,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes,auditoria:vAuditoria,diagnostico:vDiagnostico,legenda:vLegenda,leads:vLeads,importacoes:vImportacoes,saidas:vSaidas,plataformas:vPlataformas,custos:vCustos,conferencia:vConferencia,ranking:vRanking,assessores:vAssessores,vencimentos:vVencimentos,zeragem:vZeragem,automacao:vAutomacao,parceiros:vParceiros};
 document.querySelectorAll(".nav-item").forEach(b=>b.addEventListener("click",()=>{
   document.querySelectorAll(".nav-item").forEach(x=>x.classList.remove("active"));
   b.classList.add("active"); fecharMenu(); render(b.dataset.view);
@@ -9329,6 +9333,510 @@ async function pcCriar(){
   toast("Barra criada", nome);
   fecharFicha();
   vParceiros();
+}
+
+// =====================================================================
+// MARKETING · CAMPANHAS
+// Só a gestão vê (não está em ABAS_ASSESSOR) e o banco também recusa:
+// mkt_campanhas / mkt_publico têm RLS de gestão e as funções
+// mkt_previa_publico, mkt_criar_campanha e mkt_resultado checam app_is_gestor.
+// A lista gravada (mkt_publico) é o registro de quem a campanha atingiu.
+// "Dias parado" sempre vem da última operação REAL (DMA ou zeragem).
+// Nome, telefone e barra vêm do banco; sempre escapar com cpEsc.
+// =====================================================================
+const MK_OBJ = { reativacao:"Reativação", ativacao:"Ativação", aniversario:"Aniversário",
+                 parceiro:"Parceiro", leads:"Leads", outro:"Outro" };
+const MK_ST  = { rascunho:["Rascunho","var(--surface-2)","var(--text-dim)"],
+                 enviada:["Enviada","var(--green-deep)","var(--green)"],
+                 encerrada:["Encerrada","var(--surface-2)","var(--text-faint)"] };
+let mkState = { lista:[], atual:null, publico:[], res:[], filtro:"todos", previa:null, regras:null };
+
+function mkTag(st){
+  const s = MK_ST[st] || [st, "var(--surface-2)", "var(--text-dim)"];
+  return `<span class="tag" style="background:${s[1]};color:${s[2]}">${s[0]}</span>`;
+}
+function mkPct(a, b){ return b ? (100*a/b).toLocaleString("pt-BR",{maximumFractionDigits:1}) + "%" : "—"; }
+function mkKpi(rotulo, valor, sub, cor){
+  return `<div class="kpi"><div class="k-label">${rotulo}</div>
+    <div class="k-val"${cor?` style="color:${cor}"`:""}>${valor}</div>
+    <div class="k-sub">${sub||"&nbsp;"}</div></div>`;
+}
+// Supabase corta em mil linhas: busca de mil em mil
+async function mkRpcTudo(fn, args){
+  let tudo = [], de = 0;
+  for(;;){
+    const { data, error } = await sb.rpc(fn, args).range(de, de + 999);
+    if(error) throw error;
+    tudo = tudo.concat(data || []);
+    if(!data || data.length < 1000) break;
+    de += 1000;
+  }
+  return tudo;
+}
+function mkErroMsg(e){
+  const m = (e && e.message) || String(e);
+  return /gestão/i.test(m) ? "Esta área é restrita à gestão." : m;
+}
+
+// ---------- lista ----------
+async function vMarketing(){
+  el("content").innerHTML = '<div class="loading"><div class="spinner"></div>Carregando campanhas…</div>';
+  const { data, error } = await sb.from("mkt_campanhas")
+    .select("id,nome,objetivo,canal_envio,status,data_envio,janela_dias,criado_em")
+    .order("criado_em", { ascending:false });
+  if(error){ el("content").innerHTML = `<div class="empty">${cpEsc(mkErroMsg(error))}</div>`; return; }
+  mkState.lista = data || [];
+  const contagens = await Promise.all(mkState.lista.map(c =>
+    sb.from("mkt_publico").select("id", { count:"exact", head:true }).eq("campanha_id", c.id)));
+  mkState.lista.forEach((c,i) => { c.publico = contagens[i].count || 0; });
+
+  const L = mkState.lista;
+  el("content").innerHTML = `
+    <div class="pc-sum">
+      <div><div class="k">Campanhas</div><div class="v">${nf(L.length)}</div></div>
+      <div><div class="k">Enviadas</div><div class="v">${nf(L.filter(c=>c.status==="enviada").length)}</div></div>
+      <div><div class="k">Rascunhos</div><div class="v">${nf(L.filter(c=>c.status==="rascunho").length)}</div></div>
+      <div><div class="k">Pessoas atingidas</div><div class="v">${nf(L.filter(c=>c.status!=="rascunho").reduce((s,c)=>s+c.publico,0))}</div></div>
+    </div>
+    <div class="panel">
+      <div class="toolbar" style="justify-content:flex-end">
+        <button class="pc-add" onclick="mkNova()">+ Nova campanha</button>
+      </div>
+      ${!L.length ? '<div class="empty">Nenhuma campanha ainda. Crie a primeira.</div>' :
+      `<table><thead><tr><th>Campanha</th><th>Objetivo</th><th>Status</th><th>Envio</th><th>Público</th><th>Canal</th></tr></thead><tbody>
+      ${L.map(c => `<tr onclick="mkDetalhe('${c.id}')" style="cursor:pointer">
+        <td style="font-weight:700">${cpEsc(c.nome)}</td>
+        <td style="color:var(--text-dim)">${MK_OBJ[c.objetivo]||cpEsc(c.objetivo)}</td>
+        <td>${mkTag(c.status)}</td>
+        <td style="color:var(--text-dim)">${c.data_envio ? fmtData(c.data_envio) : "—"}</td>
+        <td>${nf(c.publico)}</td>
+        <td style="color:var(--text-dim)">${c.canal_envio==="sistema" ? "Pelo sistema" : "Planilha no RD"}</td>
+      </tr>`).join("")}</tbody></table>`}
+    </div>`;
+}
+
+// ---------- nova campanha ----------
+function mkNova(){
+  mkState.previa = null;
+  const faixas = ["sem"].concat(FAIXA_ORDEM.slice().reverse());
+  el("content").innerHTML = `
+    <div style="margin-bottom:14px"><button class="pc-cp" style="margin:0" onclick="vMarketing()">← Campanhas</button></div>
+    <div class="panel" style="padding:18px 20px">
+      <div class="pc-form" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:4px 18px">
+        <div><label>Nome da campanha</label><input id="mkNome" placeholder="Reativação outubro" autocomplete="off"></div>
+        <div><label>Objetivo</label><select class="search select" id="mkObj" style="width:100%">
+          ${Object.keys(MK_OBJ).map(k=>`<option value="${k}">${MK_OBJ[k]}</option>`).join("")}</select></div>
+        <div><label>Como vai ser enviada</label><select class="search select" id="mkCanal" style="width:100%">
+          <option value="importacao">Planilha importada no RD</option>
+          <option value="sistema">Disparo pelo sistema</option></select></div>
+        <div><label>Parado há pelo menos (dias)</label><input id="mkMin" value="30" inputmode="numeric"></div>
+        <div><label>Parado há no máximo (dias)</label><input id="mkMax" value="90" inputmode="numeric"></div>
+        <div><label>Acompanhar por (dias após o envio)</label><input id="mkJan" value="15" inputmode="numeric"></div>
+        <div><label>Tirar quem recebeu campanha nos últimos (dias)</label><input id="mkDesc" value="0" inputmode="numeric">
+          <div class="pc-hint">0 = não tirar ninguém.</div></div>
+        <div><label>Barras (separadas por vírgula)</label><input id="mkBarras" placeholder="vazio = todas" autocomplete="off"></div>
+        <div><label>Modelo do RD (opcional)</label><input id="mkTpl" placeholder="nome do template aprovado" autocomplete="off"></div>
+      </div>
+      <div class="pc-form" style="margin-top:6px">
+        <label>Faixas</label>
+        <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:13px">
+          ${faixas.map(f=>`<label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-size:13px;margin:0">
+            <input type="checkbox" class="mkFx" value="${f}" checked style="width:auto">${FAIXA_NOME[f]}</label>`).join("")}
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:13px;margin-top:12px">
+          <input type="checkbox" id="mkNunca" style="width:auto">Incluir quem nunca operou</label>
+      </div>
+      <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
+        <button class="pc-add" onclick="mkPrevia()">Ver público e avisos</button>
+      </div>
+    </div>
+    <div id="mkPrev"></div>`;
+}
+
+function mkLerRegras(){
+  const n = id => { const v = parseInt(el(id).value, 10); return isFinite(v) ? v : null; };
+  const regras = {
+    dias_min: n("mkMin") ?? 30, dias_max: n("mkMax") ?? 90,
+    sem_campanha_dias: n("mkDesc") || 0,
+    incluir_nunca_operou: el("mkNunca").checked
+  };
+  const barras = el("mkBarras").value.split(",").map(b=>b.trim().toUpperCase()).filter(Boolean);
+  if(barras.length) regras.barras = barras;
+  const fx = [...document.querySelectorAll(".mkFx")].filter(x=>x.checked).map(x=>x.value);
+  if(fx.length && fx.length < document.querySelectorAll(".mkFx").length) regras.faixas = fx;
+  return regras;
+}
+
+// último dia útil antes de hoje (sem feriados: o aviso é só um alerta)
+function mkUltimoUtil(){
+  const d = new Date(); d.setHours(0,0,0,0);
+  do { d.setDate(d.getDate() - 1); } while(d.getDay() === 0 || d.getDay() === 6);
+  return d;
+}
+
+async function mkPrevia(){
+  const regras = mkLerRegras();
+  if(regras.dias_min > regras.dias_max){ toast("Faixa de dias inválida", "O mínimo é maior que o máximo.", true); return; }
+  const box = el("mkPrev");
+  box.innerHTML = '<div class="loading"><div class="spinner"></div>Montando o público…</div>';
+  let P;
+  try { P = await mkRpcTudo("mkt_previa_publico", { p_regras: regras }); }
+  catch(e){ box.innerHTML = `<div class="empty">${cpEsc(mkErroMsg(e))}</div>`; return; }
+  mkState.previa = P; mkState.regras = regras;
+
+  // ---- avisos ----
+  const avisos = [];
+  const { data: ult } = await sb.from("operacoes").select("data").order("data", { ascending:false }).limit(1);
+  const ultPregao = ult && ult[0] ? new Date(ult[0].data + "T12:00:00") : null;
+  const util = mkUltimoUtil();
+  if(!ultPregao || ultPregao < util){
+    avisos.push(["var(--red)", `O último pregão no banco é <b>${ultPregao ? fmtData(ult[0].data) : "—"}</b>, e o último dia útil foi ${util.toLocaleDateString("pt-BR")}. Quem operou depois disso aparece como parado. <b>Lance os pregões no Volume Operado antes de criar a campanha.</b>`]);
+  } else {
+    avisos.push(["var(--green)", `Dados de operação em dia: último pregão no banco é ${fmtData(ult[0].data)}.`]);
+  }
+  const recentes = P.filter(x => x.dias_desde_campanha != null && x.dias_desde_campanha <= 15).length;
+  if(recentes) avisos.push(["var(--amber)", `<b>${nf(recentes)}</b> pessoas (${mkPct(recentes, P.length)}) receberam outra campanha nos últimos 15 dias. Para evitar cansaço, use "Tirar quem recebeu campanha nos últimos 15 dias".`]);
+  const semTel = P.filter(x => !x.telefone).length;
+  if(semTel) avisos.push(["var(--amber)", `<b>${nf(semTel)}</b> sem telefone no cadastro: não vão receber.`]);
+  const foneCount = {};
+  P.forEach(x => { const k = String(x.telefone||"").replace(/\D/g,""); if(k) foneCount[k] = (foneCount[k]||0) + 1; });
+  const dupl = Object.values(foneCount).filter(v => v > 1).reduce((s,v)=>s+v,0);
+  if(dupl) avisos.push(["var(--amber)", `<b>${nf(dupl)}</b> contas dividem telefone com outra conta da lista. No RD elas viram um contato só.`]);
+  avisos.push(["var(--text-dim)", "A lista é conferida de novo na hora de baixar a planilha ou disparar: quem voltar a operar até lá sai automaticamente."]);
+
+  // ---- distribuição ----
+  const faixasDias = [[regras.dias_min, 45], [46, 60], [61, 90], [91, 99999]]
+    .map(([a,b]) => [a, b, P.filter(x => x.dias_parado != null && x.dias_parado >= a && x.dias_parado <= b).length])
+    .filter(f => f[2] > 0);
+  const nunca = P.filter(x => x.dias_parado == null).length;
+  const porFaixa = {};
+  P.forEach(x => { porFaixa[x.faixa||"sem"] = (porFaixa[x.faixa||"sem"]||0) + 1; });
+
+  // ---- histórico de campanhas parecidas ----
+  const obj = el("mkObj").value;
+  const ant = mkState.lista.filter(c => c.objetivo === obj && c.status !== "rascunho").slice(0, 3);
+  let hist = "";
+  for(const c of ant){
+    try{
+      const R = await mkRpcTudo("mkt_resultado", { p_campanha: c.id });
+      const parados = R.filter(r => !r.ja_ativo_no_envio);
+      const reat = parados.filter(r => r.voltou_operar).length;
+      const resp = R.filter(r => r.respondeu).length;
+      hist += `<tr><td style="font-weight:650">${cpEsc(c.nome)}</td><td>${fmtData(c.data_envio)}</td>
+        <td>${nf(R.length)}</td><td>${mkPct(resp, R.length)}</td><td style="color:var(--green)">${mkPct(reat, parados.length)}</td></tr>`;
+    }catch(e){}
+  }
+
+  box.innerHTML = `
+    <div class="kpi-grid" style="margin-top:18px">
+      ${mkKpi("Público", nf(P.length), "pessoas que entram na campanha", "var(--green)")}
+      ${mkKpi("Parados há mais tempo", nf(P.filter(x=>x.dias_parado>60).length), "mais de 60 dias")}
+      ${mkKpi("Nunca operaram", nf(nunca), regras.incluir_nunca_operou ? "incluídos" : "fora da lista")}
+      ${mkKpi("Campanha recente", nf(recentes), "receberam nos últimos 15 dias", recentes ? "var(--amber)" : null)}
+    </div>
+    <div class="sec-title">Avisos antes de criar<span class="rule"></span></div>
+    <div class="panel" style="padding:6px 0;margin-bottom:22px">
+      ${avisos.map(a => `<div style="padding:10px 18px;border-left:3px solid ${a[0]};margin:6px 0;font-size:13px;line-height:1.55">${a[1]}</div>`).join("")}
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:22px">
+      <div class="panel" style="padding:14px 18px"><div class="k-label" style="margin-bottom:8px">Dias parado</div>
+        ${faixasDias.map(f => `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px">
+          <span>${f[1] > 9999 ? "mais de " + (f[0]-1) : f[0] + " a " + f[1]} dias</span><b>${nf(f[2])}</b></div>`).join("") || '<div class="empty">—</div>'}
+        ${nunca ? `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px"><span>nunca operou</span><b>${nf(nunca)}</b></div>` : ""}
+      </div>
+      <div class="panel" style="padding:14px 18px"><div class="k-label" style="margin-bottom:8px">Faixa</div>
+        ${Object.keys(porFaixa).sort((a,b)=>porFaixa[b]-porFaixa[a]).map(f => `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px">
+          <span>${FAIXA_NOME[f]||cpEsc(f)}</span><b>${nf(porFaixa[f])}</b></div>`).join("")}
+      </div>
+    </div>
+    ${hist ? `<div class="sec-title">Campanhas parecidas<span class="rule"></span></div>
+      <div class="panel" style="margin-bottom:22px"><table><thead><tr><th>Campanha</th><th>Envio</th><th>Público</th><th>Responderam</th><th>Reativaram</th></tr></thead>
+      <tbody>${hist}</tbody></table>
+      <div class="pc-hint" style="padding:10px 16px">Reativaram = dos que estavam parados no envio, quantos operaram dentro do prazo de acompanhamento.</div></div>` : ""}
+    <div class="panel" style="padding:16px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <div style="flex:1;font-size:13.5px">Criar a campanha grava a lista de hoje como rascunho. Nada é enviado ainda.</div>
+      <button class="cfg-save" id="mkCriarBtn" onclick="mkCriar()" ${P.length ? "" : "disabled"}>Criar campanha com ${nf(P.length)} pessoas</button>
+    </div>`;
+}
+
+async function mkCriar(){
+  const nome = el("mkNome").value.trim();
+  if(!nome){ toast("Falta o nome", "Dê um nome para a campanha.", true); return; }
+  const jan = parseInt(el("mkJan").value, 10);
+  el("mkCriarBtn").disabled = true;
+  const { data, error } = await sb.rpc("mkt_criar_campanha", {
+    p_nome: nome, p_objetivo: el("mkObj").value, p_canal: el("mkCanal").value,
+    p_regras: mkLerRegras(), p_template: el("mkTpl").value.trim() || null,
+    p_janela: isFinite(jan) && jan > 0 ? jan : 15
+  });
+  if(error){ el("mkCriarBtn").disabled = false; toast("Não consegui criar", mkErroMsg(error), true); return; }
+  sb.rpc("registrar_evento", { p_acao:"criou_campanha", p_resumo:"Criou a campanha " + nome, p_detalhe:{ campanha:data } });
+  toast("Campanha criada", nome);
+  await vMarketing();
+  mkDetalhe(data);
+}
+
+// ---------- detalhe ----------
+async function mkDetalhe(id){
+  el("content").innerHTML = '<div class="loading"><div class="spinner"></div>Carregando a campanha…</div>';
+  const { data: c, error } = await sb.from("mkt_campanhas").select("*").eq("id", id).single();
+  if(error || !c){ el("content").innerHTML = `<div class="empty">${cpEsc(mkErroMsg(error))}</div>`; return; }
+  mkState.atual = c; mkState.filtro = "todos";
+  if(c.status === "rascunho") return mkRascunho(c);
+  let R;
+  try { R = await mkRpcTudo("mkt_resultado", { p_campanha: c.id }); }
+  catch(e){ el("content").innerHTML = `<div class="empty">${cpEsc(mkErroMsg(e))}</div>`; return; }
+  mkState.res = R;
+  mkPintarResultado();
+}
+
+function mkCabecalho(c){
+  const envio = c.data_envio ? new Date(c.data_envio) : null;
+  let prazo = "";
+  if(envio){
+    const dias = Math.floor((Date.now() - envio.getTime()) / 864e5);
+    prazo = dias >= c.janela_dias ? `Acompanhamento de ${c.janela_dias} dias concluído`
+                                 : `Dia ${dias + 1} de ${c.janela_dias} do acompanhamento`;
+  }
+  return `
+    <div style="margin-bottom:14px"><button class="pc-cp" style="margin:0" onclick="vMarketing()">← Campanhas</button></div>
+    <div class="panel" style="padding:16px 20px;margin-bottom:18px;display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+      <div style="flex:1;min-width:220px">
+        <div style="font-size:18px;font-weight:800">${cpEsc(c.nome)} ${mkTag(c.status)}</div>
+        <div style="color:var(--text-dim);font-size:12.5px;margin-top:4px">
+          ${MK_OBJ[c.objetivo]||cpEsc(c.objetivo)} · ${c.canal_envio==="sistema" ? "disparo pelo sistema" : "planilha no RD"}
+          ${envio ? " · enviada em " + fmtDataHora(c.data_envio) : ""}${prazo ? " · " + prazo : ""}
+        </div>
+        ${c.observacoes ? `<div class="pc-hint" style="margin-top:6px">${cpEsc(c.observacoes)}</div>` : ""}
+      </div>
+      <div id="mkAcoes" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+    </div>`;
+}
+
+// ---------- rascunho: conferir, baixar, marcar como enviada ----------
+async function mkRascunho(c){
+  const { data, error } = await sb.from("mkt_publico")
+    .select("sinacor,nome,telefone,barra,faixa,ultima_op,dias_parado").eq("campanha_id", c.id).limit(10000);
+  if(error){ el("content").innerHTML = `<div class="empty">${cpEsc(mkErroMsg(error))}</div>`; return; }
+  mkState.publico = data || [];
+  const slug = (c.nome||"campanha").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g,"").slice(0,14) || "campanha";
+  el("content").innerHTML = mkCabecalho(c) + `
+    <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
+      ${mkKpi("Público gravado", nf(mkState.publico.length), "na criação da campanha", "var(--green)")}
+      ${mkKpi("Criada em", fmtData(c.criado_em), "")}
+      ${mkKpi("Acompanhamento", c.janela_dias + " dias", "depois do envio")}
+    </div>
+    <div class="sec-title">Enviar<span class="rule"></span></div>
+    <div class="panel" style="padding:16px 20px">
+      ${c.canal_envio === "sistema"
+        ? `<div class="note" style="margin-bottom:12px">O disparo direto pelo sistema ainda não está ligado ao RD. Por enquanto, baixe a planilha e importe no RD.</div>` : ""}
+      <div class="pc-form" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:4px 18px;max-width:640px">
+        <div><label>Etiqueta (prefixo)</label><input id="mkTagPref" value="${cpEsc(slug)}"></div>
+        <div><label>Pessoas por etiqueta</label><input id="mkLote" value="30" inputmode="numeric"></div>
+      </div>
+      <div class="pc-hint">Sai no formato de importação do RD: nome como "primeiro nome + Sinacor" e etiquetas ${cpEsc(slug)}01, ${cpEsc(slug)}02…</div>
+      <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
+        <button class="cfg-save" id="mkBaixarBtn" onclick="mkBaixarRD()">Conferir lista e baixar planilha do RD</button>
+        <button class="pc-add" onclick="mkMarcarEnviada()">Marcar como enviada agora</button>
+        <button class="pc-cp" style="margin:0;color:var(--red)" onclick="mkExcluir()">Excluir rascunho</button>
+      </div>
+      <div class="pc-hint" style="margin-top:10px">Marque como enviada no momento do disparo: é a partir daí que o sistema conta respostas e quem voltou a operar.</div>
+    </div>
+    <div class="sec-title" style="margin-top:22px">Público<span class="rule"></span></div>
+    <div class="panel">${mkTabelaPublico(mkState.publico.slice(0,200))}
+      ${mkState.publico.length > 200 ? `<div class="pc-hint" style="padding:10px 16px">Mostrando 200 de ${nf(mkState.publico.length)}.</div>` : ""}</div>`;
+}
+
+function mkTabelaPublico(L){
+  if(!L.length) return '<div class="empty">Ninguém na lista.</div>';
+  return `<table><thead><tr><th>Cliente</th><th>Sinacor</th><th>Barra</th><th>Faixa</th><th>Última operação</th><th>Dias parado</th></tr></thead><tbody>
+    ${L.map(p => `<tr><td style="font-weight:650">${cpEsc(p.nome||"—")}</td><td style="color:var(--text-dim)">${cpEsc(p.sinacor)}</td>
+      <td style="color:var(--text-dim)">${cpEsc(p.barra||"—")}</td><td>${faixaBadge(p.faixa,0)}</td>
+      <td style="color:var(--text-dim)">${p.ultima_op ? fmtData(p.ultima_op) : "nunca"}</td><td>${p.dias_parado ?? "—"}</td></tr>`).join("")}
+  </tbody></table>`;
+}
+
+// Antes de baixar, confere de novo: quem voltou a operar (ou saiu das regras)
+// desde a criação sai da lista gravada. Foi exatamente o erro de 04/10.
+async function mkRevalidar(c){
+  const atual = await mkRpcTudo("mkt_previa_publico", { p_regras: c.regras || {} });
+  const ok = new Set(atual.map(x => String(x.sinacor)));
+  const sair = mkState.publico.filter(p => !ok.has(String(p.sinacor))).map(p => p.sinacor);
+  for(let i = 0; i < sair.length; i += 200){
+    const { error } = await sb.from("mkt_publico").delete().eq("campanha_id", c.id).in("sinacor", sair.slice(i, i+200));
+    if(error) throw error;
+  }
+  const mapa = {}; atual.forEach(x => { mapa[String(x.sinacor)] = x; });
+  mkState.publico = mkState.publico.filter(p => ok.has(String(p.sinacor)))
+    .map(p => Object.assign(p, { dias_parado: mapa[String(p.sinacor)].dias_parado }));
+  return sair.length;
+}
+
+function mkFoneRD(t){
+  let d = String(t||"").replace(/\D/g,"");
+  if(d.length === 10 || d.length === 11) d = "55" + d;
+  return d;
+}
+
+async function mkBaixarRD(){
+  const c = mkState.atual;
+  const lote = Math.max(1, parseInt(el("mkLote").value, 10) || 30);
+  const pref = (el("mkTagPref").value || "campanha").trim();
+  el("mkBaixarBtn").disabled = true;
+  let saiu;
+  try { saiu = await mkRevalidar(c); }
+  catch(e){ el("mkBaixarBtn").disabled = false; toast("Não consegui conferir a lista", mkErroMsg(e), true); return; }
+  const lista = mkState.publico.filter(p => mkFoneRD(p.telefone).length >= 12);
+  if(!lista.length){ el("mkBaixarBtn").disabled = false; toast("Nada para exportar", "Ninguém com telefone válido.", true); return; }
+  const linhas = lista.map((p, i) => {
+    const l = new Array(ER_COLS.length).fill("");
+    l[0] = erNomeRD(p); l[1] = mkFoneRD(p.telefone); l[2] = "55";
+    l[3] = pref + String(Math.floor(i / lote) + 1).padStart(2, "0");
+    return l;
+  });
+  const ws = XLSX.utils.aoa_to_sheet([ER_COLS].concat(linhas));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Planilha1");
+  XLSX.writeFile(wb, pref + "_" + hojeISO() + ".xlsx");
+  sb.rpc("registrar_evento", { p_acao:"exportou_campanha", p_resumo:"Baixou a planilha da campanha " + c.nome,
+    p_detalhe:{ campanha:c.id, linhas:linhas.length, retirados:saiu } });
+  toast("Planilha gerada", nf(linhas.length) + " contatos" + (saiu ? " · " + nf(saiu) + " saíram por terem voltado a operar" : ""));
+  mkRascunho(c);
+}
+
+async function mkMarcarEnviada(){
+  const c = mkState.atual;
+  if(!confirm("Marcar \"" + c.nome + "\" como enviada agora? O acompanhamento começa a contar a partir deste momento.")) return;
+  const agora = new Date().toISOString();
+  const { error } = await sb.from("mkt_campanhas").update({ status:"enviada", data_envio:agora }).eq("id", c.id);
+  if(error){ toast("Não consegui atualizar", mkErroMsg(error), true); return; }
+  await sb.from("mkt_publico").update({ enviado:true, enviado_em:agora }).eq("campanha_id", c.id);
+  sb.rpc("registrar_evento", { p_acao:"enviou_campanha", p_resumo:"Marcou como enviada a campanha " + c.nome, p_detalhe:{ campanha:c.id } });
+  toast("Campanha enviada", c.nome);
+  mkDetalhe(c.id);
+}
+
+async function mkExcluir(){
+  const c = mkState.atual;
+  if(!confirm("Excluir o rascunho \"" + c.nome + "\"? A lista gravada também é apagada.")) return;
+  const { error } = await sb.from("mkt_campanhas").delete().eq("id", c.id).eq("status", "rascunho");
+  if(error){ toast("Não consegui excluir", mkErroMsg(error), true); return; }
+  toast("Rascunho excluído", c.nome);
+  vMarketing();
+}
+
+// ---------- resultado ----------
+const MK_FILTROS = {
+  todos:      ["Todos",               r => true],
+  reativados: ["Voltaram a operar",   r => r.voltou_operar && !r.ja_ativo_no_envio],
+  responderam:["Responderam",         r => r.respondeu],
+  atendidos:  ["Atendidos",           r => r.atendido],
+  sem:        ["Sem resposta",        r => !r.respondeu && !r.atendido && !r.voltou_operar],
+  ativos:     ["Já operavam no envio",r => r.ja_ativo_no_envio]
+};
+function mkFiltrar(f){ mkState.filtro = f; mkPintarResultado(); }
+
+function mkPintarResultado(){
+  const c = mkState.atual, R = mkState.res;
+  const parados = R.filter(r => !r.ja_ativo_no_envio);
+  const reat = parados.filter(r => r.voltou_operar);
+  const resp = R.filter(r => r.respondeu).length;
+  const atend = R.filter(r => r.atendido).length;
+  const bot = R.filter(r => r.recebeu_bot).length;
+  const ativos = R.length - parados.length;
+  const contratos = reat.reduce((s,r) => s + Number(r.contratos_depois||0), 0);
+  const volume = reat.reduce((s,r) => s + Number(r.volume_bov_depois||0), 0);
+
+  // reativação entre quem respondeu x quem não respondeu
+  const pResp = parados.filter(r => r.respondeu), pNao = parados.filter(r => !r.respondeu);
+  const tResp = pResp.length ? reat.filter(r => r.respondeu).length / pResp.length : null;
+  const tNao  = pNao.length  ? reat.filter(r => !r.respondeu).length / pNao.length  : null;
+
+  // por assessor
+  const porAss = {};
+  R.filter(r => r.atendido).forEach(r => {
+    const k = r.assessor || "sem nome";
+    porAss[k] = porAss[k] || { a:0, v:0 };
+    porAss[k].a++; if(r.voltou_operar && !r.ja_ativo_no_envio) porAss[k].v++;
+  });
+
+  const insights = [];
+  if(ativos) insights.push(`<b>${nf(ativos)}</b> pessoas (${mkPct(ativos, R.length)}) já estavam operando quando receberam. Elas ficam fora da taxa de reativação.`);
+  if(bot < R.length * 0.8) insights.push(`O RD registrou disparo para <b>${nf(bot)}</b> de ${nf(R.length)}. Confira no relatório do RD quantas mensagens foram de fato enviadas.`);
+  if(tResp != null && tNao != null && pResp.length >= 5)
+    insights.push(`Entre os parados que responderam, <b>${mkPct(tResp*100, 100)}</b> voltaram a operar; entre os que não responderam, <b>${mkPct(tNao*100, 100)}</b>. ${tResp > tNao*1.5 ? "Conversar faz diferença: vale priorizar o retorno a quem respondeu." : ""}`);
+  const semAtend = R.filter(r => r.respondeu && !r.atendido).length;
+  if(semAtend) insights.push(`<b>${nf(semAtend)}</b> responderam e ainda não foram atendidos por um assessor.`);
+
+  const F = MK_FILTROS[mkState.filtro] ? mkState.filtro : "todos";
+  const lista = R.filter(MK_FILTROS[F][1]);
+
+  el("content").innerHTML = mkCabecalho(c) + `
+    <div class="kpi-grid">
+      ${mkKpi("Público", nf(R.length), nf(ativos) + " já operavam no envio")}
+      ${mkKpi("Disparo registrado no RD", nf(bot), mkPct(bot, R.length) + " do público")}
+      ${mkKpi("Responderam", nf(resp), mkPct(resp, R.length) + " · " + nf(atend) + " atendidos")}
+      ${mkKpi("Voltaram a operar", nf(reat.length), mkPct(reat.length, parados.length) + " dos parados", "var(--green)")}
+    </div>
+    <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
+      ${mkKpi("Contratos BMF dos reativados", nf(contratos), "depois do envio")}
+      ${mkKpi("Volume Bovespa dos reativados", nfR(volume), "depois do envio")}
+      ${mkKpi("Responderam sem atendimento", nf(semAtend), "aguardando assessor", semAtend ? "var(--amber)" : null)}
+    </div>
+    ${insights.length ? `<div class="sec-title">O que os números dizem<span class="rule"></span></div>
+      <div class="panel" style="padding:6px 0;margin-bottom:22px">${insights.map(t =>
+        `<div style="padding:10px 18px;border-left:3px solid var(--green);margin:6px 0;font-size:13px;line-height:1.55">${t}</div>`).join("")}</div>` : ""}
+    ${Object.keys(porAss).length ? `<div class="sec-title">Por assessor<span class="rule"></span></div>
+      <div class="panel" style="margin-bottom:22px"><table><thead><tr><th>Assessor</th><th>Atendeu</th><th>Voltaram a operar</th><th>Taxa</th></tr></thead><tbody>
+      ${Object.keys(porAss).sort((a,b)=>porAss[b].a-porAss[a].a).map(k => `<tr><td style="font-weight:650">${cpEsc(k)}</td>
+        <td>${nf(porAss[k].a)}</td><td>${nf(porAss[k].v)}</td><td>${mkPct(porAss[k].v, porAss[k].a)}</td></tr>`).join("")}
+      </tbody></table></div>` : ""}
+    <div class="sec-title">Pessoas<span class="rule"></span></div>
+    <div class="sol-tabs">${Object.keys(MK_FILTROS).map(k =>
+      `<button class="sol-tab ${F===k?"on":""}" onclick="mkFiltrar('${k}')">${MK_FILTROS[k][0]} · ${nf(R.filter(MK_FILTROS[k][1]).length)}</button>`).join("")}</div>
+    <div class="panel">
+      <div class="toolbar" style="justify-content:flex-end"><button class="pc-cp" style="margin:0" onclick="mkExportar()">Exportar planilha</button></div>
+      ${!lista.length ? '<div class="empty">Ninguém neste filtro.</div>' :
+      `<table><thead><tr><th>Cliente</th><th>Barra</th><th>Dias parado no envio</th><th>Respondeu</th><th>Assessor</th><th>Voltou a operar</th><th>Contratos</th></tr></thead><tbody>
+      ${lista.slice(0,300).map(r => `<tr>
+        <td style="font-weight:650">${cpEsc(r.nome||"—")} <span style="color:var(--text-faint);font-weight:400">${cpEsc(r.sinacor)}</span></td>
+        <td style="color:var(--text-dim)">${cpEsc(r.barra||"—")}</td>
+        <td>${r.dias_parado_no_envio ?? "—"}${r.ja_ativo_no_envio ? ' <span class="tag" style="background:var(--surface-2);color:var(--amber)">já operava</span>' : ""}</td>
+        <td>${r.respondeu ? "sim" : "—"}</td>
+        <td style="color:var(--text-dim)">${cpEsc(r.assessor||"—")}</td>
+        <td>${r.voltou_operar ? `<span style="color:var(--green);font-weight:700">${fmtData(r.primeira_op_depois)}</span>` : "—"}</td>
+        <td>${Number(r.contratos_depois) ? nf(r.contratos_depois) : "—"}</td></tr>`).join("")}
+      </tbody></table>
+      ${lista.length > 300 ? `<div class="pc-hint" style="padding:10px 16px">Mostrando 300 de ${nf(lista.length)}. A planilha traz todos.</div>` : ""}`}
+    </div>`;
+
+  el("mkAcoes").innerHTML = c.status === "enviada"
+    ? `<button class="pc-cp" style="margin:0" onclick="mkEncerrar()">Encerrar campanha</button>` : "";
+}
+
+function mkExportar(){
+  const F = mkState.filtro;
+  const lista = mkState.res.filter(MK_FILTROS[F][1]);
+  if(!lista.length){ toast("Nada para exportar", "", true); return; }
+  baixarCSV("campanha_" + (mkState.atual.nome||"").toLowerCase().replace(/[^a-z0-9]+/g,"_") + "_" + F, [
+    ["Sinacor", r => r.sinacor], ["Nome", r => r.nome], ["Barra", r => r.barra], ["Faixa", r => r.faixa],
+    ["Dias parado no envio", r => r.dias_parado_no_envio], ["Já operava no envio", r => r.ja_ativo_no_envio ? "sim" : "não"],
+    ["Disparo registrado no RD", r => r.recebeu_bot ? "sim" : "não"], ["Respondeu", r => r.respondeu ? "sim" : "não"],
+    ["Atendido", r => r.atendido ? "sim" : "não"], ["Assessor", r => r.assessor],
+    ["Voltou a operar", r => r.voltou_operar ? "sim" : "não"], ["Primeira operação depois", r => r.primeira_op_depois],
+    ["Contratos BMF depois", r => r.contratos_depois], ["Volume Bovespa depois", r => r.volume_bov_depois]
+  ], lista);
+  sb.rpc("registrar_evento", { p_acao:"exportou_resultado_campanha", p_resumo:"Exportou o resultado da campanha " + mkState.atual.nome,
+    p_detalhe:{ campanha:mkState.atual.id, filtro:F, linhas:lista.length } });
+}
+
+async function mkEncerrar(){
+  const c = mkState.atual;
+  if(!confirm("Encerrar \"" + c.nome + "\"? Os números continuam disponíveis.")) return;
+  const { error } = await sb.from("mkt_campanhas").update({ status:"encerrada" }).eq("id", c.id);
+  if(error){ toast("Não consegui encerrar", mkErroMsg(error), true); return; }
+  toast("Campanha encerrada", c.nome);
+  mkDetalhe(c.id);
 }
 
 // ---------- EXPORTAR PARA O RD (clientes com faixa) ----------
