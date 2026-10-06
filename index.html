@@ -1190,6 +1190,7 @@
       <button class="nav-item" data-view="ranking"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 21H2" stroke-linecap="round"/><path class="rk-b" d="M5 21V12" stroke-linecap="round"/><path class="rk-b" d="M12 21V5" stroke-linecap="round"/><path class="rk-b" d="M19 21v-6" stroke-linecap="round"/></svg>Ranking do dia</button>
       <button class="nav-item" data-view="clube"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7.5 3.5h9L21 9.5 12 20.5 3 9.5l4.5-6z" stroke-linejoin="round"/><path d="M3 9.5h18" stroke-width="1.2"/><path d="M9.3 9.5 12 20.5l2.7-11" stroke-width="1.1" opacity=".7"/><path d="m7.5 3.5 1.8 6M16.5 3.5l-1.8 6" stroke-width="1.1" opacity=".7"/><path class="cl-faisca" d="M12 3.5v6" stroke-width="1.1" opacity=".5"/></svg><span class="cl-txt">Clube Trader</span></button>
       <button class="nav-item" data-view="publico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11z" stroke-linejoin="round"/><circle cx="12" cy="10" r="2.5"/></svg>Publico</button>
+      <button class="nav-item" data-view="patrimonio"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20h16" stroke-linecap="round"/><path d="M6 20v-6M10 20V9M14 20v-8M18 20V5" stroke-linecap="round"/><circle cx="18" cy="5" r="1.4" fill="currentColor"/></svg>Patrimônio</button>
       <button class="nav-item" data-view="multiconta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="8" width="12" height="9" rx="2"/><path d="M8 8V6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2" stroke-linecap="round"/></svg>Mesmo CPF</button>
       <button class="nav-item" data-view="plataformas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8M12 18v3" stroke-linecap="round"/></svg>Plataformas</button>
       <button class="nav-item" data-view="fila"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h10M4 12h10M4 18h7" stroke-linecap="round"/><path d="M17 15l2.2 2.2L23 13" stroke-linecap="round" stroke-linejoin="round"/></svg>Fila de ação</button>
@@ -1588,7 +1589,8 @@ const TITLES={
   diagnostico:["GESTÃO","Diagnóstico"], ia:["GESTÃO","CEO de IA"],
   integracoes:["SISTEMA","Integrações"],
   parceiros:["ATENDIMENTO","Parceiros · barras e links de abertura"],
-  marketing:["MARKETING","Campanhas · do público ao resultado"]
+  marketing:["MARKETING","Campanhas · do público ao resultado"],
+  patrimonio:["CARTEIRA","Patrimônio · onde está o dinheiro da carteira"]
 };
 const RESERVADAS={
   fluxos:{icon:"fluxos",desc:"As réguas de atendimento automatizadas — boas-vindas, ativação, manutenção, reengajamento e aniversário. Toda automação roda primeiro em modo sombra (simula sem enviar) antes de ir ao ar, em lotes controlados."},
@@ -1597,7 +1599,7 @@ const RESERVADAS={
   ia:{icon:"ia",desc:"O diagnóstico estratégico da operação em linguagem natural, e o copiloto de IA por assessor — cada um enxergando apenas a própria carteira."},
   integracoes:{icon:"integracoes",desc:"As conexões do sistema — Volume Operado (operação), RD Conversas (atendimento), Gmail/Genial (entrada de clientes) e IA. Ligadas e a ligar."}
 };
-const VIEWS={marketing:vMarketing,exportrd:vExportRD,sdr:vSDR,radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,multiconta:vMulticonta,publico:vPublico,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes,auditoria:vAuditoria,diagnostico:vDiagnostico,legenda:vLegenda,leads:vLeads,importacoes:vImportacoes,saidas:vSaidas,plataformas:vPlataformas,custos:vCustos,conferencia:vConferencia,ranking:vRanking,assessores:vAssessores,vencimentos:vVencimentos,zeragem:vZeragem,automacao:vAutomacao,parceiros:vParceiros};
+const VIEWS={patrimonio:vPatrimonio,marketing:vMarketing,exportrd:vExportRD,sdr:vSDR,radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,multiconta:vMulticonta,publico:vPublico,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes,auditoria:vAuditoria,diagnostico:vDiagnostico,legenda:vLegenda,leads:vLeads,importacoes:vImportacoes,saidas:vSaidas,plataformas:vPlataformas,custos:vCustos,conferencia:vConferencia,ranking:vRanking,assessores:vAssessores,vencimentos:vVencimentos,zeragem:vZeragem,automacao:vAutomacao,parceiros:vParceiros};
 document.querySelectorAll(".nav-item").forEach(b=>b.addEventListener("click",()=>{
   document.querySelectorAll(".nav-item").forEach(x=>x.classList.remove("active"));
   b.classList.add("active"); fecharMenu(); render(b.dataset.view);
@@ -9842,6 +9844,280 @@ async function mkEncerrar(){
   if(error){ toast("Não consegui encerrar", mkErroMsg(error), true); return; }
   toast("Campanha encerrada", c.nome);
   mkDetalhe(c.id);
+}
+
+// =====================================================================
+// PATRIMÔNIO · onde está o dinheiro da carteira
+// Mesmo desenho da aba Público (mapa, recortes, lista), mas a base é
+// todo cliente ATIVO com saldo no relatório de patrimônio, não só quem
+// teve faixa. O ESTADO vem do DDD do telefone (ddd_uf no banco), porque o
+// estado do cadastro só existe para parte da base.
+// Dados de fn_patrimonio_clientes: security definer, só gestão. A aba
+// também não está em ABAS_ASSESSOR. Nome e barra vêm do banco: cpEsc.
+// =====================================================================
+const PT_FAIXAS = [
+  ["todas","Todos", 0, Infinity],
+  ["ate50","Até R$ 50 mil", 0, 50000],
+  ["50a250","R$ 50 a 250 mil", 50000, 250000],
+  ["250a1m","R$ 250 mil a 1 mi", 250000, 1e6],
+  ["1m","Acima de R$ 1 mi", 1e6, Infinity]
+];
+const PT_MEDIDAS = {
+  total:    ["Patrimônio total", l => l.reduce((a,c)=>a+(Number(c.patrimonio)||0),0), true],
+  clientes: ["Clientes",         l => l.length, false],
+  mediana:  ["Mediana",          l => pbMediana(l.map(c=>Number(c.patrimonio)||0)), true],
+  mi:       ["Acima de R$ 1 mi", l => l.filter(c=>Number(c.patrimonio)>=1e6).length, false]
+};
+let ptTodos = [], ptFaixa = "todas", ptCorte = null, ptMedida = "total";
+
+function ptMoeda(v){
+  v = Number(v)||0;
+  if(v >= 1e9) return "R$ " + (v/1e9).toLocaleString("pt-BR",{maximumFractionDigits:1}) + " bi";
+  if(v >= 1e6) return "R$ " + (v/1e6).toLocaleString("pt-BR",{maximumFractionDigits:1}) + " mi";
+  if(v >= 1e3) return "R$ " + Math.round(v/1e3).toLocaleString("pt-BR") + " mil";
+  return "R$ " + Math.round(v).toLocaleString("pt-BR");
+}
+const ptSoma = l => l.reduce((a,c)=>a+(Number(c.patrimonio)||0),0);
+function ptFmtMedida(v){ return PT_MEDIDAS[ptMedida][2] ? ptMoeda(v) : nf(v); }
+
+async function vPatrimonio(){
+  el("content").innerHTML = '<div class="loading"><div class="spinner"></div>Carregando o patrimônio…</div>';
+  try { ptTodos = await mkRpcTudo("fn_patrimonio_clientes", {}); }
+  catch(e){ el("content").innerHTML = `<div class="empty">${cpEsc(/gestão/i.test(e.message||"") ? "Esta área é restrita à gestão." : e.message)}</div>`; return; }
+  ptFaixa = "todas"; ptCorte = null;
+  if(!ptTodos.length){ el("content").innerHTML = '<div class="empty">Nenhum cliente ativo com patrimônio informado.</div>'; return; }
+  ptPintar();
+}
+
+function ptBase(){
+  const f = PT_FAIXAS.find(x => x[0] === ptFaixa) || PT_FAIXAS[0];
+  return ptTodos.filter(c => { const p = Number(c.patrimonio)||0; return p >= f[2] && p < f[3]; });
+}
+function ptVerFaixa(f){ ptFaixa = f; ptCorte = null; ptPintar(); }
+function ptVerMedida(m){ ptMedida = m; ptPintar(); }
+function ptVer(tipo, valor, rotulo){
+  if(ptCorte && ptCorte.tipo === tipo && ptCorte.valor === valor) ptCorte = null;
+  else ptCorte = { tipo, valor, rotulo };
+  ptPintar();
+  const alvo = el("ptLista"); if(alvo && ptCorte) alvo.scrollIntoView({ behavior:"smooth", block:"nearest" });
+}
+function ptBuscarDDD(v){
+  const d = String(v||"").replace(/\D/g,"").slice(0,2);
+  if(d.length === 2){ ptCorte = { tipo:"ddd", valor:d, rotulo:"DDD " + d }; ptPintar(); const a = el("ptLista"); if(a) a.scrollIntoView({ behavior:"smooth", block:"nearest" }); }
+}
+function ptFiltrados(){
+  const base = ptBase();
+  if(!ptCorte) return base;
+  const { tipo, valor } = ptCorte;
+  if(tipo === "uf")     return base.filter(c => c.uf === valor);
+  if(tipo === "regiao"){ const ufs = Object.keys(PB_UF).filter(u => PB_UF[u].r === valor); return base.filter(c => ufs.indexOf(c.uf) >= 0); }
+  if(tipo === "ddd")    return base.filter(c => c.ddd === valor);
+  if(tipo === "barra")  return base.filter(c => (c.barra||"sem barra") === valor);
+  if(tipo === "faixa")  return base.filter(c => (c.faixa||"sem") === valor);
+  return base;
+}
+function ptPorUF(){
+  const m = {};
+  ptBase().forEach(c => { if(c.uf) (m[c.uf] = m[c.uf] || []).push(c); });
+  return m;
+}
+function ptSobre(uf, ev){
+  document.querySelectorAll(".pt-mapa .pb-uf,.pt-mapa .pb-rank-l").forEach(x => x.classList.toggle("on", x.dataset.uf === uf));
+  const tip = el("ptTip"), cx = el("ptMapaCx");
+  if(!tip || !cx) return;
+  const d = ptPorUF()[uf];
+  if(!d){ tip.classList.remove("on"); return; }
+  tip.innerHTML = `<b>${uf}</b>
+    <s>${nf(d.length)} cliente(s)</s>
+    <s>${ptMoeda(ptSoma(d))} no total</s>
+    <s>mediana ${ptMoeda(pbMediana(d.map(c=>Number(c.patrimonio)||0)))}</s>`;
+  const r = cx.getBoundingClientRect();
+  tip.style.left = Math.min(r.width-175, Math.max(4, ev.clientX - r.left + 16)) + "px";
+  tip.style.top  = Math.max(4, ev.clientY - r.top - 10) + "px";
+  tip.classList.add("on");
+}
+function ptFora(){
+  document.querySelectorAll(".pt-mapa .pb-uf,.pt-mapa .pb-rank-l").forEach(x => x.classList.remove("on"));
+  const tip = el("ptTip"); if(tip) tip.classList.remove("on");
+}
+
+function ptMapaHTML(){
+  const porUF = ptPorUF();
+  const calc = PT_MEDIDAS[ptMedida][1];
+  const val = {};
+  Object.keys(PB_UF).forEach(u => { val[u] = porUF[u] ? calc(porUF[u]) : 0; });
+  const topo = Math.max(1, ...Object.values(val));
+  const ev = u => `onclick="ptVer('uf','${u}','${u}')" onmousemove="ptSobre('${u}',event)" onmouseleave="ptFora()"`;
+  const formas = Object.entries(PB_UF).map(([u,s]) => {
+    const tem = !!porUF[u], cor = PB_REG[s.r][1];
+    const forca = tem ? 0.30 + (val[u]/topo)*0.70 : 0;
+    const sel = ptCorte && ptCorte.tipo === "uf" && ptCorte.valor === u;
+    return `<path class="pb-uf ${tem?"":"vazio"} ${sel?"sel":""}" data-uf="${u}" d="${s.d}"
+      fill="${tem ? pbHexA(cor, forca) : "rgba(255,255,255,.055)"}"
+      stroke="rgba(8,12,18,.85)" stroke-width="1.1" stroke-linejoin="round" ${tem?ev(u):""}><title>${u}</title></path>`;
+  }).join("");
+  const rotulos = Object.entries(PB_UF).map(([u,s]) => {
+    const tem = !!porUF[u];
+    const txt = tem ? ptFmtMedida(val[u]) : "–";
+    const e = tem ? ev(u) : "";
+    if(s.fx){
+      return `<g class="pb-rot ${tem?"":"vazio"}" data-uf="${u}" ${e}>
+        <line x1="${s.x}" y1="${s.y}" x2="${s.fx-6}" y2="${s.fy}" stroke="rgba(255,255,255,.28)" stroke-width="1"/>
+        <circle cx="${s.x}" cy="${s.y}" r="2.4" fill="rgba(255,255,255,.55)"/>
+        <text x="${s.fx}" y="${s.fy-1}" style="font-size:15px;font-weight:800;fill:#fff">${u}</text>
+        <text x="${s.fx+30}" y="${s.fy-1}" style="font-size:13px;font-weight:700;fill:rgba(255,255,255,.72)">${txt}</text>
+      </g>`;
+    }
+    return `<g class="pb-rot ${tem?"":"vazio"}" data-uf="${u}" ${e}>
+      <text x="${s.x}" y="${s.y-3}" text-anchor="middle" paint-order="stroke" stroke="rgba(4,9,14,.6)" stroke-width="3"
+        stroke-linejoin="round" style="font-size:16px;font-weight:800;fill:#fff">${u}</text>
+      <text x="${s.x}" y="${s.y+15}" text-anchor="middle" paint-order="stroke" stroke="rgba(4,9,14,.6)" stroke-width="3"
+        stroke-linejoin="round" style="font-size:12.5px;font-weight:700;fill:rgba(255,255,255,.9)">${txt}</text>
+    </g>`;
+  }).join("");
+  const rank = Object.keys(porUF).sort((a,b) => val[b]-val[a]).map(u => {
+    const s = PB_UF[u]; if(!s) return "";
+    const sel = ptCorte && ptCorte.tipo === "uf" && ptCorte.valor === u;
+    return `<div class="pb-rank-l ${sel?"sel":""}" data-uf="${u}" ${ev(u)}>
+      <span class="r-uf">${u}</span>
+      <span class="r-tri"><i style="width:${Math.round(val[u]/topo*100)}%;background:${PB_REG[s.r][1]}"></i></span>
+      <span class="r-n">${ptFmtMedida(val[u])}</span></div>`;
+  }).join("");
+  const totalBase = ptSoma(ptBase());
+  const regs = Object.keys(PB_REG).map(r => {
+    const ufs = Object.keys(PB_UF).filter(u => PB_UF[u].r === r);
+    const lista = ufs.flatMap(u => porUF[u] || []);
+    const sel = ptCorte && ptCorte.tipo === "regiao" && ptCorte.valor === r;
+    const soma = ptSoma(lista);
+    return `<button class="${sel?"sel":""}" onclick="ptVer('regiao','${r}','${PB_REG[r][0]}')">
+      <span class="rg-n"><i style="background:${PB_REG[r][1]}"></i>${PB_REG[r][0]}</span>
+      <span class="rg-v">${ptMoeda(soma)}</span>
+      <span class="rg-p" style="display:block">${nf(lista.length)} clientes · ${totalBase ? (soma/totalBase*100).toFixed(1) : "0,0"}%</span>
+    </button>`;
+  }).join("");
+  return `<div class="pb-mapa-cx pt-mapa" id="ptMapaCx">
+    <div class="pb-medidas">${Object.entries(PT_MEDIDAS).map(([k,v]) =>
+      `<button class="${ptMedida===k?"on":""}" onclick="ptVerMedida('${k}')">${v[0]}</button>`).join("")}
+      <span style="margin-left:auto;font-size:10.5px;color:var(--text-faint);align-self:center">clique num estado</span>
+    </div>
+    <div class="pb-mapa-cols">
+      <svg viewBox="60 180 860 800" class="pb-svg">${formas}${rotulos}</svg>
+      <div class="pb-rank">${rank}</div>
+    </div>
+    <div class="pb-reg">${regs}</div>
+    <div class="pb-tip" id="ptTip"></div>
+  </div>`;
+}
+
+// barras por patrimônio: [chave, soma, qtd]
+function ptAgrupar(lista, chave){
+  const m = {};
+  lista.forEach(c => { const k = chave(c); if(k == null) return; m[k] = m[k] || [k,0,0]; m[k][1] += Number(c.patrimonio)||0; m[k][2]++; });
+  return Object.values(m).sort((a,b) => b[1]-a[1]);
+}
+function ptBarras(grupos, tipo, rotulo, limite){
+  if(!grupos.length) return '<div class="pb-sem">Sem dado.</div>';
+  const total = grupos.reduce((a,g)=>a+g[1],0) || 1, topo = grupos[0][1] || 1;
+  return grupos.slice(0, limite || grupos.length).map(([k,soma,n]) => {
+    const sel = ptCorte && ptCorte.tipo === tipo && ptCorte.valor === k;
+    const nome = rotulo ? rotulo(k) : k;
+    const kk = String(k).replace(/'/g,""), nn = String(nome).replace(/'/g,"");
+    return `<div class="pb-barra ${sel?"sel":""}" onclick="ptVer('${tipo}','${cpEsc(kk)}','${cpEsc(nn)}')" title="${nf(n)} cliente(s)">
+      <span class="b-rot">${cpEsc(nome)}</span>
+      <span class="b-tri"><i style="width:${Math.round(soma/topo*100)}%"></i></span>
+      <span class="b-pct">${(soma/total*100).toFixed(1)}%</span>
+      <span class="b-qtd">${ptMoeda(soma)}</span>
+    </div>`;
+  }).join("");
+}
+
+function ptPintar(){
+  const base = ptBase();
+  const total = ptSoma(base);
+  const semDDD = base.filter(c => !c.uf).length;
+  const comp = ptTodos.reduce((m,c) => (c.competencia && c.competencia > m) ? c.competencia : m, "");
+  const chips = PT_FAIXAS.map(([k,rot,a,b]) => {
+    const n = ptTodos.filter(c => { const p = Number(c.patrimonio)||0; return p >= a && p < b; }).length;
+    return `<button class="sol-tab ${ptFaixa===k?"on":""}" onclick="ptVerFaixa('${k}')">${rot} · ${nf(n)}</button>`;
+  }).join("");
+
+  el("content").innerHTML = `
+    <div class="note" style="margin:0 0 16px">
+      Clientes <b>ativos</b> com saldo no relatório de patrimônio, pelo <b>mês mais recente</b> de cada um
+      ${comp ? "(o mais novo é " + fmtData(comp).slice(3) + ")" : ""}. O <b>estado vem do DDD do telefone</b>
+      do cadastro, não do endereço.
+    </div>
+    <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
+      <div class="kpi"><div class="k-label">Clientes com patrimônio</div><div class="k-val">${nf(base.length)}</div>
+        <div class="k-sub">${(PT_FAIXAS.find(f=>f[0]===ptFaixa)||PT_FAIXAS[0])[1]}</div></div>
+      <div class="kpi"><div class="k-label">Patrimônio total</div><div class="k-val" style="color:var(--green)">${ptMoeda(total)}</div>
+        <div class="k-sub">soma do recorte</div></div>
+      <div class="kpi"><div class="k-label">Mediana por cliente</div><div class="k-val">${ptMoeda(pbMediana(base.map(c=>Number(c.patrimonio)||0)))}</div>
+        <div class="k-sub">metade tem mais, metade menos</div></div>
+      <div class="kpi"><div class="k-label">Sem DDD válido</div><div class="k-val">${nf(semDDD)}</div>
+        <div class="k-sub">fora do mapa, mas na lista</div></div>
+    </div>
+    <div class="sol-tabs">${chips}</div>
+
+    <div class="pb-sec">Onde está o patrimônio</div>
+    ${ptMapaHTML()}
+
+    <div class="pb-sec">Recortes</div>
+    <div class="pb-grid">
+      <div class="pb-bloco"><h4 style="display:flex;align-items:center;gap:10px">Por DDD
+          <input type="text" inputmode="numeric" maxlength="2" placeholder="DDD" oninput="ptBuscarDDD(this.value)"
+            style="margin-left:auto;width:64px;background:var(--bg);border:1px solid var(--border-strong);border-radius:8px;padding:5px 8px;color:var(--text);font-size:12px">
+        </h4>${ptBarras(ptAgrupar(base, c => c.ddd || null), "ddd", k => "DDD " + k, 15)}</div>
+      <div class="pb-bloco"><h4>Por barra</h4>${ptBarras(ptAgrupar(base, c => c.barra || "sem barra"), "barra", null, 15)}</div>
+      <div class="pb-bloco"><h4>Faixa do Clube</h4>${ptBarras(ptAgrupar(base, c => c.faixa || "sem"), "faixa", k => FAIXA_NOME[k] || k)}</div>
+    </div>
+
+    <div class="pb-lista" id="ptLista">${ptListaHTML()}</div>`;
+}
+
+function ptListaHTML(){
+  const lista = ptFiltrados().slice().sort((a,b) => (Number(b.patrimonio)||0) - (Number(a.patrimonio)||0));
+  const titulo = ptCorte
+    ? `${nf(lista.length)} cliente(s) · <b>${cpEsc(ptCorte.rotulo)}</b> <span>· ${ptMoeda(ptSoma(lista))}</span>`
+    : `Maiores patrimônios <span>· clique num estado, DDD, barra ou faixa para filtrar</span>`;
+  const mostra = ptCorte ? lista.slice(0,300) : lista.slice(0,50);
+  return `
+    <div class="pb-lista-cab">
+      <div class="pb-lista-tit">${titulo}</div>
+      <div style="display:flex;gap:8px">
+        <button class="sol-tab" onclick="ptExportar()">Exportar planilha</button>
+        ${ptCorte ? `<button class="sol-tab" onclick="ptCorte=null;ptPintar()">Fechar</button>` : ""}
+      </div>
+    </div>
+    <div class="panel"><table><thead><tr>
+      <th>Cliente</th><th>Sinacor</th><th>Barra</th><th>DDD</th><th>Estado</th><th>Faixa</th><th>Patrimônio</th><th>Última op.</th>
+    </tr></thead><tbody>${mostra.map(c => `<tr onclick="abrirFicha('${cpEsc(c.id)}')" style="cursor:pointer">
+      <td><div class="cell-name"><span class="mini-av">${ini(c.nome||"?")}</span>${cpEsc(c.nome||"—")}</div></td>
+      <td class="num">${cpEsc(c.sinacor||"—")}</td>
+      <td class="num">${cpEsc(c.barra||"—")}</td>
+      <td class="num">${cpEsc(c.ddd||"—")}</td>
+      <td class="num">${cpEsc(c.uf||"—")}</td>
+      <td>${faixaBadge(c.faixa||"sem", 0)}</td>
+      <td class="num" style="font-weight:700">${nfR(c.patrimonio)}</td>
+      <td class="num">${c.data_ultima_operacao ? fmtData(c.data_ultima_operacao) : "—"}</td>
+    </tr>`).join("")}</tbody></table>
+    ${lista.length > mostra.length ? `<div class="pc-hint" style="padding:10px 16px">Mostrando ${nf(mostra.length)} de ${nf(lista.length)}. A planilha traz todos.</div>` : ""}
+    </div>`;
+}
+
+function ptExportar(){
+  const lista = ptFiltrados().slice().sort((a,b) => (Number(b.patrimonio)||0) - (Number(a.patrimonio)||0));
+  if(!lista.length){ toast("Nada para exportar", "", true); return; }
+  const nome = "patrimonio" + (ptCorte ? "_" + String(ptCorte.rotulo).toLowerCase().replace(/[^a-z0-9]+/g,"_") : "") +
+               (ptFaixa !== "todas" ? "_" + ptFaixa : "");
+  baixarCSV(nome, [
+    ["Sinacor", c => c.sinacor], ["Nome", c => c.nome], ["Barra", c => c.barra],
+    ["Telefone", c => c.telefone], ["DDD", c => c.ddd], ["Estado (pelo DDD)", c => c.uf],
+    ["Faixa", c => FAIXA_NOME[c.faixa] || c.faixa], ["Patrimônio", c => c.patrimonio],
+    ["Competência", c => c.competencia], ["Última operação", c => c.data_ultima_operacao]
+  ], lista);
+  sb.rpc("registrar_evento", { p_acao:"exportou_patrimonio", p_resumo:"Exportou " + lista.length + " clientes da aba Patrimônio",
+    p_detalhe:{ recorte: ptCorte ? ptCorte.rotulo : "todos", faixa: ptFaixa, linhas: lista.length } });
 }
 
 // ---------- EXPORTAR PARA O RD (clientes com faixa) ----------
