@@ -9162,7 +9162,7 @@ async function pcFicha(id){
 async function pcCarregarClientes(nome){
   const { data, error } = await sb.from("clientes")
     .select("id,nome,sinacor,data_cadastro,situacao_conta")
-    .eq("barra", nome).order("data_cadastro", { ascending:false }).limit(25);
+    .eq("barra", nome).eq("status", "ativo").order("data_cadastro", { ascending:false }).limit(25);
   if(error){ el("pcClientes").innerHTML = '<div class="empty">Não consegui carregar os clientes.</div>'; return; }
   if(!data || !data.length){ el("pcClientes").innerHTML = '<div class="empty">Nenhum cliente nesta barra ainda.</div>'; return; }
   el("pcClientes").innerHTML = `<div class="panel"><table><thead><tr>
