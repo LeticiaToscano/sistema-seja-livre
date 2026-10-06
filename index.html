@@ -9054,7 +9054,7 @@ function pcPintar(){
     return;
   }
   el("pcLista").innerHTML = `<table><thead><tr>
-      <th>Barra</th><th>Id Genial</th><th>Parceiro</th><th>Clientes</th><th>Link de abertura</th>
+      <th>Barra</th><th>Id Genial</th><th>Parceiro</th><th>Clientes</th><th>Link de abertura</th><th></th>
     </tr></thead><tbody>` +
     linhas.map((b,i) => `<tr class="${b.ativa===false?'pc-off':''}" onclick="pcFicha('${b.id}')">
       <td style="font-weight:700">${b.nome}${b.ativa===false?' <span class="tag" style="background:var(--surface-2);color:var(--text-faint)">inativa</span>':''}</td>
@@ -9067,6 +9067,7 @@ function pcPintar(){
              <button class="pc-cp" onclick="pcCopiar(this,'${b.link_abertura}')">copiar</button>`
           : '<span style="color:var(--text-faint)">sem link</span>'
       }</td>
+      <td onclick="event.stopPropagation()"><button class="pc-cp" style="margin:0" onclick="pcFormEditar('${b.id}')">editar</button></td>
     </tr>`).join("") + "</tbody></table>" +
     (encurtar
       ? `<div style="text-align:center;padding:12px">
@@ -9108,9 +9109,11 @@ async function pcFicha(id){
   el("drStatus").innerHTML = b.ativa === false
     ? '<span class="tag" style="background:var(--surface-2);color:var(--text-faint)">inativa</span>'
     : '<span class="tag" style="background:var(--green-deep);color:var(--green)">ativa</span>';
-  el("drActions").innerHTML = b.link_abertura
-    ? `<button class="pc-add" onclick="pcCopiar(this,'${b.link_abertura}')">Copiar link de abertura</button>`
-    : "";
+  el("drActions").innerHTML =
+    `<button class="pc-cp" style="margin:0 8px 0 0" onclick="pcFormEditar('${b.id}')">Editar barra</button>` +
+    (b.link_abertura
+      ? `<button class="pc-add" onclick="pcCopiar(this,'${b.link_abertura}')">Copiar link de abertura</button>`
+      : "");
   el("drBody").innerHTML = `
     <div class="dr-stats">
       <div class="dr-stat"><div class="l">Clientes na barra</div><div class="v">${nf(b.clientes)}</div></div>
@@ -9174,6 +9177,95 @@ async function pcSalvarObs(b){
   if(error){ toast("Não consegui salvar", error.message, true); return; }
   b.observacoes = txt;
   toast("Observação salva", b.nome);
+}
+
+// ---------- editar barra ----------
+// Grava pela editar_barra (security definer, só gestão), que registra quem
+// alterou e quando. Só vai para o banco o campo que mudou de fato.
+// O NOME não é editável: ele vem da Genial e é o que liga a barra aos
+// clientes e às operações — renomear aqui desligaria todo mundo dela.
+function pcFormEditar(id){
+  const b = pcState.lista.find(x => String(x.id) === String(id));
+  if(!b) return;
+  const v = x => cpEsc(x == null ? "" : x);
+  const temPct = Object.prototype.hasOwnProperty.call(b, "pct_parceiro");
+  el("overlay").classList.add("open"); el("drawer").classList.add("open");
+  el("drName").textContent = "Editar · " + b.nome;
+  el("drSub").textContent = "O nome da barra vem da Genial e não pode ser alterado aqui";
+  el("drStatus").innerHTML = ""; el("drActions").innerHTML = "";
+  el("drBody").innerHTML = `
+    <div class="pc-form">
+      <label>Parceiro</label>
+      <input id="peParc" value="${v(b.parceiro_pagamento)}" autocomplete="off">
+      <div class="pc-hint">É também quem o gerencial considera para o pagamento desta barra.</div>
+      ${temPct ? `
+      <label>Percentual do parceiro</label>
+      <input id="pePct" value="${v(b.pct_parceiro)}" inputmode="decimal" autocomplete="off">
+      <div class="pc-hint">Usado no gerencial. Deixe vazio se não houver.</div>` : ""}
+
+      <label>Id da Genial</label>
+      <input id="peId" value="${v(b.id_genial)}" inputmode="numeric" autocomplete="off">
+
+      <label>Link de abertura</label>
+      <input id="peLink" value="${v(b.link_abertura)}" autocomplete="off">
+
+      <label>Instrução de troca de assessoria</label>
+      <textarea id="peInstr">${v(b.instrucao_troca)}</textarea>
+
+      <label>Observações</label>
+      <textarea id="peObs">${v(b.observacoes)}</textarea>
+
+      <label style="display:flex;align-items:center;gap:8px;margin-top:14px">
+        <input type="checkbox" id="peAtiva" ${b.ativa === false ? "" : "checked"} style="width:auto">
+        Barra ativa
+      </label>
+
+      <div style="margin-top:18px;display:flex;gap:10px">
+        <button class="pc-add" id="peSalvar">Salvar alterações</button>
+        <button class="pc-cp" style="margin:0" onclick="pcFicha('${b.id}')">Cancelar</button>
+      </div>
+    </div>`;
+  el("peSalvar").addEventListener("click", () => pcSalvarEdicao(b, temPct));
+}
+
+async function pcSalvarEdicao(b, temPct){
+  const txt = id => { const x = el(id).value.trim(); return x === "" ? null : x; };
+  const idg = txt("peId");
+  const novo = {
+    parceiro_pagamento: txt("peParc"),
+    id_genial:          idg ? (idg.replace(/\D/g, "") || null) : null,
+    link_abertura:      txt("peLink"),
+    instrucao_troca:    txt("peInstr"),
+    observacoes:        txt("peObs"),
+    ativa:              el("peAtiva").checked
+  };
+  if(temPct){
+    const p = txt("pePct");
+    const num = p == null ? null : Number(p.replace(",", "."));
+    if(p != null && !isFinite(num)){ toast("Percentual inválido", "Use só números, ex.: 30 ou 0,3", true); return; }
+    novo.pct_parceiro = num;
+  }
+  // só vai para o banco o que mudou
+  const igual = (a, c) => String(a == null ? "" : a) === String(c == null ? "" : c);
+  const mudou = {};
+  Object.keys(novo).forEach(k => {
+    const antes = k === "ativa" ? (b.ativa !== false) : b[k];
+    if(!igual(antes, novo[k])) mudou[k] = novo[k];
+  });
+  if(!Object.keys(mudou).length){ toast("Nada mudou", b.nome); return; }
+
+  el("peSalvar").disabled = true;
+  const { error } = await sb.rpc("editar_barra", { p_id: b.id, p_dados: mudou });
+  el("peSalvar").disabled = false;
+  if(error){
+    toast("Não consegui salvar", /gestão/i.test(error.message || "")
+      ? "Só a gestão pode editar barras." : error.message, true);
+    return;
+  }
+  Object.assign(b, mudou);
+  toast("Barra atualizada", b.nome);
+  pcResumo(); pcPintar();
+  pcFicha(b.id);
 }
 
 // ---------- nova barra ----------
