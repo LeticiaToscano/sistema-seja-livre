@@ -1229,7 +1229,7 @@
       <button class="nav-item" data-view="integracoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 7V4M15 7V4M8 7h8v4a4 4 0 0 1-8 0z" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15v5" stroke-linecap="round"/></svg>Integrações</button>
     </nav>
     <div class="foot">
-      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v08/10 conferência cobrança Genial</div></div></div>
+      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v08/10b conferência cobrança Genial</div></div></div>
       <button class="btn-vercomo hidden" id="verComoBtn" type="button">Ver como assessor</button>
       <button class="btn-logout" id="logoutBtn">Sair</button>
     </div>
@@ -6626,7 +6626,7 @@ function autoPintar(){
     ["acompanhamento","Em acompanhamento", J?J.length:null, ""],
     ["ativos","Carteira ativa", autoState.periodo?ativos.length:null, ""],
     ["encerrados","Encerrados", autoState.periodo?encerrados.length:null, ""],
-    ...(ehGestor()?[["cobranca","Conferir cobrança Genial", cobState?cobState.divs.length:null, cobState&&cobState.divs.length?"#ff9aa6":""]]:[])
+    ...(ehGestor()?[["cobranca","Conferir cobrança Genial", cobState?cobState.graves.length:null, cobState&&cobState.graves.length?"#ff9aa6":""]]:[])
   ].map(([k,t,c,cor])=>`<button class="vp-btn ${aba===k?"on":""}" onclick="autoAba('${k}')">${t} <b style="margin-left:5px${cor?";color:"+cor:""}">${n(c)}</b></button>`).join("");
 
   if(aba==="ativos" || aba==="encerrados"){
@@ -6827,8 +6827,12 @@ const COB_TIPOS = {
   naoCob:   {t:"Liberado no sistema e não cobrado", grave:false},
   troca:    {t:"Dia da troca de plano cobrado nos dois planos", grave:false},
   corretora:{t:"Cobrado em outra corretora", grave:false},
-  semPlano: {t:"Sistema sem plano registrado", grave:false}
+  semPlano: {t:"Sistema sem plano registrado", grave:false, info:true},
+  foraHist: {t:"Começou antes do histórico do sistema", grave:false, info:true}
 };
+// info = não é divergência: o sistema não tem como conferir (fica só na tela)
+const cobDiv = r => r.P.some(p=>!COB_TIPOS[p.k].info);
+const cobGrave = r => r.P.some(p=>COB_TIPOS[p.k].grave);
 let cobState = null;        // resultado da última conferência
 let cobFiltro = "divs";
 
@@ -6900,7 +6904,10 @@ async function cobLer(file){
 }
 
 // ---- a conferência ----
-function cobConferir(G, S, comp){
+// histIni = primeira liberação que o sistema registrou (antes disso o sistema
+// não sabe quem estava ativo, então não acusa erro — 08/10/2026: 93 falsos
+// "cobrado sem liberação" na conferência de setembro eram todos de antes de 20/08)
+function cobConferir(G, S, comp, histIni){
   const grp=(l,k)=>l.reduce((m,x)=>{ const c=k(x); if(c) (m[c]=m[c]||[]).push(x); return m; },{});
   const gC=grp(G,x=>x.cpf), sC=grp(S,x=>cobCpf(x.cpf));
   const res=[];
@@ -6910,7 +6917,17 @@ function cobConferir(G, S, comp){
     const sx=s[s.length-1]||null;
     const P=[], add=(k,txt)=>P.push({k,txt});
     let semData=false;
-    if(!s.length){
+    const curto = x => x.planoTxt.replace(/ - Parceria.*$/i,"");
+    const antes = g.length && histIni && g[0].ini && g[0].ini < histIni;
+    // sistema só tem um período que começa depois que a cobrança da Genial terminou
+    const semEncontro = s.length && g.length && s[0].inicio && g.every(x=>x.fim && x.fim < s[0].inicio);
+    if(semEncontro){
+      if(antes) add("foraHist", `Cobrado ${g.map(curto).join(" + ")} desde ${fmtData(g[0].ini)}, encerrado em ${fmtData(g[g.length-1].fim)}; o sistema só registra a liberação de ${fmtData(s[0].inicio)} em diante.`);
+      else add("semLib", `Cobrado ${g.map(curto).join(" + ")} de ${fmtData(g[0].ini)} a ${fmtData(g[g.length-1].fim)}, mas no sistema a liberação só aparece em ${fmtData(s[0].inicio)}.`);
+      if(sx.plano!=="BASIC" && (!sx.fim || sx.fim>=comp.de)) add("naoCob", `Liberado no sistema em ${fmtData(s[0].inicio)} e esse período não aparece na cobrança.`);
+    } else if(!s.length && antes){
+      add("foraHist", `Cobrado ${g.map(curto).join(" + ")} desde ${fmtData(g[0].ini)}, antes do histórico do sistema (${fmtData(histIni)}). Não dá para conferir.`);
+    } else if(!s.length){
       add("semLib", `Cobrado ${g.map(x=>x.planoTxt.replace(/ - Parceria.*$/i,"")).join(" + ")} em ${comp.rotulo}, mas o sistema não tem essa Automação liberada no mês.`);
     } else if(!g.length){
       if(sx.plano==="BASIC") return;            // Basic não entra nesta cobrança
@@ -6930,7 +6947,7 @@ function cobConferir(G, S, comp){
       if(!sx.plano) add("semPlano","O sistema não tem o plano desse cliente para comparar.");
       else if(gA.plano!==sx.plano) add("plano", `Genial cobra ${nomeP(gA.plano)}; o liberado no sistema é ${nomeP(sx.plano)}.`);
       const s0=s[0];
-      if(!s0.inicio) semData=true;
+      if(!s0.inicio || antes) semData=true;
       else if(g[0].ini!==s0.inicio) add("inicio", `Genial cobra a partir de ${fmtData(g[0].ini)}; a liberação no sistema é de ${fmtData(s0.inicio)}.`);
       const gFim=gA.fim, sFim=(sx.fim && sx.fim<=comp.ate) ? sx.fim : null;
       if(gFim && !sFim) add("status", `Genial encerrou em ${fmtData(gFim)}, mas no sistema a Automação ${sx.fim?"só foi cancelada em "+fmtData(sx.fim):"continua ativa"}.`);
@@ -6948,7 +6965,7 @@ function cobConferir(G, S, comp){
       nome:sx?.nome||null, sinacor:sx?.sinacor||null, barra:sx?.barra||null, cliente_id:sx?.cliente_id||null,
       cobrado:g.reduce((t,x)=>t+x.valor,0)});
   });
-  const ordem=r=>r.P.some(p=>COB_TIPOS[p.k].grave)?0:r.P.length?1:2;
+  const ordem=r=>cobGrave(r)?0:cobDiv(r)?1:r.P.length?2:3;
   res.sort((a,b)=>ordem(a)-ordem(b) || String(a.nome||"~").localeCompare(String(b.nome||"~")));
   return res;
 }
@@ -6960,11 +6977,15 @@ async function cobArquivo(inp){
   el("cobStatus").innerHTML='<div class="loading" style="padding:10px 0"><div class="spinner"></div>Conferindo…</div>';
   try{
     const {linhas, comp}=await cobLer(f);
-    const {data,error}=await sb.rpc("automacao_ativos_periodo",{p_de:comp.de,p_ate:comp.ate});
+    const [mes, tudo]=await Promise.all([
+      sb.rpc("automacao_ativos_periodo",{p_de:comp.de,p_ate:comp.ate}),
+      sb.rpc("automacao_ativos_periodo",{p_de:"2000-01-01",p_ate:comp.ate})]);
+    const error=mes.error||tudo.error;
     if(error) throw new Error("Não consegui ler as Automações do sistema: "+(error.message||error));
-    const R=cobConferir(linhas, data||[], comp);
-    cobState={arquivo:f.name, comp, linhas, R,
-      divs:R.filter(r=>r.P.length), graves:R.filter(r=>r.P.some(p=>COB_TIPOS[p.k].grave)),
+    const histIni=(tudo.data||[]).map(x=>x.inicio).filter(Boolean).sort()[0]||null;
+    const R=cobConferir(linhas, mes.data||[], comp, histIni);
+    cobState={arquivo:f.name, comp, linhas, R, histIni,
+      divs:R.filter(cobDiv), graves:R.filter(cobGrave), fora:R.filter(r=>r.P.some(p=>p.k==="foraHist")),
       total:linhas.reduce((t,x)=>t+x.valor,0)};
     cobFiltro = cobState.divs.length ? "divs" : "todos";
     autoPintar();
@@ -6978,14 +6999,15 @@ function cobPintarResumo(){
   if(!cobState){ el("autoResumo").innerHTML=""; return; }
   const c=cobState, card=(v,k,cor,f)=>`<div class="vr-card" ${f?`onclick="cobFiltrar('${f}')" style="cursor:pointer"`:""}>
     <div class="v" ${cor?`style="color:${cor}"`:""}>${v}</div><div class="k">${k}</div></div>`;
-  const ok=c.R.filter(r=>!r.P.length).length, leves=c.divs.length-c.graves.length;
+  const ok=c.R.filter(cobOk).length, leves=c.divs.length-c.graves.length;
   const semData=c.R.filter(r=>r.semData).length;
   el("autoResumo").innerHTML=`<div class="venc-resumo">
     ${card(brl2(c.total), `cobrado pela Genial · ${nf(c.linhas.length)} linhas`)}
     ${card(nf(c.graves.length), "clientes com erro na cobrança", c.graves.length?"#ff9aa6":"", "graves")}
     ${card(nf(leves), "outras divergências", leves?"var(--amber)":"", "leves")}
     ${card(nf(ok), "conferem com o sistema", "var(--green)", "ok")}
-    ${semData?card(nf(semData), "liberados antes do histórico · data não conferida", "", "semdata"):""}
+    ${c.fora.length?card(nf(c.fora.length), `começaram antes do histórico do sistema (${fmtData(c.histIni)}) · não conferidos`, "", "fora"):""}
+    ${semData?card(nf(semData), "data de início não conferida", "", "semdata"):""}
   </div>`;
 }
 
@@ -6995,10 +7017,10 @@ function cobPintarPainel(){
         <input type="file" accept=".xlsx,.xls" style="display:none" onchange="cobArquivo(this)">
         ${cobState?"Conferir outra planilha":"Subir planilha da Genial"}</label>
       ${cobState?`<select class="search select" id="cobFiltro" style="max-width:240px">
-        ${[["divs","Só divergências"],["graves","Só erros"],["leves","Só outras divergências"],["ok","Só os que conferem"],["semdata","Data não conferida"],["todos","Todos"]]
+        ${[["divs","Só divergências"],["graves","Só erros"],["leves","Só outras divergências"],["ok","Só os que conferem"],["fora","Antes do histórico"],["semdata","Data não conferida"],["todos","Todos"]]
           .map(([k,t])=>`<option value="${k}" ${cobFiltro===k?"selected":""}>${t}</option>`).join("")}</select>
         <input class="search" id="cobBusca" placeholder="Buscar por nome, Sinacor ou CPF…">
-        ${cobState.divs.length?`<button class="btn-rd" onclick="cobPopup()">Ver alerta</button><button class="btn-rd" onclick="cobBaixar()">Baixar lista para a Genial</button>`:""}`:""}
+        ${cobState.graves.length?`<button class="btn-rd" onclick="cobPopup()">Ver alerta</button><button class="btn-rd" onclick="cobBaixar()">Baixar lista para a Genial</button>`:""}`:""}
     </div>
     <div id="cobStatus"></div><div id="cobTabela"></div>`;
   el("autoPainel").innerHTML=topo;
@@ -7012,16 +7034,17 @@ function cobPintarPainel(){
   el("cobBusca").addEventListener("input",()=>cobTabela());
   cobTabela();
 }
+const cobOk = r => !cobDiv(r) && !r.P.some(p=>p.k==="foraHist");
 function cobFiltrar(f){ cobFiltro=f; if(el("cobFiltro")) el("cobFiltro").value=f; cobTabela(); }
 
 function cobTabela(){
   const termo=semAcento((el("cobBusca")?.value||"").trim()), dig=(el("cobBusca")?.value||"").replace(/\D/g,"");
-  const grave=r=>r.P.some(p=>COB_TIPOS[p.k].grave);
   const l=cobState.R.filter(r=>{
-    if(cobFiltro==="divs" && !r.P.length) return false;
-    if(cobFiltro==="graves" && !grave(r)) return false;
-    if(cobFiltro==="leves" && (!r.P.length || grave(r))) return false;
-    if(cobFiltro==="ok" && r.P.length) return false;
+    if(cobFiltro==="divs" && !cobDiv(r)) return false;
+    if(cobFiltro==="graves" && !cobGrave(r)) return false;
+    if(cobFiltro==="leves" && (!cobDiv(r) || cobGrave(r))) return false;
+    if(cobFiltro==="ok" && !cobOk(r)) return false;
+    if(cobFiltro==="fora" && !r.P.some(p=>p.k==="foraHist")) return false;
     if(cobFiltro==="semdata" && !r.semData) return false;
     if(!termo) return true;
     return semAcento(r.nome).includes(termo) || (dig && (r.cpf.includes(dig) || String(r.sinacor||"").includes(dig)));
@@ -7033,18 +7056,17 @@ function cobTabela(){
       ${celCliente({...r, nome:r.nome||("CPF "+r.cpf)})}
       <td>${r.g.length?r.g.map(x=>`<div style="margin:2px 0">${tagPlano(x.plano)} <span style="white-space:nowrap">${per(x.ini,x.fim)}</span>${subLinha(`${nf(x.dias)} dias · ${brl2(x.valor)}${x.corretora&&semAcento(x.corretora).trim()!=="genial"?" · "+escA(x.corretora):""}`)}</div>`).join(""):faint("não cobrado")}</td>
       <td>${r.s.length?r.s.map(x=>`<div style="margin:2px 0">${tagPlano(x.plano)} <span style="white-space:nowrap">${per(x.inicio,x.fim)}</span></div>`).join(""):faint("sem liberação no mês")}</td>
-      <td style="max-width:380px">${r.P.length?r.P.map(p=>`<div style="font-size:12px;margin:2px 0;color:${COB_TIPOS[p.k].grave?"#ff9aa6":"var(--amber)"}">● ${escA(p.txt)}</div>`).join("")
-        :`<span class="tag t-green">confere</span>${r.semData?subLinha("data de início não conferida"):""}`}</td>
+      <td style="max-width:380px">${cobOk(r)?`<span class="tag t-green">confere</span>${r.semData?subLinha("data de início não conferida"):""}`:""}${r.P.map(p=>`<div style="font-size:12px;margin:2px 0;color:${COB_TIPOS[p.k].grave?"#ff9aa6":COB_TIPOS[p.k].info?"var(--text-faint)":"var(--amber)"}">● ${escA(p.txt)}</div>`).join("")}</td>
     </tr>`).join("")}</tbody></table>
-    <div class="stack-cap" style="margin-top:10px">${nf(l.length)} clientes · CPF é a chave entre a planilha e o sistema. Vermelho = erro de cobrança a contestar; amarelo = divergência para olhar. Basic não entra nesta cobrança.</div>`;
+    <div class="stack-cap" style="margin-top:10px">${nf(l.length)} clientes · CPF é a chave entre a planilha e o sistema. Vermelho = erro de cobrança a contestar (vai no alerta e na lista para a Genial); amarelo = divergência para olhar; cinza = o sistema não tem como conferir. Basic não entra nesta cobrança.</div>`;
 }
 
 // ---- popup de alerta ----
 function cobPopup(){
   const c=cobState; if(!c) return;
-  if(!c.divs.length){ toast("Cobrança confere", `Todas as ${nf(c.linhas.length)} linhas de ${c.comp.rotulo} batem com o sistema.`); return; }
+  if(!c.graves.length){ toast("Nenhum erro de cobrança", `${c.comp.rotulo}: nada para contestar com a Genial${c.divs.length?` · ${nf(c.divs.length)} divergências para olhar na tela`:""}.`); return; }
   const porTipo={};
-  c.divs.forEach(r=>r.P.forEach(p=>{ (porTipo[p.k]=porTipo[p.k]||[]).push({r,p}); }));
+  c.graves.forEach(r=>r.P.filter(p=>COB_TIPOS[p.k].grave).forEach(p=>{ (porTipo[p.k]=porTipo[p.k]||[]).push({r,p}); }));
   const secs=Object.keys(COB_TIPOS).filter(k=>porTipo[k]).map(k=>{
     const L=porTipo[k];
     return `<div class="vpop-sec"><div class="vpop-sec-t" style="color:${COB_TIPOS[k].grave?"#ff9aa6":"var(--amber)"}">${COB_TIPOS[k].t} · ${nf(L.length)}</div>
@@ -7069,10 +7091,10 @@ function cobPopup(){
 
 function cobBaixar(){
   if(!ehGestor()){ toast("Exportação restrita","Só a gestão pode baixar planilhas.",true); return; }
-  const c=cobState; if(!c||!c.divs.length) return;
+  const c=cobState; if(!c||!c.graves.length) return;
   const nomeP=k=>AUTO_PLANOS.find(p=>p.k===k)?.nome||"";
   const linhas=[];
-  c.divs.forEach(r=>r.P.forEach(p=>linhas.push([
+  c.graves.forEach(r=>r.P.filter(p=>COB_TIPOS[p.k].grave).forEach(p=>linhas.push([
     r.cpf, r.nome||"", r.sinacor||"", COB_TIPOS[p.k].t, p.txt,
     r.g.map(x=>nomeP(x.plano)).join(" + "), r.g.map(x=>x.ini?fmtData(x.ini):"").join(" + "), r.g.map(x=>x.fim?fmtData(x.fim):"").join(" + "),
     r.g.map(x=>x.dias).join(" + "), Number(r.cobrado.toFixed(2)),
