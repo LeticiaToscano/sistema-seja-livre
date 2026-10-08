@@ -1229,7 +1229,7 @@
       <button class="nav-item" data-view="integracoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 7V4M15 7V4M8 7h8v4a4 4 0 0 1-8 0z" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15v5" stroke-linecap="round"/></svg>Integrações</button>
     </nav>
     <div class="foot">
-      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v21/09 código no celular</div></div></div>
+      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v08/10 conferência cobrança Genial</div></div></div>
       <button class="btn-vercomo hidden" id="verComoBtn" type="button">Ver como assessor</button>
       <button class="btn-logout" id="logoutBtn">Sair</button>
     </div>
@@ -6583,6 +6583,7 @@ async function autoCarregarPeriodo(){
 async function vAutomacao(){
   if(!podeVer("automacao")){ el("content").innerHTML='<div class="empty">Esta área é só para a gestão.</div>'; return; }
   if(!autoState.de) autoDefinirAtalho(autoState.atalho||"mes");
+  if(autoState.aba==="cobranca" && !ehGestor()) autoState.aba="cancelar";
   el("content").innerHTML=`
     <div class="panel" id="autoHoje" style="padding:18px 20px;margin-bottom:22px"><div class="loading"><div class="spinner"></div>Carregando…</div></div>
     <div class="venc-periodo" style="margin-bottom:16px">
@@ -6624,7 +6625,8 @@ function autoPintar(){
     ["cancelar","Para cancelar", pend, pend?"#ff9aa6":""],
     ["acompanhamento","Em acompanhamento", J?J.length:null, ""],
     ["ativos","Carteira ativa", autoState.periodo?ativos.length:null, ""],
-    ["encerrados","Encerrados", autoState.periodo?encerrados.length:null, ""]
+    ["encerrados","Encerrados", autoState.periodo?encerrados.length:null, ""],
+    ...(ehGestor()?[["cobranca","Conferir cobrança Genial", cobState?cobState.divs.length:null, cobState&&cobState.divs.length?"#ff9aa6":""]]:[])
   ].map(([k,t,c,cor])=>`<button class="vp-btn ${aba===k?"on":""}" onclick="autoAba('${k}')">${t} <b style="margin-left:5px${cor?";color:"+cor:""}">${n(c)}</b></button>`).join("");
 
   if(aba==="ativos" || aba==="encerrados"){
@@ -6638,6 +6640,9 @@ function autoPintar(){
       el("autoPainel").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
       await autoCarregarPeriodo(); autoPintar();
     }));
+  } else if(aba==="cobranca"){
+    el("autoDatas").innerHTML=`<span class="stack-cap" style="margin:0">${cobState?`Competência ${cobState.comp.rotulo} · ${escA(cobState.arquivo)}`:"O sistema é o dado certo — a planilha da Genial é que é conferida"}</span>`;
+    cobPintarResumo(); cobPintarPainel(); return;
   } else {
     el("autoDatas").innerHTML=`<span class="stack-cap" style="margin:0">Situação de hoje · ${new Date().toLocaleDateString("pt-BR")}</span>`;
   }
@@ -6799,6 +6804,285 @@ async function autoAtalho(k){
   autoDefinirAtalho(k);
   el("autoPainel").innerHTML='<div class="loading"><div class="spinner"></div>Carregando…</div>';
   await autoCarregarPeriodo(); autoPintar();
+}
+
+// ---- CONFERÊNCIA DA COBRANÇA DA GENIAL ----
+// (Letícia, 08/10/2026) O SISTEMA é o dado real. A planilha mensal que a
+// Genial manda (aba "Base") é que é conferida, por CPF:
+//   1) plano cobrado = plano liberado
+//   2) data de início cobrada = data de liberação no sistema
+//   3) Data final (cancelamento) = cancelamento confirmado pela Nelógica
+//   4) valor = preço do plano × dias/30, e dias batem com as datas
+// Qualquer diferença abre um popup para alertar a Genial.
+// Segurança: tudo roda no navegador. A planilha não é gravada em lugar
+// nenhum e o lado do sistema vem da RPC que só responde para gestor.
+const AUTO_PRECO = {PLUS:174.99, PREMIUM:272.99};
+const COB_TIPOS = {
+  semLib:   {t:"Cobrado sem liberação no sistema", grave:true},
+  dobro:    {t:"Cobrado em dobro", grave:true},
+  plano:    {t:"Plano cobrado diferente do liberado", grave:true},
+  inicio:   {t:"Data de início diferente da liberação", grave:true},
+  status:   {t:"Cancelamento não confere", grave:true},
+  valor:    {t:"Valor ou dias não conferem", grave:true},
+  naoCob:   {t:"Liberado no sistema e não cobrado", grave:false},
+  troca:    {t:"Dia da troca de plano cobrado nos dois planos", grave:false},
+  corretora:{t:"Cobrado em outra corretora", grave:false},
+  semPlano: {t:"Sistema sem plano registrado", grave:false}
+};
+let cobState = null;        // resultado da última conferência
+let cobFiltro = "divs";
+
+function cobISO(v){
+  if(v==null || v==="") return null;
+  if(typeof v==="number") return new Date(Math.round((v-25569)*86400000)).toISOString().slice(0,10);
+  const s=String(v).trim(); let m;
+  if((m=s.match(/^(\d{4})-(\d{2})-(\d{2})/))) return m[1]+"-"+m[2]+"-"+m[3];
+  if((m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/))) return m[3]+"-"+m[2].padStart(2,"0")+"-"+m[1].padStart(2,"0");
+  return null;
+}
+function cobCpf(v){
+  const d=String(v??"").replace(/\.0+$/,"").replace(/\D/g,"");
+  if(!d) return "";
+  return d.length<=11 ? d.padStart(11,"0") : d.padStart(14,"0");
+}
+function cobPlano(txt){
+  const s=semAcento(txt);
+  if(s.includes("premium")) return "PREMIUM";
+  if(s.includes("plus")) return "PLUS";
+  if(s.includes("basic")) return "BASIC";
+  return null;
+}
+const cobMenor = (a,b) => a<b ? a : b;
+const cobMaior = (a,b) => a>b ? a : b;
+// dias cobráveis dentro do mês: contando início e fim, teto 30 (mês cheio = 30)
+function cobDias(ini, fim, comp){
+  const a=cobMaior(ini||comp.de, comp.de), b=cobMenor(fim||comp.ate, comp.ate);
+  if(a>b) return 0;
+  if(a===comp.de && b===comp.ate) return 30;
+  return Math.min(30, diasEntre(a,b)+1);
+}
+const brl2 = v => v==null ? "—" : "R$ "+Number(v).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
+
+// ---- leitura da planilha ----
+async function cobLer(file){
+  const wb=XLSX.read(new Uint8Array(await file.arrayBuffer()),{type:"array"});
+  const aba=wb.SheetNames.find(n=>semAcento(n).trim()==="base");
+  if(!aba) throw new Error('Não achei a aba "Base". Confira se é a planilha mensal de cobrança da Genial.');
+  const aoa=XLSX.utils.sheet_to_json(wb.Sheets[aba],{header:1,raw:true,defval:null});
+  const hi=aoa.findIndex(r=>(r||[]).some(c=>semAcento(c).trim()==="documento"));
+  if(hi<0) throw new Error('A aba "Base" não tem a coluna "Documento".');
+  const cab=aoa[hi].map(c=>semAcento(c).trim());
+  const col=n=>cab.indexOf(n);
+  const C={doc:col("documento"), plano:col("nome do plano"), ini:col("data de inicio"), fim:col("data final"),
+           dias:col("dias de uso"), valor:col("valor"), corr:col("nome da corretora")};
+  const falta=Object.entries({"Nome do plano":C.plano,"Data de início":C.ini,"Data final":C.fim,"Dias de uso":C.dias,"Valor":C.valor}).filter(([,i])=>i<0).map(([n])=>n);
+  if(falta.length) throw new Error("Faltam colunas na aba Base: "+falta.join(", ")+".");
+  const linhas=[];
+  aoa.slice(hi+1).forEach((r,i)=>{
+    if(!r || r[C.doc]==null || r[C.doc]==="") return;
+    linhas.push({linha:hi+2+i, cpf:cobCpf(r[C.doc]), planoTxt:String(r[C.plano]||""), plano:cobPlano(r[C.plano]),
+      ini:cobISO(r[C.ini]), fim:cobISO(r[C.fim]), dias:Number(r[C.dias]||0), valor:Number(r[C.valor]||0),
+      corretora:C.corr>=0?String(r[C.corr]||""):""});
+  });
+  if(!linhas.length) throw new Error('A aba "Base" está vazia.');
+  // competência: "Competência - 09/2026" em qualquer aba; senão o mês mais recente de início
+  let mm=null;
+  for(const n of wb.SheetNames){
+    if(n===aba) continue;
+    const t=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:false,defval:""}).flat().join(" ");
+    const m=semAcento(t).match(/competencia\s*[-:]?\s*(\d{1,2})\/(\d{4})/);
+    if(m){ mm={mes:Number(m[1]), ano:Number(m[2])}; break; }
+  }
+  if(!mm){ const u=linhas.map(l=>l.ini).filter(Boolean).sort().pop(); mm={ano:Number(u.slice(0,4)), mes:Number(u.slice(5,7))}; }
+  const de=isoDia(new Date(mm.ano,mm.mes-1,1)), ate=isoDia(new Date(mm.ano,mm.mes,0));
+  const rotulo=new Date(mm.ano,mm.mes-1,1).toLocaleDateString("pt-BR",{month:"long",year:"numeric"}).replace(" de ","/");
+  return {linhas, comp:{de, ate, rotulo}};
+}
+
+// ---- a conferência ----
+function cobConferir(G, S, comp){
+  const grp=(l,k)=>l.reduce((m,x)=>{ const c=k(x); if(c) (m[c]=m[c]||[]).push(x); return m; },{});
+  const gC=grp(G,x=>x.cpf), sC=grp(S,x=>cobCpf(x.cpf));
+  const res=[];
+  new Set([...Object.keys(gC),...Object.keys(sC)]).forEach(cpf=>{
+    const g=(gC[cpf]||[]).slice().sort((a,b)=>String(a.ini).localeCompare(String(b.ini)));
+    const s=(sC[cpf]||[]).slice().sort((a,b)=>String(a.inicio||"").localeCompare(String(b.inicio||"")));
+    const sx=s[s.length-1]||null;
+    const P=[], add=(k,txt)=>P.push({k,txt});
+    let semData=false;
+    if(!s.length){
+      add("semLib", `Cobrado ${g.map(x=>x.planoTxt.replace(/ - Parceria.*$/i,"")).join(" + ")} em ${comp.rotulo}, mas o sistema não tem essa Automação liberada no mês.`);
+    } else if(!g.length){
+      if(sx.plano==="BASIC") return;            // Basic não entra nesta cobrança
+      add("naoCob", `Liberado no sistema (${sx.plano?AUTO_PLANOS.find(p=>p.k===sx.plano)?.nome||sx.plano:"sem plano"}${sx.inicio?", desde "+fmtData(sx.inicio):""}) e não aparece na cobrança.`);
+    } else {
+      // sobreposição entre linhas do mesmo CPF
+      for(let i=0;i<g.length;i++) for(let j=i+1;j<g.length;j++){
+        const a=g[i], b=g[j];
+        const ini=cobMaior(cobMaior(a.ini,b.ini),comp.de), fim=cobMenor(cobMenor(a.fim||comp.ate,b.fim||comp.ate),comp.ate);
+        if(ini>fim) continue;
+        const d=diasEntre(ini,fim)+1;
+        if(d===1 && a.fim && a.fim===b.ini) add("troca", `Na troca de ${a.planoTxt.replace(/ - Parceria.*$/i,"")} para ${b.planoTxt.replace(/ - Parceria.*$/i,"")}, o dia ${fmtData(a.fim)} foi cobrado nos dois planos.`);
+        else add("dobro", `Duas cobranças ao mesmo tempo (${a.planoTxt.replace(/ - Parceria.*$/i,"")}${a.corretora?" · "+a.corretora:""} e ${b.planoTxt.replace(/ - Parceria.*$/i,"")}${b.corretora?" · "+b.corretora:""}) por ${nf(d)} dias.`);
+      }
+      const gA=g.slice().sort((a,b)=>String(a.fim||"9999").localeCompare(String(b.fim||"9999")) || String(a.ini).localeCompare(String(b.ini))).pop();
+      const nomeP=k=>AUTO_PLANOS.find(p=>p.k===k)?.nome||"sem plano";
+      if(!sx.plano) add("semPlano","O sistema não tem o plano desse cliente para comparar.");
+      else if(gA.plano!==sx.plano) add("plano", `Genial cobra ${nomeP(gA.plano)}; o liberado no sistema é ${nomeP(sx.plano)}.`);
+      const s0=s[0];
+      if(!s0.inicio) semData=true;
+      else if(g[0].ini!==s0.inicio) add("inicio", `Genial cobra a partir de ${fmtData(g[0].ini)}; a liberação no sistema é de ${fmtData(s0.inicio)}.`);
+      const gFim=gA.fim, sFim=(sx.fim && sx.fim<=comp.ate) ? sx.fim : null;
+      if(gFim && !sFim) add("status", `Genial encerrou em ${fmtData(gFim)}, mas no sistema a Automação ${sx.fim?"só foi cancelada em "+fmtData(sx.fim):"continua ativa"}.`);
+      else if(!gFim && sFim) add("status", `Cancelada no sistema em ${fmtData(sFim)}, e a Genial cobra como ativa.`);
+      else if(gFim && sFim && gFim!==sFim) add("status", `Genial encerrou em ${fmtData(gFim)}; o cancelamento no sistema é de ${fmtData(sFim)}.`);
+      g.forEach(x=>{
+        if(x.corretora && semAcento(x.corretora).trim()!=="genial") add("corretora", `Linha ${x.linha} cobrada na corretora ${x.corretora}.`);
+        const preco=AUTO_PRECO[x.plano];
+        const dEsp=cobDias(x.ini,x.fim,comp);
+        if(x.dias!==dEsp) add("valor", `Linha ${x.linha}: ${nf(x.dias)} dias cobrados; pelas datas seriam ${nf(dEsp)}.`);
+        if(preco!=null && Math.abs(preco*x.dias/30 - x.valor)>0.05) add("valor", `Linha ${x.linha}: cobrado ${brl2(x.valor)}; pela tabela (${brl2(preco)} × ${nf(x.dias)}/30) seria ${brl2(preco*x.dias/30)}.`);
+      });
+    }
+    res.push({cpf, g, s, sx, P, semData,
+      nome:sx?.nome||null, sinacor:sx?.sinacor||null, barra:sx?.barra||null, cliente_id:sx?.cliente_id||null,
+      cobrado:g.reduce((t,x)=>t+x.valor,0)});
+  });
+  const ordem=r=>r.P.some(p=>COB_TIPOS[p.k].grave)?0:r.P.length?1:2;
+  res.sort((a,b)=>ordem(a)-ordem(b) || String(a.nome||"~").localeCompare(String(b.nome||"~")));
+  return res;
+}
+
+async function cobArquivo(inp){
+  const f=inp.files&&inp.files[0]; inp.value="";
+  if(!f) return;
+  if(!ehGestor()){ toast("Acesso restrito","Só a gestão confere a cobrança.",true); return; }
+  el("cobStatus").innerHTML='<div class="loading" style="padding:10px 0"><div class="spinner"></div>Conferindo…</div>';
+  try{
+    const {linhas, comp}=await cobLer(f);
+    const {data,error}=await sb.rpc("automacao_ativos_periodo",{p_de:comp.de,p_ate:comp.ate});
+    if(error) throw new Error("Não consegui ler as Automações do sistema: "+(error.message||error));
+    const R=cobConferir(linhas, data||[], comp);
+    cobState={arquivo:f.name, comp, linhas, R,
+      divs:R.filter(r=>r.P.length), graves:R.filter(r=>r.P.some(p=>COB_TIPOS[p.k].grave)),
+      total:linhas.reduce((t,x)=>t+x.valor,0)};
+    cobFiltro = cobState.divs.length ? "divs" : "todos";
+    autoPintar();
+    cobPopup();
+  }catch(e){
+    el("cobStatus").innerHTML=`<div class="empty" style="color:#ff9aa6">${escA(e.message||e)}</div>`;
+  }
+}
+
+function cobPintarResumo(){
+  if(!cobState){ el("autoResumo").innerHTML=""; return; }
+  const c=cobState, card=(v,k,cor,f)=>`<div class="vr-card" ${f?`onclick="cobFiltrar('${f}')" style="cursor:pointer"`:""}>
+    <div class="v" ${cor?`style="color:${cor}"`:""}>${v}</div><div class="k">${k}</div></div>`;
+  const ok=c.R.filter(r=>!r.P.length).length, leves=c.divs.length-c.graves.length;
+  const semData=c.R.filter(r=>r.semData).length;
+  el("autoResumo").innerHTML=`<div class="venc-resumo">
+    ${card(brl2(c.total), `cobrado pela Genial · ${nf(c.linhas.length)} linhas`)}
+    ${card(nf(c.graves.length), "clientes com erro na cobrança", c.graves.length?"#ff9aa6":"", "graves")}
+    ${card(nf(leves), "outras divergências", leves?"var(--amber)":"", "leves")}
+    ${card(nf(ok), "conferem com o sistema", "var(--green)", "ok")}
+    ${semData?card(nf(semData), "liberados antes do histórico · data não conferida", "", "semdata"):""}
+  </div>`;
+}
+
+function cobPintarPainel(){
+  const topo=`<div class="toolbar" style="align-items:center;flex-wrap:wrap;gap:10px">
+      <label class="pc-add" style="display:inline-flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="file" accept=".xlsx,.xls" style="display:none" onchange="cobArquivo(this)">
+        ${cobState?"Conferir outra planilha":"Subir planilha da Genial"}</label>
+      ${cobState?`<select class="search select" id="cobFiltro" style="max-width:240px">
+        ${[["divs","Só divergências"],["graves","Só erros"],["leves","Só outras divergências"],["ok","Só os que conferem"],["semdata","Data não conferida"],["todos","Todos"]]
+          .map(([k,t])=>`<option value="${k}" ${cobFiltro===k?"selected":""}>${t}</option>`).join("")}</select>
+        <input class="search" id="cobBusca" placeholder="Buscar por nome, Sinacor ou CPF…">
+        ${cobState.divs.length?`<button class="btn-rd" onclick="cobPopup()">Ver alerta</button><button class="btn-rd" onclick="cobBaixar()">Baixar lista para a Genial</button>`:""}`:""}
+    </div>
+    <div id="cobStatus"></div><div id="cobTabela"></div>`;
+  el("autoPainel").innerHTML=topo;
+  if(!cobState){
+    el("cobTabela").innerHTML=`<div class="empty" style="line-height:1.7">Suba a planilha mensal de cobrança da Genial (a que tem a aba <b>Base</b>).<br>
+      O sistema confere, cliente por cliente: plano cobrado × liberado, data de início × liberação, cancelamento e valor.<br>
+      <span style="color:var(--text-faint)">A planilha é lida aqui no navegador e não é gravada em lugar nenhum.</span></div>`;
+    return;
+  }
+  el("cobFiltro").addEventListener("change",e=>{ cobFiltro=e.target.value; cobTabela(); });
+  el("cobBusca").addEventListener("input",()=>cobTabela());
+  cobTabela();
+}
+function cobFiltrar(f){ cobFiltro=f; if(el("cobFiltro")) el("cobFiltro").value=f; cobTabela(); }
+
+function cobTabela(){
+  const termo=semAcento((el("cobBusca")?.value||"").trim()), dig=(el("cobBusca")?.value||"").replace(/\D/g,"");
+  const grave=r=>r.P.some(p=>COB_TIPOS[p.k].grave);
+  const l=cobState.R.filter(r=>{
+    if(cobFiltro==="divs" && !r.P.length) return false;
+    if(cobFiltro==="graves" && !grave(r)) return false;
+    if(cobFiltro==="leves" && (!r.P.length || grave(r))) return false;
+    if(cobFiltro==="ok" && r.P.length) return false;
+    if(cobFiltro==="semdata" && !r.semData) return false;
+    if(!termo) return true;
+    return semAcento(r.nome).includes(termo) || (dig && (r.cpf.includes(dig) || String(r.sinacor||"").includes(dig)));
+  });
+  if(!l.length){ el("cobTabela").innerHTML='<div class="empty">Nenhum cliente com esse filtro.</div>'; return; }
+  const per=(a,b)=>`${a?fmtData(a):faint("antes do histórico")} ${faint("→")} ${b?fmtData(b):faint("ativa")}`;
+  el("cobTabela").innerHTML=`<table><thead><tr><th>Cliente</th><th>Cobrado pela Genial</th><th>No sistema</th><th>Resultado</th></tr></thead>
+    <tbody>${l.map(r=>`<tr ${linhaCli(r)}>
+      ${celCliente({...r, nome:r.nome||("CPF "+r.cpf)})}
+      <td>${r.g.length?r.g.map(x=>`<div style="margin:2px 0">${tagPlano(x.plano)} <span style="white-space:nowrap">${per(x.ini,x.fim)}</span>${subLinha(`${nf(x.dias)} dias · ${brl2(x.valor)}${x.corretora&&semAcento(x.corretora).trim()!=="genial"?" · "+escA(x.corretora):""}`)}</div>`).join(""):faint("não cobrado")}</td>
+      <td>${r.s.length?r.s.map(x=>`<div style="margin:2px 0">${tagPlano(x.plano)} <span style="white-space:nowrap">${per(x.inicio,x.fim)}</span></div>`).join(""):faint("sem liberação no mês")}</td>
+      <td style="max-width:380px">${r.P.length?r.P.map(p=>`<div style="font-size:12px;margin:2px 0;color:${COB_TIPOS[p.k].grave?"#ff9aa6":"var(--amber)"}">● ${escA(p.txt)}</div>`).join("")
+        :`<span class="tag t-green">confere</span>${r.semData?subLinha("data de início não conferida"):""}`}</td>
+    </tr>`).join("")}</tbody></table>
+    <div class="stack-cap" style="margin-top:10px">${nf(l.length)} clientes · CPF é a chave entre a planilha e o sistema. Vermelho = erro de cobrança a contestar; amarelo = divergência para olhar. Basic não entra nesta cobrança.</div>`;
+}
+
+// ---- popup de alerta ----
+function cobPopup(){
+  const c=cobState; if(!c) return;
+  if(!c.divs.length){ toast("Cobrança confere", `Todas as ${nf(c.linhas.length)} linhas de ${c.comp.rotulo} batem com o sistema.`); return; }
+  const porTipo={};
+  c.divs.forEach(r=>r.P.forEach(p=>{ (porTipo[p.k]=porTipo[p.k]||[]).push({r,p}); }));
+  const secs=Object.keys(COB_TIPOS).filter(k=>porTipo[k]).map(k=>{
+    const L=porTipo[k];
+    return `<div class="vpop-sec"><div class="vpop-sec-t" style="color:${COB_TIPOS[k].grave?"#ff9aa6":"var(--amber)"}">${COB_TIPOS[k].t} · ${nf(L.length)}</div>
+      ${L.slice(0,6).map(({r,p})=>`<div class="vpop-item" style="cursor:default;align-items:flex-start">
+        <div><div class="vn">${escA(r.nome||("CPF "+r.cpf))}</div><div class="vb">${escA(p.txt)}</div></div></div>`).join("")}
+      ${L.length>6?`<div class="vb" style="padding-top:8px;font-size:11.5px;color:var(--text-dim)">e mais ${nf(L.length-6)} na tela</div>`:""}</div>`;
+  }).join("");
+  el("vpop").innerHTML=`
+    <div class="vpop-head">
+      <div class="ico" style="background:rgba(255,154,166,.14);color:#ff9aa6">⚠</div>
+      <div><h3>${nf(c.graves.length)} ${c.graves.length===1?"cliente com erro":"clientes com erro"} na cobrança de ${c.comp.rotulo}</h3>
+        <p>A planilha da Genial não bate com o sistema${c.divs.length>c.graves.length?` · mais ${nf(c.divs.length-c.graves.length)} com divergência para olhar`:""}. O sistema é o dado certo — alertar a Genial.</p></div>
+      <button class="vpop-close" onclick="fecharPopupVenc()">✕</button>
+    </div>
+    <div class="vpop-body">${secs}</div>
+    <div class="vpop-foot">
+      <button onclick="fecharPopupVenc()">Ver na tela</button>
+      <button class="prim" onclick="cobBaixar()">Baixar lista para a Genial</button>
+    </div>`;
+  el("vpopBack").classList.add("open");
+}
+
+function cobBaixar(){
+  if(!ehGestor()){ toast("Exportação restrita","Só a gestão pode baixar planilhas.",true); return; }
+  const c=cobState; if(!c||!c.divs.length) return;
+  const nomeP=k=>AUTO_PLANOS.find(p=>p.k===k)?.nome||"";
+  const linhas=[];
+  c.divs.forEach(r=>r.P.forEach(p=>linhas.push([
+    r.cpf, r.nome||"", r.sinacor||"", COB_TIPOS[p.k].t, p.txt,
+    r.g.map(x=>nomeP(x.plano)).join(" + "), r.g.map(x=>x.ini?fmtData(x.ini):"").join(" + "), r.g.map(x=>x.fim?fmtData(x.fim):"").join(" + "),
+    r.g.map(x=>x.dias).join(" + "), Number(r.cobrado.toFixed(2)),
+    r.s.map(x=>nomeP(x.plano)).join(" + "), r.s.map(x=>x.inicio?fmtData(x.inicio):"antes do histórico").join(" + "), r.s.map(x=>x.fim?fmtData(x.fim):"ativa").join(" + ")
+  ])));
+  const ws=XLSX.utils.aoa_to_sheet([["CPF","Cliente","Sinacor","Problema","Detalhe",
+    "Plano cobrado","Início cobrado","Fim cobrado","Dias cobrados","Valor cobrado (R$)",
+    "Plano liberado (sistema)","Liberação (sistema)","Cancelamento (sistema)"]].concat(linhas));
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Divergências");
+  XLSX.writeFile(wb, `Divergencias_cobranca_Genial_${c.comp.de.slice(0,7)}.xlsx`);
 }
 
 // ---------- VENCIMENTOS DE RENDA FIXA ----------
