@@ -1220,6 +1220,7 @@
       <button class="nav-item" data-view="importacoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" stroke-linecap="round" stroke-linejoin="round"/></svg>Importações</button>
       <button class="nav-item" data-view="config"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 8h14M5 16h14" stroke-linecap="round"/><circle cx="9" cy="8" r="2.2" fill="var(--bg-2)"/><circle cx="15" cy="16" r="2.2" fill="var(--bg-2)"/></svg>Configurações</button>
       <button class="nav-item" data-view="auditoria"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l7 3v5c0 4-3 7-7 8-4-1-7-4-7-8V6z" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg>Auditoria</button>
+      <button class="nav-item" data-view="atividade"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2" stroke-linecap="round" stroke-linejoin="round"/></svg>Atividade</button>
       <button class="nav-item" data-view="diagnostico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 13h4l2.5-7 4 14 2.5-7H21" stroke-linecap="round" stroke-linejoin="round"/></svg>Diagnóstico</button>
       <button class="nav-item" data-view="ia"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="5" width="14" height="14" rx="3"/><path d="M9 9h6v6H9z" fill="var(--bg-2)"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke-linecap="round"/></svg>CEO de IA</button>
 
@@ -1277,7 +1278,63 @@
 // ============ CONFIG (a chave publishable é pública por natureza — o RLS protege) ============
 const SUPABASE_URL = "https://hdgacffmwigdscrtctia.supabase.co";
 const SUPABASE_KEY = "sb_publishable_8-g_Xdbxmb52CnPVhOpkBw_BmJk2M1a";
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// ============ REGISTRO DE ATIVIDADE DOS ASSESSORES ============
+// Grava tudo o que um assessor faz: cliques, abas, pesquisas, filtros,
+// fichas abertas e cada consulta ao banco. A gestao nao e gravada (nem no
+// "Ver como assessor"). A tabela so aceita acrescentar: ninguem apaga.
+function deveRegistrar(){
+  return typeof USUARIO_ID !== "undefined" && !!USUARIO_ID && PAPEL !== "—" && !ehGestorReal();
+}
+function logAtv(acao, detalhe){
+  try{
+    if(!deveRegistrar()) return Promise.resolve();
+    return sb.rpc("registrar_atividade",{
+      p_aba: VIEW_ATUAL || null, p_acao: acao, p_detalhe: detalhe || {}
+    }).then(()=>{}, ()=>{});
+  }catch(e){ return Promise.resolve(); }
+}
+const fetchLogado = (url, opt) => {
+  try{
+    const u = String(url);
+    if(u.includes("/rest/v1/") && !/registrar_atividade|fn_atividade_equipe/.test(u)){
+      const d = { consulta: decodeURIComponent(u.split("/rest/v1/")[1]||"").slice(0,1500),
+                  metodo: (opt && opt.method) || "GET" };
+      if(opt && typeof opt.body === "string") d.parametros = opt.body.slice(0,1500);
+      setTimeout(()=>logAtv("consulta", d), 0);
+    }
+  }catch(e){}
+  return fetch(url, opt);
+};
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { global:{ fetch: fetchLogado } });
+
+document.addEventListener("click", e=>{
+  const b = e.target.closest("button,a,tr,.df-chip,.pb-uf,.pb-barra,.pb-p,.clube-chip,.aniv-item,.notif-item");
+  if(!b) return;
+  const txt = (b.innerText || b.getAttribute("title") || "").trim().replace(/\s+/g," ").slice(0,140);
+  logAtv("clique", { elemento: b.tagName.toLowerCase(), texto: txt,
+                     aba_clicada: (b.dataset && b.dataset.view) || undefined });
+}, true);
+const _tInput = {};
+document.addEventListener("input", e=>{
+  const t = e.target;
+  if(!t.matches || !t.matches("input,textarea") || t.type === "password") return;
+  const k = t.id || t.placeholder || "campo";
+  clearTimeout(_tInput[k]);
+  _tInput[k] = setTimeout(()=>{
+    const v = (t.value||"").trim();
+    if(v) logAtv("pesquisa", { campo: t.placeholder || t.id || "campo", texto: v.slice(0,200) });
+  }, 1200);
+}, true);
+document.addEventListener("change", e=>{
+  const t = e.target;
+  if(!t.matches || !t.matches("select,input[type=date],input[type=checkbox]")) return;
+  const valor = t.type === "checkbox" ? t.checked
+              : (t.options && t.options[t.selectedIndex] ? t.options[t.selectedIndex].text : t.value);
+  logAtv("filtro", { campo: t.id || t.name || "filtro", valor: valor });
+}, true);
+document.addEventListener("visibilitychange", ()=>{
+  logAtv(document.hidden ? "saiu_da_tela" : "voltou_a_tela", {});
+});
 
 const SAUDE_LABEL = {saudavel:"Saudável",negligenciado:"Negligenciado",em_recuperacao:"Em recuperação",critico:"Crítico",nunca_operou:"Nunca operou"};
 const OP_LABEL = {operando:"Operando",parou:"Parou de operar",nunca_operou:"Nunca operou"};
@@ -1542,7 +1599,7 @@ function pedirCodigo(factorId, novo){
   i.addEventListener("keydown",ev=>{ if(ev.key==="Enter") enviar(); });
   el("mfaSair").onclick=async ev=>{ ev.preventDefault(); await sb.auth.signOut(); location.reload(); };
 }
-el("logoutBtn").addEventListener("click", async ()=>{ await sb.auth.signOut(); location.reload(); });
+el("logoutBtn").addEventListener("click", async ()=>{ await logAtv("saiu_do_sistema", {}); await sb.auth.signOut(); location.reload(); });
 
 async function mostrarApp(session){
   el("login").classList.add("hidden"); el("app").classList.remove("hidden");
@@ -1553,6 +1610,7 @@ async function mostrarApp(session){
   const {data:a} = await sb.from("assessores").select("nome,papel").eq("auth_user_id",session.user.id).maybeSingle();
   if(a){ nome=a.nome||email; papel=a.papel; }
   PAPEL = papel;
+  logAtv("entrou_no_sistema", { email: email });
   if(ehGestorReal()){ const vb=el("verComoBtn"); vb.classList.remove("hidden"); vb.onclick=alternarVerComo; }
   aplicarMenu();
   el("userName").textContent=nome; el("avatar").textContent=ini(nome);
@@ -1586,7 +1644,7 @@ const TITLES={
   custos:["GESTÃO","Custos por cliente e plataforma"],
   importacoes:["GESTÃO","Importações · os relatórios da corretora"],
   legenda:["SISTEMA","Legenda · o que cada etiqueta significa"],
-  diagnostico:["GESTÃO","Diagnóstico"], ia:["GESTÃO","CEO de IA"],
+  diagnostico:["GESTÃO","Diagnóstico"], atividade:["GESTÃO","Atividade · o que cada assessor faz no sistema"], ia:["GESTÃO","CEO de IA"],
   integracoes:["SISTEMA","Integrações"],
   parceiros:["ATENDIMENTO","Parceiros · barras e links de abertura"],
   marketing:["MARKETING","Campanhas · do público ao resultado"],
@@ -1599,7 +1657,7 @@ const RESERVADAS={
   ia:{icon:"ia",desc:"O diagnóstico estratégico da operação em linguagem natural, e o copiloto de IA por assessor — cada um enxergando apenas a própria carteira."},
   integracoes:{icon:"integracoes",desc:"As conexões do sistema — Volume Operado (operação), RD Conversas (atendimento), Gmail/Genial (entrada de clientes) e IA. Ligadas e a ligar."}
 };
-const VIEWS={patrimonio:vPatrimonio,marketing:vMarketing,exportrd:vExportRD,sdr:vSDR,radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,multiconta:vMulticonta,publico:vPublico,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes,auditoria:vAuditoria,diagnostico:vDiagnostico,legenda:vLegenda,leads:vLeads,importacoes:vImportacoes,saidas:vSaidas,plataformas:vPlataformas,custos:vCustos,conferencia:vConferencia,ranking:vRanking,assessores:vAssessores,vencimentos:vVencimentos,zeragem:vZeragem,automacao:vAutomacao,parceiros:vParceiros};
+const VIEWS={atividade:vAtividade,patrimonio:vPatrimonio,marketing:vMarketing,exportrd:vExportRD,sdr:vSDR,radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,multiconta:vMulticonta,publico:vPublico,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes,auditoria:vAuditoria,diagnostico:vDiagnostico,legenda:vLegenda,leads:vLeads,importacoes:vImportacoes,saidas:vSaidas,plataformas:vPlataformas,custos:vCustos,conferencia:vConferencia,ranking:vRanking,assessores:vAssessores,vencimentos:vVencimentos,zeragem:vZeragem,automacao:vAutomacao,parceiros:vParceiros};
 document.querySelectorAll(".nav-item").forEach(b=>b.addEventListener("click",()=>{
   document.querySelectorAll(".nav-item").forEach(x=>x.classList.remove("active"));
   b.classList.add("active"); fecharMenu(); render(b.dataset.view);
@@ -7285,6 +7343,7 @@ async function abrirFicha(id){
   const {data:s} = await sb.from("vw_saude_carteira").select("saude,status_operacao,data_ativacao,data_ultima_operacao,contratos_bmf,volume_bovespa,qtd_operacoes,faixa,grau,tem_akeloo").eq("id",id).maybeSingle();
   if(!c){ el("drBody").innerHTML='<div class="empty">Cliente não encontrado.</div>'; return; }
   fichaAtual = c;
+  logAtv("abriu_ficha", { cliente: c.nome, sinacor: c.sinacor, barra: c.barra });
   el("drName").textContent=c.nome;
   el("drSub").innerHTML=`Sinacor ${c.sinacor} · ${c.barra||"sem barra"} ${tagParceiro(c.barra,c.parceiros)}`;
   el("drStatus").innerHTML = (s?`<span class="status s-${s.saude}">${SAUDE_LABEL[s.saude]||s.saude}</span>`:"")
@@ -8792,6 +8851,207 @@ async function sdrBoletados(){
             : '<span class="status s-critico">não operou</span>'}</td>
     </tr>`).join("")}
     </tbody></table></div>`;
+}
+
+
+// =====================================================================
+// ATIVIDADE · o que cada assessor faz no sistema
+// Le da fn_atividade_equipe, que esta na trava rpc_so_gestao: so a gestao
+// recebe resposta. A aba tambem nao esta em ABAS_ASSESSOR.
+// O conteudo vem do que o assessor digitou e clicou: sempre escapar.
+// =====================================================================
+let avState = { periodo:"hoje", de:"", ate:"", dados:[], pessoa:null, tipo:"tudo", consultas:false };
+const AV_TIPOS = {
+  tudo:["Tudo"], pesquisa:["Pesquisas"], abriu_ficha:["Fichas abertas"],
+  aba:["Abas abertas"], filtro:["Filtros"], clique:["Cliques"], acesso:["Entradas e saídas"]
+};
+const AV_ACESSO = ["entrou_no_sistema","saiu_do_sistema","saiu_da_tela","voltou_a_tela"];
+
+function avIntervalo(){
+  const h = new Date(), d0 = x => { const d = new Date(x); d.setHours(0,0,0,0); return d; };
+  if(avState.periodo === "livre"){
+    const de  = avState.de  ? new Date(avState.de  + "T00:00:00") : d0(h);
+    const ate = avState.ate ? new Date(avState.ate + "T23:59:59") : h;
+    return [de, ate];
+  }
+  const dias = {hoje:0, ontem:1, "7":6, "30":29}[avState.periodo] ?? 0;
+  const de = d0(h); de.setDate(de.getDate() - dias);
+  if(avState.periodo === "ontem"){ const ate = d0(h); ate.setMilliseconds(-1); return [de, ate]; }
+  return [de, h];
+}
+
+function avNomeAba(v){ return (TITLES[v] && TITLES[v][1]) ? TITLES[v][1].split(" · ")[0] : v; }
+
+function avQuem(email){ return String(email||"sem e-mail").split("@")[0].replace(/[._]/g," ")
+  .replace(/\b\w/g, c => c.toUpperCase()); }
+
+// o que cada evento quer dizer, em uma frase
+function avFrase(e){
+  const d = e.detalhe || {}, x = v => cpEsc(v == null ? "" : String(v));
+  switch(e.acao){
+    case "entrou_no_sistema": return "Entrou no sistema";
+    case "saiu_do_sistema":   return "Saiu do sistema";
+    case "saiu_da_tela":      return '<span style="color:var(--text-faint)">Saiu da tela do sistema</span>';
+    case "voltou_a_tela":     return '<span style="color:var(--text-faint)">Voltou para a tela</span>';
+    case "abriu_ficha":       return `Abriu a ficha de <b>${x(d.cliente)}</b>${d.sinacor?` · Sinacor ${x(d.sinacor)}`:""}`;
+    case "pesquisa":          return `Pesquisou <b>“${x(d.texto)}”</b> <span style="color:var(--text-faint)">em ${x(d.campo)}</span>`;
+    case "filtro":            return `Filtrou <span style="color:var(--text-faint)">${x(d.campo)}:</span> <b>${x(d.valor)}</b>`;
+    case "clique":
+      if(d.aba_clicada) return `Abriu a aba <b>${x(avNomeAba(d.aba_clicada))}</b>`;
+      return `Clicou em <span style="color:var(--text-dim)">${x(d.texto) || x(d.elemento)}</span>`;
+    case "consulta":{
+      const alvo = String(d.consulta||"").split("?")[0];
+      return `<span style="color:var(--text-faint)">Consultou ${x(alvo)}</span>`;
+    }
+  }
+  return x(e.acao);
+}
+
+function avTipoDe(e){
+  if(AV_ACESSO.indexOf(e.acao) >= 0) return "acesso";
+  if(e.acao === "clique" && e.detalhe && e.detalhe.aba_clicada) return "aba";
+  return e.acao;
+}
+
+async function vAtividade(){
+  if(!ehGestor()){ el("content").innerHTML = '<div class="empty">Esta área é só para a gestão.</div>'; return; }
+  el("content").innerHTML = '<div class="loading"><div class="spinner"></div>Carregando a atividade…</div>';
+  const [de, ate] = avIntervalo();
+  const {data, error} = await sb.rpc("fn_atividade_equipe", {
+    p_inicio: de.toISOString(), p_fim: ate.toISOString(), p_email: null, p_limite: 5000 });
+  if(error){ el("content").innerHTML = `<div class="empty">${cpEsc(/gest/i.test(error.message||"")
+      ? "Esta área é só para a gestão." : error.message)}</div>`; return; }
+  avState.dados = data || [];
+  avPintar();
+}
+
+function avPeriodo(p){ avState.periodo = p; vAtividade(); }
+function avDatas(){ avState.de = el("avDe").value; avState.ate = el("avAte").value; avState.periodo = "livre"; vAtividade(); }
+function avPessoa(email){ avState.pessoa = email; avState.tipo = "tudo"; avPintar(); }
+function avTipo(t){ avState.tipo = t; avPintar(); }
+function avConsultas(v){ avState.consultas = v; avPintar(); }
+
+function avPintar(){
+  const D = avState.dados;
+  const porPessoa = {};
+  D.forEach(e => { (porPessoa[e.email] = porPessoa[e.email] || []).push(e); });
+  const pessoas = Object.keys(porPessoa).sort((a,b) =>
+    String(porPessoa[b][0].criado_em).localeCompare(String(porPessoa[a][0].criado_em)));
+  if(avState.pessoa && !porPessoa[avState.pessoa]) avState.pessoa = null;
+
+  const per = [["hoje","Hoje"],["ontem","Ontem"],["7","7 dias"],["30","30 dias"]];
+  const cab = `
+    <div class="venc-periodo" style="margin-bottom:16px">
+      <div class="vp-atalhos">${per.map(([k,r]) =>
+        `<button class="vp-btn ${avState.periodo===k?"on":""}" onclick="avPeriodo('${k}')">${r}</button>`).join("")}</div>
+      <div class="vp-datas">
+        <label>de</label><input type="date" id="avDe" value="${avState.de}" onchange="avDatas()">
+        <label>até</label><input type="date" id="avAte" value="${avState.ate}" onchange="avDatas()">
+      </div>
+    </div>
+    ${D.length >= 5000 ? `<div class="venc-stale">O período tem mais de 5 mil registros: aparecem só os 5 mil mais recentes. Encurte o período para ver tudo.</div>` : ""}`;
+
+  if(!pessoas.length){
+    el("content").innerHTML = cab + `<div class="empty">Nenhum assessor usou o sistema neste período.</div>`;
+    return;
+  }
+
+  const conta = (l, f) => l.filter(f).length;
+  const linhasPessoas = pessoas.map(p => {
+    const L = porPessoa[p];
+    const ult = L[0].criado_em;
+    const min = (Date.now() - new Date(ult).getTime()) / 60000;
+    const agora = min < 10;
+    return `<tr onclick="avPessoa('${cpEsc(p)}')" style="cursor:pointer" class="${avState.pessoa===p?"linha-preta":""}">
+      <td><div class="cell-name"><span class="mini-av">${ini(avQuem(p))}</span>
+        <div>${cpEsc(avQuem(p))}<div style="font-size:11px;color:var(--text-faint);font-weight:500">${cpEsc(p)}</div></div></div></td>
+      <td>${agora ? '<span class="tag t-green">usando agora</span>' : `<span style="color:var(--text-dim)">${fmtDataHora(ult)}</span>`}</td>
+      <td class="num">${nf(conta(L, e => e.acao==="pesquisa"))}</td>
+      <td class="num">${nf(conta(L, e => e.acao==="abriu_ficha"))}</td>
+      <td class="num">${nf(conta(L, e => avTipoDe(e)==="aba"))}</td>
+      <td class="num">${nf(conta(L, e => e.acao==="consulta"))}</td>
+      <td class="num">${nf(conta(L, e => e.acao==="entrou_no_sistema"))}</td>
+    </tr>`;
+  }).join("");
+
+  el("content").innerHTML = cab + `
+    <div class="note" style="margin:0 0 16px">
+      Tudo o que cada assessor fez no sistema no período. O registro só aceita acrescentar:
+      nenhum assessor consegue ver, alterar ou apagar o próprio histórico.
+      A gestão não é registrada.
+    </div>
+    <div class="panel" style="margin-bottom:22px"><table><thead><tr>
+      <th>Assessor</th><th>Última atividade</th><th>Pesquisas</th><th>Fichas abertas</th>
+      <th>Abas abertas</th><th>Consultas ao banco</th><th>Entradas</th></tr></thead>
+      <tbody>${linhasPessoas}</tbody></table></div>
+    <div id="avDetalhe">${avState.pessoa ? avDetalhe(porPessoa[avState.pessoa]) :
+      '<div class="empty">Clique num assessor para ver tudo o que ele fez.</div>'}</div>`;
+}
+
+function avDetalhe(L){
+  const p = avState.pessoa;
+  const cont = t => t === "tudo" ? L.filter(e => avState.consultas || e.acao !== "consulta").length
+                                 : L.filter(e => avTipoDe(e) === t).length;
+  const fichas = L.filter(e => e.acao === "abriu_ficha");
+  const clientesDistintos = new Set(fichas.map(e => (e.detalhe||{}).sinacor || (e.detalhe||{}).cliente)).size;
+  const abas = {};
+  L.filter(e => avTipoDe(e) === "aba").forEach(e => { const a = e.detalhe.aba_clicada; abas[a] = (abas[a]||0) + 1; });
+  const topAbas = Object.entries(abas).sort((a,b) => b[1]-a[1]).slice(0,6)
+    .map(([a,n]) => `${cpEsc(avNomeAba(a))} <b>${nf(n)}</b>`).join(" · ");
+
+  let lista = L.filter(e => avState.tipo === "tudo"
+      ? (avState.consultas || e.acao !== "consulta")
+      : avTipoDe(e) === avState.tipo);
+  window.__avLista = lista;
+
+  let dia = "", corpo = "";
+  lista.slice(0, 1500).forEach(e => {
+    const d = new Date(e.criado_em);
+    const dd = d.toLocaleDateString("pt-BR", {weekday:"long", day:"2-digit", month:"long"});
+    if(dd !== dia){
+      dia = dd;
+      corpo += `<div style="padding:12px 16px;background:var(--bg-2);border-bottom:1px solid var(--border);
+        font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--text-faint)">${dd}</div>`;
+    }
+    corpo += `<div style="display:flex;gap:14px;align-items:baseline;padding:9px 16px;border-bottom:1px solid rgba(255,255,255,.04)">
+      <span class="num" style="font-size:12px;flex:0 0 62px">${d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}</span>
+      <span style="font-size:11px;color:var(--text-faint);flex:0 0 120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${cpEsc(avNomeAba(e.aba||""))}</span>
+      <span style="font-size:13px;flex:1;line-height:1.5">${avFrase(e)}</span>
+    </div>`;
+  });
+
+  return `
+    <div class="sec-title">${cpEsc(avQuem(p))}<span class="rule"></span>
+      <button class="btn-rd" onclick="avExportar()" style="margin-left:12px">Exportar planilha</button></div>
+    <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
+      <div class="kpi"><div class="k-label">Registros</div><div class="k-val">${nf(L.length)}</div><div class="k-sub">no período</div></div>
+      <div class="kpi"><div class="k-label">Pesquisas</div><div class="k-val">${nf(cont("pesquisa"))}</div><div class="k-sub">textos digitados</div></div>
+      <div class="kpi"><div class="k-label">Clientes vistos</div><div class="k-val">${nf(clientesDistintos)}</div><div class="k-sub">${nf(fichas.length)} fichas abertas</div></div>
+      <div class="kpi"><div class="k-label">Primeiro registro</div><div class="k-val" style="font-size:18px">${fmtDataHora(L[L.length-1].criado_em)}</div><div class="k-sub">último: ${fmtDataHora(L[0].criado_em)}</div></div>
+    </div>
+    ${topAbas ? `<div class="note" style="margin-bottom:14px">Abas que mais abriu: ${topAbas}</div>` : ""}
+    <div class="sol-tabs">
+      ${Object.keys(AV_TIPOS).map(t => `<button class="sol-tab ${avState.tipo===t?"on":""}" onclick="avTipo('${t}')">${AV_TIPOS[t][0]} · ${nf(cont(t))}</button>`).join("")}
+      <label style="display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--text-dim);margin-left:auto">
+        <input type="checkbox" ${avState.consultas?"checked":""} onchange="avConsultas(this.checked)" style="width:auto">
+        mostrar consultas ao banco (${nf(L.filter(e=>e.acao==="consulta").length)})</label>
+    </div>
+    <div class="panel">${corpo || '<div class="empty">Nada deste tipo no período.</div>'}
+      ${lista.length > 1500 ? `<div class="pc-hint" style="padding:10px 16px">Mostrando 1.500 de ${nf(lista.length)}. A planilha traz todos.</div>` : ""}
+    </div>`;
+}
+
+function avExportar(){
+  const lista = window.__avLista || [];
+  if(!lista.length){ toast("Nada para exportar", "", true); return; }
+  const limpa = h => String(h).replace(/<[^>]+>/g, "").replace(/&quot;/g,'"').replace(/&amp;/g,"&")
+    .replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&#39;/g,"'");
+  baixarCSV("atividade_" + avQuem(avState.pessoa).toLowerCase().replace(/\s+/g,"_"), [
+    ["Quando", e => fmtDataHora(e.criado_em)], ["E-mail", e => e.email],
+    ["Aba", e => avNomeAba(e.aba||"")], ["Tipo", e => e.acao],
+    ["O que fez", e => limpa(avFrase(e))], ["Detalhe", e => JSON.stringify(e.detalhe||{})],
+    ["Navegador", e => e.agente]
+  ], lista);
 }
 
 // ---------- erro ----------
