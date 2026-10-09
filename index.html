@@ -10236,8 +10236,13 @@ async function mkRascunho(c){
                <input id="mkVar2" value="${cpEsc(c.variavel_2 || "")}" maxlength="300" placeholder="ex.: amanhã, 10/10, às 19h" autocomplete="off">
              </div>
              <div class="pc-hint">É o mesmo texto para todos da campanha.</div>
+             <div class="pc-form" style="max-width:260px;margin-top:10px">
+               <label>Pessoas a cada 5 minutos</label>
+               <input id="mkRitmo" value="${c.lote_rodada || 150}" inputmode="numeric">
+             </div>
+             <div class="pc-hint">De 1 a 300. Menos pessoas por vez dá tempo da equipe responder quem chamar.</div>
              <button class="cfg-save" id="mkDispBtn" style="margin-top:12px" onclick="mkDisparar()">Disparar pelo RD</button>
-             <div class="pc-hint" style="margin-top:8px">Começa em até 5 minutos e sai em ritmo de ~150 pessoas a cada 5 minutos. O acompanhamento conta a partir do clique.</div>
+             <div class="pc-hint" style="margin-top:8px">Começa em até 5 minutos, no ritmo escolhido acima. O acompanhamento conta a partir do clique.</div>
            </div>
            <div class="pc-hint" style="margin-bottom:10px">Ou, se preferir, baixe a planilha e importe no RD:</div>` : ""}
       <div class="pc-form" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:4px 18px;max-width:640px">
@@ -10332,17 +10337,20 @@ async function mkDisparar(){
   if(!/^[A-Za-z0-9_-]{1,100}$/.test(tpl)){
     toast("Template inválido", "Use o nome do template no RD, como aviso_compromisso_1791564439", true); return;
   }
-  if(!confirm(`Disparar "${c.nome}" pelo RD para ${nf(mkState.publico.length)} pessoas?\n\nNão dá para desfazer.`)) return;
+  const minutos = Math.ceil(mkState.publico.length / Math.max(1, parseInt(el("mkRitmo").value, 10) || 150)) * 5;
+  if(!confirm(`Disparar "${c.nome}" pelo RD para ${nf(mkState.publico.length)} pessoas?\n\nLeva cerca de ${nf(minutos)} minutos para sair inteira. Não dá para desfazer.`)) return;
   const btn = el("mkDispBtn");
   btn.disabled = true; btn.textContent = "Colocando na fila…";
   const var2 = (el("mkVar2").value || "").trim();
-  const { data, error } = await sb.rpc("mkt_disparar", { p_campanha: c.id, p_template: tpl, p_variavel_2: var2 || null });
+  const ritmo = parseInt(el("mkRitmo").value, 10);
+  if(!(ritmo >= 1 && ritmo <= 300)){ toast("Ritmo inválido", "Escolha de 1 a 300 pessoas a cada 5 minutos.", true); return; }
+  const { data, error } = await sb.rpc("mkt_disparar", { p_campanha: c.id, p_template: tpl, p_variavel_2: var2 || null, p_lote: ritmo });
   if(error){
     btn.disabled = false; btn.textContent = "Disparar pelo RD";
     toast("Não consegui disparar", mkErroMsg(error), true); return;
   }
   sb.rpc("registrar_evento", { p_acao:"disparou_campanha", p_resumo:"Disparou pelo RD a campanha " + c.nome,
-    p_detalhe:{ campanha:c.id, template:tpl, variavel_2:var2 || null, pessoas:data } });
+    p_detalhe:{ campanha:c.id, template:tpl, variavel_2:var2 || null, ritmo, pessoas:data } });
   toast("Disparo na fila", nf(data) + " pessoas · começa em até 5 minutos");
   mkDetalhe(c.id);
 }
