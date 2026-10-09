@@ -9917,6 +9917,7 @@ async function pcCriar(){
 const MK_OBJ = { reativacao:"Reativação", ativacao:"Ativação", aniversario:"Aniversário",
                  parceiro:"Parceiro", leads:"Leads", outro:"Outro" };
 const MK_ST  = { rascunho:["Rascunho","var(--surface-2)","var(--text-dim)"],
+                 disparando:["Disparando","var(--surface-2)","var(--amber)"],
                  enviada:["Enviada","var(--green-deep)","var(--green)"],
                  encerrada:["Encerrada","var(--surface-2)","var(--text-faint)"] };
 let mkState = { lista:[], atual:null, publico:[], res:[], filtro:"todos", previa:null, regras:null };
@@ -10204,7 +10205,16 @@ async function mkRascunho(c){
     <div class="sec-title">Enviar<span class="rule"></span></div>
     <div class="panel" style="padding:16px 20px">
       ${c.canal_envio === "sistema"
-        ? `<div class="note" style="margin-bottom:12px">O disparo direto pelo sistema ainda não está ligado ao RD. Por enquanto, baixe a planilha e importe no RD.</div>` : ""}
+        ? `<div style="margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid var(--border)">
+             <div class="pc-form" style="max-width:420px">
+               <label>Id do template no RD</label>
+               <input id="mkTpl" value="${cpEsc(c.template_rd || "")}" placeholder="ex.: 6ab447b25c7d2afe82119eb9" autocomplete="off">
+             </div>
+             <div class="pc-hint">O template precisa ter o primeiro nome como variável, igual ao aviso02.</div>
+             <button class="cfg-save" id="mkDispBtn" style="margin-top:12px" onclick="mkDisparar()">Disparar pelo RD</button>
+             <div class="pc-hint" style="margin-top:8px">Começa em até 5 minutos e sai em ritmo de ~150 pessoas a cada 5 minutos. O acompanhamento conta a partir do clique.</div>
+           </div>
+           <div class="pc-hint" style="margin-bottom:10px">Ou, se preferir, baixe a planilha e importe no RD:</div>` : ""}
       <div class="pc-form" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:4px 18px;max-width:640px">
         <div><label>Etiqueta (prefixo)</label><input id="mkTagPref" value="${cpEsc(slug)}"></div>
         <div><label>Pessoas por etiqueta</label><input id="mkLote" value="30" inputmode="numeric"></div>
@@ -10288,6 +10298,26 @@ async function mkMarcarEnviada(){
   await sb.from("mkt_publico").update({ enviado:true, enviado_em:agora }).eq("campanha_id", c.id);
   sb.rpc("registrar_evento", { p_acao:"enviou_campanha", p_resumo:"Marcou como enviada a campanha " + c.nome, p_detalhe:{ campanha:c.id } });
   toast("Campanha enviada", c.nome);
+  mkDetalhe(c.id);
+}
+
+async function mkDisparar(){
+  const c = mkState.atual;
+  const tpl = (el("mkTpl").value || "").trim().toLowerCase();
+  if(!/^[0-9a-f]{24}$/.test(tpl)){
+    toast("Id do template inválido", "São 24 letras e números, como 6ab447b25c7d2afe82119eb9", true); return;
+  }
+  if(!confirm(`Disparar "${c.nome}" pelo RD para ${nf(mkState.publico.length)} pessoas?\n\nNão dá para desfazer.`)) return;
+  const btn = el("mkDispBtn");
+  btn.disabled = true; btn.textContent = "Colocando na fila…";
+  const { data, error } = await sb.rpc("mkt_disparar", { p_campanha: c.id, p_template: tpl });
+  if(error){
+    btn.disabled = false; btn.textContent = "Disparar pelo RD";
+    toast("Não consegui disparar", mkErroMsg(error), true); return;
+  }
+  sb.rpc("registrar_evento", { p_acao:"disparou_campanha", p_resumo:"Disparou pelo RD a campanha " + c.nome,
+    p_detalhe:{ campanha:c.id, template:tpl, pessoas:data } });
+  toast("Disparo na fila", nf(data) + " pessoas · começa em até 5 minutos");
   mkDetalhe(c.id);
 }
 
