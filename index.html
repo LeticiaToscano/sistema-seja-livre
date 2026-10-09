@@ -1213,6 +1213,7 @@
 
       <div class="nav-label">Marketing</div>
       <button class="nav-item" data-view="marketing"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 10v4a1 1 0 0 0 1 1h2l5 4V5L7 9H5a1 1 0 0 0-1 1z" stroke-linejoin="round"/><path d="M16 9a3.5 3.5 0 0 1 0 6M18.5 6.5a7 7 0 0 1 0 11" stroke-linecap="round"/></svg>Campanhas</button>
+      <button class="nav-item" data-view="eventos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4" stroke-linecap="round"/><path d="M9 14.5l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg>Eventos</button>
 
       <div class="nav-label">Gestão</div>
       <button class="nav-item" data-view="conferencia"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l3 3 8-8M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9" stroke-linecap="round" stroke-linejoin="round"/></svg>Conferência</button>
@@ -1648,6 +1649,7 @@ const TITLES={
   integracoes:["SISTEMA","Integrações"],
   parceiros:["ATENDIMENTO","Parceiros · barras e links de abertura"],
   marketing:["MARKETING","Campanhas · do público ao resultado"],
+  eventos:["MARKETING","Eventos · quem se cadastrou e quem já é cliente"],
   patrimonio:["CARTEIRA","Patrimônio · onde está o dinheiro da carteira"]
 };
 const RESERVADAS={
@@ -1657,7 +1659,7 @@ const RESERVADAS={
   ia:{icon:"ia",desc:"O diagnóstico estratégico da operação em linguagem natural, e o copiloto de IA por assessor — cada um enxergando apenas a própria carteira."},
   integracoes:{icon:"integracoes",desc:"As conexões do sistema — Volume Operado (operação), RD Conversas (atendimento), Gmail/Genial (entrada de clientes) e IA. Ligadas e a ligar."}
 };
-const VIEWS={atividade:vAtividade,patrimonio:vPatrimonio,marketing:vMarketing,exportrd:vExportRD,sdr:vSDR,radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,multiconta:vMulticonta,publico:vPublico,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes,auditoria:vAuditoria,diagnostico:vDiagnostico,legenda:vLegenda,leads:vLeads,importacoes:vImportacoes,saidas:vSaidas,plataformas:vPlataformas,custos:vCustos,conferencia:vConferencia,ranking:vRanking,assessores:vAssessores,vencimentos:vVencimentos,zeragem:vZeragem,automacao:vAutomacao,parceiros:vParceiros};
+const VIEWS={atividade:vAtividade,patrimonio:vPatrimonio,marketing:vMarketing,eventos:vEventos,exportrd:vExportRD,sdr:vSDR,radar:vRadar,clientes:vClientes,explorar:vExplorar,destaques:vDestaques,clube:vClube,multiconta:vMulticonta,publico:vPublico,fila:vFila,aniversariantes:vAniversariantes,solicitacoes:vSolicitacoes,config:vConfig,integracoes:vIntegracoes,auditoria:vAuditoria,diagnostico:vDiagnostico,legenda:vLegenda,leads:vLeads,importacoes:vImportacoes,saidas:vSaidas,plataformas:vPlataformas,custos:vCustos,conferencia:vConferencia,ranking:vRanking,assessores:vAssessores,vencimentos:vVencimentos,zeragem:vZeragem,automacao:vAutomacao,parceiros:vParceiros};
 document.querySelectorAll(".nav-item").forEach(b=>b.addEventListener("click",()=>{
   document.querySelectorAll(".nav-item").forEach(x=>x.classList.remove("active"));
   b.classList.add("active"); fecharMenu(); render(b.dataset.view);
@@ -10387,6 +10389,163 @@ function mkPintarResultado(){
     ? `<button class="pc-cp" style="margin:0" onclick="mkEncerrar()">Encerrar campanha</button>` : "";
 }
 
+// =====================================================================
+// MARKETING · EVENTOS
+// Os cadastros chegam do formulário público do evento (QR code) na tabela
+// evento_leads. O formulário só GRAVA (anon tem insert e nada mais).
+// A leitura passa por mkt_evento_leads, que só responde para a gestão
+// (app_is_gestor) e cruza WhatsApp/e-mail com a base de clientes.
+// A aba não está em ABAS_ASSESSOR. Tudo que vem do formulário é digitado
+// por gente de fora: sempre escapar com cpEsc.
+// =====================================================================
+const EV_FILTROS = {
+  todos:    ["Todos",              r => true],
+  naocli:   ["Ainda não são clientes", r => !r.cliente_id],
+  cliente:  ["Clientes",           r => r.cliente_id && r.cliente_status === "ativo"],
+  ex:       ["Ex-clientes",        r => r.cliente_id && r.cliente_status !== "ativo"]
+};
+let evState = { evento:null, lista:[], filtro:"todos", busca:"" };
+
+function evSituacao(r){
+  if(!r.cliente_id) return '<span class="tag" style="background:var(--surface-2);color:var(--amber)">Não é cliente</span>';
+  if(r.cliente_status === "ativo") return '<span class="tag" style="background:var(--green-deep);color:var(--green)">Cliente</span>';
+  return '<span class="tag" style="background:var(--surface-2);color:var(--text-dim)">Ex-cliente</span>';
+}
+function evSitTexto(r){ return !r.cliente_id ? "Não é cliente" : (r.cliente_status === "ativo" ? "Cliente" : "Ex-cliente"); }
+function evFone(d){
+  d = String(d || "").replace(/\D/g, "");
+  return d.length === 11 ? `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`
+       : d.length === 10 ? `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}` : d;
+}
+
+// ---------- lista de eventos ----------
+async function vEventos(){
+  el("content").innerHTML = '<div class="loading"><div class="spinner"></div>Carregando eventos…</div>';
+  const { data, error } = await sb.from("eventos").select("slug,nome,criado_em").order("criado_em", { ascending:false });
+  if(error){ el("content").innerHTML = `<div class="empty">${cpEsc(mkErroMsg(error))}</div>`; return; }
+  const L = data || [];
+  const contagens = await Promise.all(L.map(e =>
+    sb.from("evento_leads").select("id", { count:"exact", head:true }).eq("evento", e.slug)));
+  L.forEach((e,i) => { e.total = contagens[i].count || 0; });
+  el("content").innerHTML = `
+    <div class="pc-sum">
+      <div><div class="k">Eventos</div><div class="v">${nf(L.length)}</div></div>
+      <div><div class="k">Cadastros recebidos</div><div class="v">${nf(L.reduce((s,e)=>s+e.total,0))}</div></div>
+    </div>
+    <div class="panel">
+      ${!L.length ? '<div class="empty">Nenhum evento cadastrado.</div>' :
+      `<table><thead><tr><th>Evento</th><th>Cadastros</th><th>Criado em</th></tr></thead><tbody>
+      ${L.map(e => `<tr onclick="evDetalhe('${cpEsc(e.slug)}')" style="cursor:pointer">
+        <td style="font-weight:700">${cpEsc(e.nome)}</td><td>${nf(e.total)}</td>
+        <td style="color:var(--text-dim)">${fmtData(e.criado_em)}</td></tr>`).join("")}
+      </tbody></table>`}
+    </div>`;
+}
+
+// ---------- um evento ----------
+async function evDetalhe(slug){
+  el("content").innerHTML = '<div class="loading"><div class="spinner"></div>Cruzando os cadastros com a base…</div>';
+  const { data: ev, error: e1 } = await sb.from("eventos").select("slug,nome").eq("slug", slug).single();
+  if(e1 || !ev){ el("content").innerHTML = `<div class="empty">${cpEsc(mkErroMsg(e1))}</div>`; return; }
+  let L;
+  try { L = await mkRpcTudo("mkt_evento_leads", { p_evento: slug }); }
+  catch(e){ el("content").innerHTML = `<div class="empty">${cpEsc(mkErroMsg(e))}</div>`; return; }
+  evState = { evento: ev, lista: L, filtro: "todos", busca: "" };
+  evPintar();
+}
+
+function evContar(L, campo){
+  const m = {};
+  L.forEach(r => { const v = r[campo]; (Array.isArray(v) ? v : [v]).forEach(x => { if(x) m[x] = (m[x]||0) + 1; }); });
+  return Object.keys(m).sort((a,b) => m[b]-m[a]).map(k => [k, m[k]]);
+}
+function evBarras(titulo, pares, total){
+  if(!pares.length) return "";
+  return `<div class="panel" style="padding:14px 18px">
+    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-faint);font-weight:700;margin-bottom:10px">${titulo}</div>
+    ${pares.map(([k,n]) => `<div style="margin:8px 0">
+      <div style="display:flex;justify-content:space-between;gap:10px;font-size:12.5px"><span>${cpEsc(k)}</span><b>${nf(n)}</b></div>
+      <div style="height:5px;border-radius:3px;background:var(--surface-2);margin-top:5px">
+        <div style="height:100%;width:${total ? Math.round(100*n/total) : 0}%;border-radius:3px;background:var(--green)"></div></div></div>`).join("")}
+  </div>`;
+}
+
+function evPintar(){
+  const ev = evState.evento, R = evState.lista;
+  const naoCli = R.filter(EV_FILTROS.naocli[1]), cli = R.filter(EV_FILTROS.cliente[1]), ex = R.filter(EV_FILTROS.ex[1]);
+  const F = EV_FILTROS[evState.filtro] ? evState.filtro : "todos";
+  const q = evState.busca.trim().toLowerCase();
+  const lista = R.filter(EV_FILTROS[F][1]).filter(r => !q ||
+    [r.nome, r.email, r.whatsapp, r.sinacor].some(v => String(v||"").toLowerCase().includes(q)));
+
+  el("content").innerHTML = `
+    <div style="margin-bottom:14px"><button class="pc-cp" style="margin:0" onclick="vEventos()">← Eventos</button></div>
+    <div class="panel" style="padding:16px 20px;margin-bottom:18px">
+      <div style="font-size:18px;font-weight:800">${cpEsc(ev.nome)}</div>
+      <div style="color:var(--text-dim);font-size:12.5px;margin-top:4px">Cadastros pelo formulário do QR code · cliente reconhecido pelo WhatsApp ou pelo e-mail da base</div>
+    </div>
+    <div class="kpi-grid">
+      ${mkKpi("Cadastros", nf(R.length), R.length ? "último em " + fmtDataHora(R[0].criado_em) : "")}
+      ${mkKpi("Ainda não são clientes", nf(naoCli.length), mkPct(naoCli.length, R.length) + " dos cadastros", "var(--amber)")}
+      ${mkKpi("Já são clientes", nf(cli.length), mkPct(cli.length, R.length) + " dos cadastros", "var(--green)")}
+      ${mkKpi("Ex-clientes", nf(ex.length), "estão na base, mas não ativos")}
+    </div>
+    ${R.length ? `<div class="sec-title">O que o público respondeu<span class="rule"></span></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-bottom:22px">
+      ${evBarras("O que mais interessa", evContar(R,"interesse"), R.length)}
+      ${evBarras("Experiência", evContar(R,"experiencia"), R.length)}
+      ${evBarras("Corretora atual", evContar(R,"corretora"), R.length)}
+      ${evBarras("Mercados", evContar(R,"mercados"), R.length)}
+    </div>` : ""}
+    <div class="sec-title">Leads<span class="rule"></span></div>
+    <div class="sol-tabs">${Object.keys(EV_FILTROS).map(k =>
+      `<button class="sol-tab ${F===k?"on":""}" onclick="evFiltrar('${k}')">${EV_FILTROS[k][0]} · ${nf(R.filter(EV_FILTROS[k][1]).length)}</button>`).join("")}</div>
+    <div class="panel">
+      <div class="toolbar">
+        <input class="search" id="evBusca" placeholder="Buscar nome, e-mail, WhatsApp ou Sinacor" value="${cpEsc(evState.busca)}" autocomplete="off">
+        <button class="pc-cp" style="margin:0" onclick="evExportar()">Exportar planilha</button>
+      </div>
+      ${!lista.length ? '<div class="empty">Ninguém neste filtro.</div>' :
+      `<table><thead><tr><th>Nome</th><th>WhatsApp</th><th>E-mail</th><th>Situação</th><th>Experiência</th><th>Corretora</th><th>Interesse</th><th>Cadastro</th></tr></thead><tbody>
+      ${lista.slice(0,500).map(r => `<tr${mkAbre(r.cliente_id)}>
+        <td style="font-weight:650">${cpEsc(r.nome)}</td>
+        <td style="color:var(--text-dim);white-space:nowrap">${cpEsc(evFone(r.whatsapp))}</td>
+        <td style="color:var(--text-dim)">${cpEsc(r.email)}</td>
+        <td>${evSituacao(r)}${r.cliente_id ? `<div style="font-size:11px;color:var(--text-faint);margin-top:4px">${cpEsc(r.sinacor||"")}${r.barra ? " · " + cpEsc(r.barra) : ""}</div>` : ""}</td>
+        <td style="color:var(--text-dim)">${cpEsc(r.experiencia||"—")}</td>
+        <td style="color:var(--text-dim)">${cpEsc(r.corretora||"—")}</td>
+        <td style="color:var(--text-dim)">${cpEsc(r.interesse||"—")}</td>
+        <td style="color:var(--text-dim);white-space:nowrap">${fmtDataHora(r.criado_em)}</td></tr>`).join("")}
+      </tbody></table>
+      ${lista.length > 500 ? `<div class="pc-hint" style="padding:10px 16px">Mostrando 500 de ${nf(lista.length)}. A planilha traz todos.</div>` : ""}`}
+    </div>`;
+
+  const b = el("evBusca");
+  b.oninput = () => { evState.busca = b.value; clearTimeout(b._t); b._t = setTimeout(() => {
+    evPintar(); const n = el("evBusca"); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }, 250); };
+}
+function evFiltrar(k){ evState.filtro = k; evPintar(); }
+
+function evExportar(){
+  const F = evState.filtro, q = evState.busca.trim().toLowerCase();
+  const lista = evState.lista.filter(EV_FILTROS[F][1]).filter(r => !q ||
+    [r.nome, r.email, r.whatsapp, r.sinacor].some(v => String(v||"").toLowerCase().includes(q)));
+  if(!lista.length){ toast("Nada para exportar", "", true); return; }
+  const cab = ["Nome","WhatsApp","E-mail","Situação","Sinacor","Nome na base","Barra","Reconhecido por",
+               "Experiência","Corretora","Mercados","Frequência","Interesse","Cadastro"];
+  const linhas = lista.map(r => [r.nome, evFone(r.whatsapp), r.email, evSitTexto(r), r.sinacor||"", r.cliente_nome||"",
+    r.barra||"", r.casou_por||"", r.experiencia||"", r.corretora||"", (r.mercados||[]).join(", "),
+    r.frequencia||"", r.interesse||"", fmtDataHora(r.criado_em)]);
+  const ws = XLSX.utils.aoa_to_sheet([cab].concat(linhas));
+  ws["!cols"] = cab.map((_,i) => ({ wch: [28,16,30,14,10,28,16,14,34,24,40,24,40,16][i] }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Leads");
+  const nome = (evState.evento.nome||"evento").normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^A-Za-z0-9]+/g,"_");
+  XLSX.writeFile(wb, `${nome}_${F}_${hojeISO()}.xlsx`);
+  sb.rpc("registrar_evento", { p_acao:"exportou_leads_evento", p_resumo:"Exportou os leads do evento " + evState.evento.nome,
+    p_detalhe:{ evento:evState.evento.slug, filtro:F, linhas:lista.length } });
+}
+
 function mkExportar(){
   const F = mkState.filtro;
   const lista = mkState.res.filter(MK_FILTROS[F][1]);
@@ -10835,4 +10994,4 @@ function erBaixar(){
 boot();
 </script>
 </body>
-</html>
+</html>s
