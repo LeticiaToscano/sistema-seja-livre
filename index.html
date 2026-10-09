@@ -9989,8 +9989,9 @@ async function vMarketing(){
 }
 
 // ---------- nova campanha ----------
-function mkNova(){
+async function mkNova(){
   mkState.previa = null;
+  if(!BARRAS.length) await cliCarregarCadastros();
   const faixas = ["sem"].concat(FAIXA_ORDEM.slice().reverse());
   el("content").innerHTML = `
     <div style="margin-bottom:14px"><button class="pc-cp" style="margin:0" onclick="vMarketing()">← Campanhas</button></div>
@@ -10002,13 +10003,23 @@ function mkNova(){
         <div><label>Como vai ser enviada</label><select class="search select" id="mkCanal" style="width:100%">
           <option value="importacao">Planilha importada no RD</option>
           <option value="sistema">Disparo pelo sistema</option></select></div>
+        <div><label>Público</label><select class="search select" id="mkModo" style="width:100%" onchange="mkModoDias()">
+          <option value="parados">Só quem está parado</option>
+          <option value="todos">Todos os clientes (ativos e parados)</option></select></div>
         <div><label>Parado há pelo menos (dias)</label><input id="mkMin" value="30" inputmode="numeric"></div>
         <div><label>Parado há no máximo (dias)</label><input id="mkMax" value="90" inputmode="numeric"></div>
         <div><label>Acompanhar por (dias após o envio)</label><input id="mkJan" value="15" inputmode="numeric"></div>
         <div><label>Tirar quem recebeu campanha nos últimos (dias)</label><input id="mkDesc" value="0" inputmode="numeric">
           <div class="pc-hint">0 = não tirar ninguém.</div></div>
-        <div><label>Barras (separadas por vírgula)</label><input id="mkBarras" placeholder="vazio = todas" autocomplete="off"></div>
-        <div><label>Modelo do RD (opcional)</label><input id="mkTpl" placeholder="nome do template aprovado" autocomplete="off"></div>
+        <div><label>DDDs (separados por vírgula)</label><input id="mkDdd" placeholder="vazio = todos · ex.: 11, 21" inputmode="numeric" autocomplete="off"></div>
+        <div><label>Template do RD</label><input id="mkTpl" placeholder="ex.: aviso_compromisso_1791564439" autocomplete="off"></div>
+      </div>
+      <div class="pc-form" style="margin-top:6px">
+        <label>Barras <span style="text-transform:none;letter-spacing:0;color:var(--text-faint)">(nenhuma marcada = todas)</span></label>
+        <div style="display:flex;gap:8px 14px;flex-wrap:wrap;font-size:13px">
+          ${BARRAS.map(b=>`<label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-size:13px;margin:0">
+            <input type="checkbox" class="mkBarra" value="${cpEsc(b.nome)}" style="width:auto">${cpEsc(b.nome)}</label>`).join("")}
+        </div>
       </div>
       <div class="pc-form" style="margin-top:6px">
         <label>Faixas</label>
@@ -10026,6 +10037,12 @@ function mkNova(){
     <div id="mkPrev"></div>`;
 }
 
+function mkModoDias(){
+  const todos = el("mkModo").value === "todos";
+  ["mkMin","mkMax"].forEach(id => { el(id).disabled = todos; el(id).style.opacity = todos ? .4 : 1; });
+  if(todos) el("mkNunca").checked = true;
+}
+
 function mkLerRegras(){
   const n = id => { const v = parseInt(el(id).value, 10); return isFinite(v) ? v : null; };
   const regras = {
@@ -10033,8 +10050,11 @@ function mkLerRegras(){
     sem_campanha_dias: n("mkDesc") || 0,
     incluir_nunca_operou: el("mkNunca").checked
   };
-  const barras = el("mkBarras").value.split(",").map(b=>b.trim().toUpperCase()).filter(Boolean);
+  if(el("mkModo").value === "todos"){ regras.todos = true; regras.dias_min = 0; regras.dias_max = 99999; }
+  const barras = [...document.querySelectorAll(".mkBarra")].filter(x=>x.checked).map(x=>x.value);
   if(barras.length) regras.barras = barras;
+  const ddds = [...new Set(el("mkDdd").value.split(/[^0-9]+/).filter(d=>/^[1-9][0-9]$/.test(d)))];
+  if(ddds.length) regras.ddds = ddds;
   const fx = [...document.querySelectorAll(".mkFx")].filter(x=>x.checked).map(x=>x.value);
   if(fx.length && fx.length < document.querySelectorAll(".mkFx").length) regras.faixas = fx;
   return regras;
@@ -10207,10 +10227,15 @@ async function mkRascunho(c){
       ${c.canal_envio === "sistema"
         ? `<div style="margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid var(--border)">
              <div class="pc-form" style="max-width:420px">
-               <label>Id do template no RD</label>
-               <input id="mkTpl" value="${cpEsc(c.template_rd || "")}" placeholder="ex.: 6ab447b25c7d2afe82119eb9" autocomplete="off">
+               <label>Template do RD</label>
+               <input id="mkTpl" value="${cpEsc(c.template_rd || "")}" placeholder="ex.: aviso_compromisso_1791564439" autocomplete="off">
              </div>
-             <div class="pc-hint">O template precisa ter o primeiro nome como variável, igual ao aviso02.</div>
+             <div class="pc-hint">Nome do template aprovado no RD. A variável {{1}} recebe o primeiro nome do cliente.</div>
+             <div class="pc-form" style="max-width:520px;margin-top:10px">
+               <label>Texto da variável {{2}} (se o template tiver)</label>
+               <input id="mkVar2" value="${cpEsc(c.variavel_2 || "")}" maxlength="300" placeholder="ex.: amanhã, 10/10, às 19h" autocomplete="off">
+             </div>
+             <div class="pc-hint">É o mesmo texto para todos da campanha.</div>
              <button class="cfg-save" id="mkDispBtn" style="margin-top:12px" onclick="mkDisparar()">Disparar pelo RD</button>
              <div class="pc-hint" style="margin-top:8px">Começa em até 5 minutos e sai em ritmo de ~150 pessoas a cada 5 minutos. O acompanhamento conta a partir do clique.</div>
            </div>
@@ -10303,20 +10328,21 @@ async function mkMarcarEnviada(){
 
 async function mkDisparar(){
   const c = mkState.atual;
-  const tpl = (el("mkTpl").value || "").trim().toLowerCase();
-  if(!/^[0-9a-f]{24}$/.test(tpl)){
-    toast("Id do template inválido", "São 24 letras e números, como 6ab447b25c7d2afe82119eb9", true); return;
+  const tpl = (el("mkTpl").value || "").trim();
+  if(!/^[A-Za-z0-9_-]{1,100}$/.test(tpl)){
+    toast("Template inválido", "Use o nome do template no RD, como aviso_compromisso_1791564439", true); return;
   }
   if(!confirm(`Disparar "${c.nome}" pelo RD para ${nf(mkState.publico.length)} pessoas?\n\nNão dá para desfazer.`)) return;
   const btn = el("mkDispBtn");
   btn.disabled = true; btn.textContent = "Colocando na fila…";
-  const { data, error } = await sb.rpc("mkt_disparar", { p_campanha: c.id, p_template: tpl });
+  const var2 = (el("mkVar2").value || "").trim();
+  const { data, error } = await sb.rpc("mkt_disparar", { p_campanha: c.id, p_template: tpl, p_variavel_2: var2 || null });
   if(error){
     btn.disabled = false; btn.textContent = "Disparar pelo RD";
     toast("Não consegui disparar", mkErroMsg(error), true); return;
   }
   sb.rpc("registrar_evento", { p_acao:"disparou_campanha", p_resumo:"Disparou pelo RD a campanha " + c.nome,
-    p_detalhe:{ campanha:c.id, template:tpl, pessoas:data } });
+    p_detalhe:{ campanha:c.id, template:tpl, variavel_2:var2 || null, pessoas:data } });
   toast("Disparo na fila", nf(data) + " pessoas · começa em até 5 minutos");
   mkDetalhe(c.id);
 }
