@@ -9992,6 +9992,7 @@ async function vMarketing(){
 async function mkNova(){
   mkState.previa = null;
   if(!BARRAS.length) await cliCarregarCadastros();
+  mkState.barrasSel = []; mkState.prevFora = new Set(); mkState.prevAbertos = new Set();
   const faixas = ["sem"].concat(FAIXA_ORDEM.slice().reverse());
   el("content").innerHTML = `
     <div style="margin-bottom:14px"><button class="pc-cp" style="margin:0" onclick="vMarketing()">← Campanhas</button></div>
@@ -10014,12 +10015,14 @@ async function mkNova(){
         <div><label>DDDs (separados por vírgula)</label><input id="mkDdd" placeholder="vazio = todos · ex.: 11, 21" inputmode="numeric" autocomplete="off"></div>
         <div><label>Template do RD</label><input id="mkTpl" placeholder="ex.: aviso_compromisso_1791564439" autocomplete="off"></div>
       </div>
-      <div class="pc-form" style="margin-top:6px">
-        <label>Barras <span style="text-transform:none;letter-spacing:0;color:var(--text-faint)">(nenhuma marcada = todas)</span></label>
-        <div style="display:flex;gap:8px 14px;flex-wrap:wrap;font-size:13px">
-          ${BARRAS.map(b=>`<label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-size:13px;margin:0">
-            <input type="checkbox" class="mkBarra" value="${cpEsc(b.nome)}" style="width:auto">${cpEsc(b.nome)}</label>`).join("")}
-        </div>
+      <div class="pc-form" style="margin-top:6px;max-width:640px;position:relative">
+        <label>Barras <span style="text-transform:none;letter-spacing:0;color:var(--text-faint)">(nenhuma escolhida = todas)</span></label>
+        <input id="mkBarraBusca" placeholder="Digite para buscar a barra" autocomplete="off"
+               oninput="mkBarraSugerir()" onfocus="mkBarraSugerir()" onkeydown="mkBarraTecla(event)"
+               onblur="setTimeout(()=>{const s=el('mkBarraSug'); if(s) s.style.display='none';},150)">
+        <div id="mkBarraSug" style="display:none;position:absolute;left:0;right:0;z-index:20;margin-top:4px;max-height:260px;overflow:auto;
+             background:var(--surface-2);border:1px solid var(--border-strong);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.35)"></div>
+        <div id="mkBarraChips" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"></div>
       </div>
       <div class="pc-form" style="margin-top:6px">
         <label>Faixas</label>
@@ -10037,6 +10040,38 @@ async function mkNova(){
     <div id="mkPrev"></div>`;
 }
 
+// ---------- escolha de barras: busca + etiquetas ----------
+function mkSemAcento(t){ return String(t||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase(); }
+function mkBarraSugerir(){
+  const q = mkSemAcento(el("mkBarraBusca").value).trim();
+  const sel = new Set(mkState.barrasSel || []);
+  const L = BARRAS.map(b => b.nome).filter(n => !sel.has(n) && (!q || mkSemAcento(n).includes(q))).slice(0, 30);
+  const box = el("mkBarraSug");
+  box.innerHTML = L.length ? L.map((n, i) =>
+    `<div class="mk-sug" data-nome="${cpEsc(n)}" onmousedown="mkBarraAdd(this.dataset.nome)"
+          onmouseover="this.style.background='rgba(255,255,255,.06)'" onmouseout="this.style.background=''"
+          style="padding:9px 12px;cursor:pointer;font-size:13px">${cpEsc(n)}</div>`).join("")
+    : '<div style="padding:9px 12px;font-size:13px;color:var(--text-faint)">Nenhuma barra encontrada</div>';
+  box.style.display = "block";
+}
+function mkBarraTecla(e){
+  if(e.key === "Enter"){ e.preventDefault(); const p = el("mkBarraSug").querySelector(".mk-sug"); if(p) mkBarraAdd(p.dataset.nome); }
+  if(e.key === "Escape") el("mkBarraSug").style.display = "none";
+}
+function mkBarraAdd(nome){
+  if(!nome) return;
+  mkState.barrasSel = mkState.barrasSel || [];
+  if(!mkState.barrasSel.includes(nome)) mkState.barrasSel.push(nome);
+  el("mkBarraBusca").value = ""; el("mkBarraSug").style.display = "none";
+  mkBarraChips();
+}
+function mkBarraTirar(i){ mkState.barrasSel.splice(i, 1); mkBarraChips(); }
+function mkBarraChips(){
+  el("mkBarraChips").innerHTML = (mkState.barrasSel || []).map((n, i) =>
+    `<span class="tag" style="background:var(--green-deep);color:var(--green);display:inline-flex;align-items:center;gap:6px;padding:4px 6px 4px 10px">
+       ${cpEsc(n)}<button onclick="mkBarraTirar(${i})" title="Tirar" style="background:none;border:0;color:inherit;cursor:pointer;font-size:14px;line-height:1;padding:0 2px">×</button></span>`).join("");
+}
+
 function mkModoDias(){
   const todos = el("mkModo").value === "todos";
   ["mkMin","mkMax"].forEach(id => { el(id).disabled = todos; el(id).style.opacity = todos ? .4 : 1; });
@@ -10051,7 +10086,7 @@ function mkLerRegras(){
     incluir_nunca_operou: el("mkNunca").checked
   };
   if(el("mkModo").value === "todos"){ regras.todos = true; regras.dias_min = 0; regras.dias_max = 99999; }
-  const barras = [...document.querySelectorAll(".mkBarra")].filter(x=>x.checked).map(x=>x.value);
+  const barras = (mkState.barrasSel || []).slice();
   if(barras.length) regras.barras = barras;
   const ddds = [...new Set(el("mkDdd").value.split(/[^0-9]+/).filter(d=>/^[1-9][0-9]$/.test(d)))];
   if(ddds.length) regras.ddds = ddds;
@@ -10076,6 +10111,10 @@ async function mkPrevia(){
   try { P = await mkRpcTudo("mkt_previa_publico", { p_regras: regras }); }
   catch(e){ box.innerHTML = `<div class="empty">${cpEsc(mkErroMsg(e))}</div>`; return; }
   mkState.previa = P; mkState.regras = regras;
+  // quem já tinha sido tirado continua fora, se ainda estiver no público
+  const noPub = new Set(P.map(x => String(x.sinacor)));
+  mkState.prevFora = new Set([...(mkState.prevFora || [])].filter(sx => noPub.has(sx)));
+  mkState.prevBusca = "";
 
   // ---- avisos ----
   const avisos = [];
@@ -10146,10 +10185,85 @@ async function mkPrevia(){
       <div class="panel" style="margin-bottom:22px"><table><thead><tr><th>Campanha</th><th>Envio</th><th>Público</th><th>Responderam</th><th>Reativaram</th></tr></thead>
       <tbody>${hist}</tbody></table>
       <div class="pc-hint" style="padding:10px 16px">Reativaram = dos que estavam parados no envio, quantos operaram dentro do prazo de acompanhamento.</div></div>` : ""}
+    ${P.length ? `<div class="sec-title">Clientes por parceiro<span class="rule"></span></div>
+    <div class="panel" style="margin-bottom:22px">
+      <div class="toolbar" style="gap:10px;flex-wrap:wrap">
+        <input class="search" placeholder="Buscar cliente, Sinacor ou parceiro" autocomplete="off"
+               oninput="mkState.prevBusca=this.value;mkPintarGrupos()" style="flex:1;min-width:220px">
+      </div>
+      <div class="pc-hint" style="padding:0 16px 8px">Abra um parceiro para ver os clientes. A caixa ao lado do nome inclui ou tira o parceiro inteiro.</div>
+      <div id="mkGrupos"></div>
+    </div>` : ""}
     <div class="panel" style="padding:16px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
       <div style="flex:1;font-size:13.5px">Criar a campanha grava a lista de hoje como rascunho. Nada é enviado ainda.</div>
       <button class="cfg-save" id="mkCriarBtn" onclick="mkCriar()" ${P.length ? "" : "disabled"}>Criar campanha com ${nf(P.length)} pessoas</button>
     </div>`;
+  if(P.length) mkPintarGrupos();
+}
+
+// ---------- clientes por parceiro: incluir ou tirar antes de criar ----------
+function mkGruposDados(){
+  const q = mkSemAcento(mkState.prevBusca || "").trim();
+  const G = {};
+  for(const x of mkState.previa || []){
+    const b = x.barra || "— sem barra —";
+    if(q && ![x.nome, x.sinacor, b].some(v => mkSemAcento(v).includes(q))) continue;
+    (G[b] = G[b] || []).push(x);
+  }
+  return Object.keys(G).sort((a, b) => G[b].length - G[a].length || a.localeCompare(b)).map(b => [b, G[b]]);
+}
+function mkPintarGrupos(){
+  const F = mkState.prevFora, abertos = mkState.prevAbertos = mkState.prevAbertos || new Set();
+  const grupos = mkGruposDados();
+  el("mkGrupos").innerHTML = !grupos.length ? '<div class="empty">Ninguém encontrado.</div>' : grupos.map(([b, L], gi) => {
+    const dentro = L.filter(x => !F.has(String(x.sinacor))).length;
+    const todos = dentro === L.length, nenhum = dentro === 0;
+    return `<details ${abertos.has(b) ? "open" : ""} ontoggle="mkGrupoAberto(this, ${gi})" data-barra="${cpEsc(b)}"
+             style="border-top:1px solid var(--border)">
+      <summary style="display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;list-style:none">
+        <input type="checkbox" style="width:auto" ${nenhum ? "" : "checked"} onclick="event.stopPropagation();mkGrupoTodos(${gi}, this.checked)"
+               ${!todos && !nenhum ? 'data-meio="1"' : ""}>
+        <span style="font-weight:650;flex:1">${cpEsc(b)}</span>
+        <span style="color:${nenhum ? "var(--text-faint)" : todos ? "var(--green)" : "var(--amber)"};font-size:13px">${nf(dentro)} de ${nf(L.length)}</span>
+        <span style="color:var(--text-faint);font-size:12px">▾</span>
+      </summary>
+      <div class="mk-grupo-corpo">${abertos.has(b) ? mkGrupoCorpo(L) : ""}</div>
+    </details>`;
+  }).join("");
+  // caixa "meio marcada" quando só parte do parceiro está dentro
+  el("mkGrupos").querySelectorAll('input[data-meio]').forEach(i => { i.indeterminate = true; });
+  mkAtualizarBotaoCriar();
+}
+function mkGrupoCorpo(L){
+  const F = mkState.prevFora;
+  return `<table><tbody>${L.map(x => `<tr style="${F.has(String(x.sinacor)) ? "opacity:.45" : ""}">
+    <td style="width:36px;padding-left:40px"><input type="checkbox" style="width:auto" ${F.has(String(x.sinacor)) ? "" : "checked"}
+        onclick="mkClienteAlternar('${cpEsc(String(x.sinacor))}')"></td>
+    <td style="font-weight:600">${cpEsc(x.nome || "—")}</td>
+    <td style="color:var(--text-dim)">${cpEsc(x.sinacor || "—")}</td>
+    <td>${faixaBadge(x.faixa, 0)}</td>
+    <td style="color:var(--text-dim)">${x.ultima_op ? "operou em " + fmtData(x.ultima_op) : "nunca operou"}</td>
+  </tr>`).join("")}</tbody></table>`;
+}
+function mkGrupoAberto(det, gi){
+  const b = det.dataset.barra, ab = mkState.prevAbertos;
+  if(det.open){ ab.add(b); det.querySelector(".mk-grupo-corpo").innerHTML = mkGrupoCorpo(mkGruposDados()[gi][1]); }
+  else ab.delete(b);
+}
+function mkGrupoTodos(gi, sim){
+  mkGruposDados()[gi][1].forEach(x => sim ? mkState.prevFora.delete(String(x.sinacor)) : mkState.prevFora.add(String(x.sinacor)));
+  mkPintarGrupos();
+}
+function mkClienteAlternar(sx){
+  const F = mkState.prevFora;
+  F.has(sx) ? F.delete(sx) : F.add(sx);
+  mkPintarGrupos();
+}
+function mkAtualizarBotaoCriar(){
+  const b = el("mkCriarBtn"); if(!b) return;
+  const n = (mkState.previa || []).length - mkState.prevFora.size;
+  b.textContent = "Criar campanha com " + nf(n) + " pessoas";
+  b.disabled = n <= 0;
 }
 
 async function mkCriar(){
@@ -10157,9 +10271,11 @@ async function mkCriar(){
   if(!nome){ toast("Falta o nome", "Dê um nome para a campanha.", true); return; }
   const jan = parseInt(el("mkJan").value, 10);
   el("mkCriarBtn").disabled = true;
+  const regras = mkLerRegras();
+  if(mkState.prevFora && mkState.prevFora.size) regras.excluir = [...mkState.prevFora];
   const { data, error } = await sb.rpc("mkt_criar_campanha", {
     p_nome: nome, p_objetivo: el("mkObj").value, p_canal: el("mkCanal").value,
-    p_regras: mkLerRegras(), p_template: el("mkTpl").value.trim() || null,
+    p_regras: regras, p_template: el("mkTpl").value.trim() || null,
     p_janela: isFinite(jan) && jan > 0 ? jan : 15
   });
   if(error){ el("mkCriarBtn").disabled = false; toast("Não consegui criar", mkErroMsg(error), true); return; }
