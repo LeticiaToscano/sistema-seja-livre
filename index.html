@@ -10421,7 +10421,7 @@ function evFone(d){
 // ---------- lista de eventos ----------
 async function vEventos(){
   el("content").innerHTML = '<div class="loading"><div class="spinner"></div>Carregando eventos…</div>';
-  const { data, error } = await sb.from("eventos").select("slug,nome,criado_em").order("criado_em", { ascending:false });
+  const { data, error } = await sb.from("mkt_eventos").select("slug,nome,criado_em").order("criado_em", { ascending:false });
   if(error){ el("content").innerHTML = `<div class="empty">${cpEsc(mkErroMsg(error))}</div>`; return; }
   const L = data || [];
   const contagens = await Promise.all(L.map(e =>
@@ -10445,7 +10445,7 @@ async function vEventos(){
 // ---------- um evento ----------
 async function evDetalhe(slug){
   el("content").innerHTML = '<div class="loading"><div class="spinner"></div>Cruzando os cadastros com a base…</div>';
-  const { data: ev, error: e1 } = await sb.from("eventos").select("slug,nome").eq("slug", slug).single();
+  const { data: ev, error: e1 } = await sb.from("mkt_eventos").select("slug,nome").eq("slug", slug).single();
   if(e1 || !ev){ el("content").innerHTML = `<div class="empty">${cpEsc(mkErroMsg(e1))}</div>`; return; }
   let L;
   try { L = await mkRpcTudo("mkt_evento_leads", { p_evento: slug }); }
