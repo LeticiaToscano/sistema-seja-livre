@@ -1230,7 +1230,7 @@
       <button class="nav-item" data-view="integracoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 7V4M15 7V4M8 7h8v4a4 4 0 0 1-8 0z" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15v5" stroke-linecap="round"/></svg>Integrações</button>
     </nav>
     <div class="foot">
-      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v08/10b conferência cobrança Genial</div></div></div>
+      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v13/10 busca com botão em Clientes</div></div></div>
       <button class="btn-vercomo hidden" id="verComoBtn" type="button">Ver como assessor</button>
       <button class="btn-logout" id="logoutBtn">Sair</button>
     </div>
@@ -1915,7 +1915,7 @@ async function vClientes(){
   el("content").innerHTML=`
     <div class="panel">
       <div class="toolbar">
-        <input class="search" id="busca" placeholder="Buscar por nome, Sinacor ou parceiro…">
+        <input class="search" id="busca" placeholder="Nome, Sinacor, CPF ou parceiro — Enter para buscar">
         <select class="search select" id="filtro">
           <option value="todos">Todas as situações</option>
           <option value="operando">Operando</option>
@@ -1927,6 +1927,8 @@ async function vClientes(){
           ${BARRAS.map(b=>`<option value="${b.nome}">${b.nome}</option>`).join("")}
         </select>
         <span id="filtroParceiroBox"></span>
+        <button class="cfg-save" id="cliBuscar" onclick="cliAplicar()" style="padding:9px 18px">Buscar</button>
+        <button class="btn-rd" onclick="cliLimpar()" title="Limpar a busca e os filtros">Limpar</button>
         <button class="btn-rd" onclick="cliNovaBarra()" title="Criar uma barra nova">+ barra</button>
       </div>
       <div id="cliAcoes"></div>
@@ -1936,11 +1938,13 @@ async function vClientes(){
   cliState={termo:"",filtro:"todos",barra:"todas",parceiro:"todos",page:0,size:50,total:0};
   cliSel = new Set();
 
-  el("busca").addEventListener("input",e=>{ clearTimeout(buscaTimer); buscaTimer=setTimeout(()=>{cliState.termo=e.target.value.trim();cliState.page=0;carregarClientes();},300); });
-  el("filtro").addEventListener("change",e=>{ cliState.filtro=e.target.value; cliState.page=0; carregarClientes(); });
+  // Busca e filtros só rodam ao clicar em Buscar ou apertar Enter.
+  // Antes cada letra disparava uma consulta, e a resposta de uma letra
+  // antiga às vezes chegava por último e apagava a certa.
+  el("busca").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); cliAplicar(); } });
   el("filtroBarra").addEventListener("change",e=>{
-    cliState.barra=e.target.value; cliState.parceiro="todos"; cliState.page=0;
-    cliSel.clear(); cliPintarParceiro(); carregarClientes();
+    // troca a barra só para mostrar (ou esconder) o filtro de parceiro
+    cliState.barra=e.target.value; cliState.parceiro="todos"; cliPintarParceiro();
   });
   cliPintarParceiro();
   carregarClientes();
@@ -1975,8 +1979,7 @@ function cliPintarParceiro(){
     <button class="btn-rd" onclick="cliNovoParceiro()" title="Criar um parceiro nesta barra">+ parceiro</button>`;
   el("filtroParceiro").value = cliState.parceiro;
   el("filtroParceiro").addEventListener("change",e=>{
-    cliState.parceiro=e.target.value; cliState.page=0; cliSel.clear();
-    cliPintarParceiro(); carregarClientes();
+    cliState.parceiro=e.target.value; cliPintarParceiro();
   });
 
   // com um parceiro escolhido, as ações dele ficam à mão
@@ -2053,8 +2056,28 @@ async function cliNovoParceiro(){
   toast(data.acao==="criado" ? "Parceiro criado" : "Esse parceiro já existia", data.nome);
   await cliCarregarCadastros(); cliPintarParceiro();
 }
+// Lê o que está nos campos e busca. Única porta de entrada da busca.
+function cliAplicar(){
+  cliState.termo    = el("busca").value.trim();
+  cliState.filtro   = el("filtro").value;
+  cliState.barra    = el("filtroBarra").value;
+  cliState.parceiro = el("filtroParceiro") ? el("filtroParceiro").value : "todos";
+  cliState.page = 0; cliSel.clear();
+  carregarClientes();
+}
+function cliLimpar(){
+  el("busca").value=""; el("filtro").value="todos"; el("filtroBarra").value="todas";
+  cliState.barra="todas"; cliState.parceiro="todos"; cliPintarParceiro();
+  cliAplicar();
+}
+
+let cliSeq = 0;   // só a consulta mais recente pode pintar a tabela
 async function carregarClientes(){
   const {termo,filtro,page,size}=cliState;
+  const meu = ++cliSeq;
+  const btn = el("cliBuscar"); if(btn){ btn.disabled=true; btn.textContent="Buscando…"; }
+  const fim = () => { if(meu===cliSeq && btn){ btn.disabled=false; btn.textContent="Buscar"; } };
+  el("tabelaClientes").innerHTML='<div class="loading"><div class="spinner"></div>Buscando…</div>';
 
   // Com termo de busca, procura na tabela de clientes direto: acha em
   // QUALQUER barra e QUALQUER situacao, inclusive quem foi desligado e a
@@ -2063,6 +2086,8 @@ async function carregarClientes(){
   if(termo && termo.trim().length >= 2){
     const {data,error} = await sb.rpc("fn_buscar_cliente",
       {p_termo: termo.trim(), p_limite: 200});
+    if(meu!==cliSeq) return;
+    fim();
     if(error) return erro(error,"tabelaClientes");
     const achados = data || [];
     cliState.total = achados.length;
@@ -2115,6 +2140,8 @@ async function carregarClientes(){
   if(cliState.parceiro==="__sem"){ q = q.is("parceiros",null); }
   else if(cliState.parceiro!=="todos"){ q = q.eq("parceiros",cliState.parceiro); }
   const {data,error,count} = await q;
+  if(meu!==cliSeq) return;
+  fim();
   if(error){ return erro(error,"tabelaClientes"); }
   cliState.total=count||0;
   if(!data.length){ el("tabelaClientes").innerHTML='<div class="empty">Nenhum cliente encontrado.</div>'; return; }
