@@ -10120,6 +10120,11 @@ function mkFonteTrocar(){
   el("mkPrev").innerHTML = "";
 }
 // Lê o arquivo e guarda só nome + telefone. A validação de verdade é no banco.
+function mkFoneLead(v){
+  let d = String(v ?? "").replace(/\D/g, "").replace(/^0+/, "");
+  if(d.length === 10 || d.length === 11) d = "55" + d;
+  return d;
+}
 async function mkLerPlanilha(f){
   const box = el("mkPrev");
   mkState.planilha = null;
@@ -10132,33 +10137,35 @@ async function mkLerPlanilha(f){
       .filter(r => r && r.some(c => String(c).trim() !== ""));   // Excel guarda linhas vazias formatadas
   }catch(e){ box.innerHTML = `<div class="empty">Não consegui ler a planilha: ${cpEsc(e.message)}</div>`; return; }
   const norm = v => mkSemAcento(v).trim();
-  const ehFone = c => /telefone|whats|celular|fone|numero/.test(norm(c));
-  const hi = aoa.slice(0, 10).findIndex(r => r.some(ehFone));
-  let cTel, cNome, corpo;
-  if(hi >= 0){
-    const cab = aoa[hi].map(norm);
-    cTel  = cab.findIndex(ehFone);
-    cNome = cab.findIndex(c => /^nome|nome completo|^cliente|^lead/.test(c));
-    corpo = aoa.slice(hi + 1);
-  } else {
-    // sem cabeçalho: a coluna de telefone é a que tem mais números de 10 a 13 dígitos
-    const n = (aoa[0] || []).length;
-    const pts = Array.from({ length:n }, (_, j) => aoa.filter(r => /^\d{10,13}$/.test(String(r[j]||"").replace(/\D/g,""))).length);
-    cTel = pts.indexOf(Math.max(...pts, 0));
-    cNome = cTel === 0 ? 1 : 0;
-    corpo = aoa;
+  const ehFone = c => /telefone|whats|celular|fone|contato|numero|phone/.test(norm(c));
+  const valido = v => /^55\d{10,11}$/.test(mkFoneLead(v));
+  const hi = aoa.slice(0, 10).findIndex(r => r.some(c => ehFone(c) || /^nome/.test(norm(c))));
+  const corpo = hi >= 0 ? aoa.slice(hi + 1) : aoa;
+  const cab = hi >= 0 ? aoa[hi].map(norm) : [];
+  // escolhe a coluna pelo conteúdo: a que tem mais telefones válidos (cabeçalho de telefone desempata)
+  const nCol = Math.max(0, ...corpo.slice(0, 500).map(r => r.length));
+  const amostra = corpo.slice(0, 500);
+  let cTel = -1, melhor = 0;
+  for(let j = 0; j < nCol; j++){
+    const pts = amostra.filter(r => valido(r[j])).length * 2 + (ehFone(cab[j] || "") ? 1 : 0);
+    if(pts > melhor){ melhor = pts; cTel = j; }
   }
-  if(cTel < 0){ box.innerHTML = '<div class="empty">Não achei a coluna de telefone na planilha.</div>'; return; }
+  if(cTel < 0 || melhor < 2){
+    const ex = amostra.slice(0, 3).map(r => r.filter(c => String(c).trim()).slice(0, 4).join(" | ")).filter(Boolean);
+    box.innerHTML = `<div class="empty">Não achei nenhuma coluna com telefone válido (DDD + número).${ex.length ? "<br>Início da planilha: " + ex.map(cpEsc).join("<br>") : ""}</div>`; return;
+  }
+  let cNome = cab.findIndex(c => /^nome|nome completo|^cliente|^lead/.test(c));
+  if(cNome < 0 && hi < 0) cNome = cTel === 0 ? 1 : 0;
   if(corpo.length > 20000){ box.innerHTML = `<div class="empty">A planilha tem ${nf(corpo.length)} linhas preenchidas. O limite é 20.000: divida em arquivos menores.</div>`; return; }
 
   const lista = [], invalidos = [];
   for(const r of corpo){
     const nome = cNome >= 0 ? String(r[cNome] || "").trim().slice(0, 120) : "";
-    const fone = mkFoneRD(r[cTel]);
-    if(!/^55\d{10,11}$/.test(fone)){ invalidos.push(nome || String(r[cTel] || "")); continue; }
+    const fone = mkFoneLead(r[cTel]);
+    if(!/^55\d{10,11}$/.test(fone)){ invalidos.push(String(r[cTel] || "(vazio)")); continue; }
     lista.push({ nome, telefone: fone });
   }
-  mkState.planilha = { arquivo: f.name, lista, invalidos };
+  mkState.planilha = { arquivo: f.name, lista, invalidos, coluna: (hi >= 0 && aoa[hi][cTel]) ? String(aoa[hi][cTel]) : "coluna " + (cTel + 1) };
   mkPreviaPlanilha();
 }
 async function mkPreviaPlanilha(){
@@ -10187,7 +10194,8 @@ async function mkPreviaPlanilha(){
   if(repetidos > 0) motivos["telefone repetido na planilha"] = repetidos;
   const nm = Object.keys(motivos).sort((a, b) => motivos[b] - motivos[a]);
   box.innerHTML = `
-    <div class="kpi-grid" style="margin-top:18px">
+    <div class="pc-hint" style="margin-top:14px">Telefone lido da coluna <b>${cpEsc(P.coluna)}</b>${P.invalidos.length ? " · exemplos de telefone inválido: " + P.invalidos.slice(0, 5).map(cpEsc).join(", ") : ""}</div>
+    <div class="kpi-grid" style="margin-top:10px">
       ${mkKpi("Público", nf(entra.length), "pessoas que entram na campanha", "var(--green)")}
       ${mkKpi("Já são clientes", nf(clientes), "dentro do público")}
       ${mkKpi("Não clientes", nf(entra.length - clientes), "dentro do público")}
