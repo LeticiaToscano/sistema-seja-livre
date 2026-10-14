@@ -10031,18 +10031,21 @@ async function mkNova(){
         <div><label>Como vai ser enviada</label><select class="search select" id="mkCanal" style="width:100%">
           <option value="importacao">Planilha importada no RD</option>
           <option value="sistema">Disparo pelo sistema</option></select></div>
-        <div><label>Público</label><select class="search select" id="mkModo" style="width:100%" onchange="mkModoDias()">
+        <div><label>Público vem de</label><select class="search select" id="mkFonte" style="width:100%" onchange="mkFonteTrocar()">
+          <option value="filtro">Filtro de clientes</option>
+          <option value="planilha">Planilha de leads</option></select></div>
+        <div class="mkSoFiltro"><label>Público</label><select class="search select" id="mkModo" style="width:100%" onchange="mkModoDias()">
           <option value="parados">Só quem está parado</option>
           <option value="todos">Todos os clientes (ativos e parados)</option></select></div>
-        <div><label>Parado há pelo menos (dias)</label><input id="mkMin" value="30" inputmode="numeric"></div>
-        <div><label>Parado há no máximo (dias)</label><input id="mkMax" value="90" inputmode="numeric"></div>
+        <div class="mkSoFiltro"><label>Parado há pelo menos (dias)</label><input id="mkMin" value="30" inputmode="numeric"></div>
+        <div class="mkSoFiltro"><label>Parado há no máximo (dias)</label><input id="mkMax" value="90" inputmode="numeric"></div>
         <div><label>Acompanhar por (dias após o envio)</label><input id="mkJan" value="15" inputmode="numeric"></div>
-        <div><label>Tirar quem recebeu campanha nos últimos (dias)</label><input id="mkDesc" value="0" inputmode="numeric">
+        <div class="mkSoFiltro"><label>Tirar quem recebeu campanha nos últimos (dias)</label><input id="mkDesc" value="0" inputmode="numeric">
           <div class="pc-hint">0 = não tirar ninguém.</div></div>
-        <div><label>DDDs (separados por vírgula)</label><input id="mkDdd" placeholder="vazio = todos · ex.: 11, 21" inputmode="numeric" autocomplete="off"></div>
+        <div class="mkSoFiltro"><label>DDDs (separados por vírgula)</label><input id="mkDdd" placeholder="vazio = todos · ex.: 11, 21" inputmode="numeric" autocomplete="off"></div>
         <div><label>Template do RD</label><input id="mkTpl" placeholder="ex.: aviso_compromisso_1791564439" autocomplete="off"></div>
       </div>
-      <div class="pc-form" style="margin-top:6px;max-width:640px;position:relative">
+      <div class="pc-form mkSoFiltro" style="margin-top:6px;max-width:640px;position:relative">
         <label>Barras <span style="text-transform:none;letter-spacing:0;color:var(--text-faint)">(nenhuma escolhida = todas)</span></label>
         <input id="mkBarraBusca" placeholder="Digite para buscar a barra" autocomplete="off"
                oninput="mkBarraSugerir()" onfocus="mkBarraSugerir()" onkeydown="mkBarraTecla(event)"
@@ -10051,7 +10054,7 @@ async function mkNova(){
              background:var(--surface-2);border:1px solid var(--border-strong);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.35)"></div>
         <div id="mkBarraChips" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"></div>
       </div>
-      <div class="pc-form" style="margin-top:6px">
+      <div class="pc-form mkSoFiltro" style="margin-top:6px">
         <label>Faixas</label>
         <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:13px">
           ${faixas.map(f=>`<label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-size:13px;margin:0">
@@ -10060,8 +10063,13 @@ async function mkNova(){
         <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:13px;margin-top:12px">
           <input type="checkbox" id="mkNunca" style="width:auto">Incluir quem nunca operou</label>
       </div>
-      <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
+      <div class="mkSoFiltro" style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
         <button class="pc-add" onclick="mkPrevia()">Ver público e avisos</button>
+      </div>
+      <div class="pc-form mkSoPlan" style="margin-top:6px;display:none">
+        <label>Planilha de leads (.xlsx ou .csv)</label>
+        <input type="file" id="mkArq" accept=".xlsx,.xls,.csv" style="width:auto" onchange="mkLerPlanilha(this.files[0])">
+        <div class="pc-hint">Precisa de uma coluna de telefone (Telefone, WhatsApp ou Celular). A coluna Nome é opcional. Até 5.000 linhas.</div>
       </div>
     </div>
     <div id="mkPrev"></div>`;
@@ -10097,6 +10105,98 @@ function mkBarraChips(){
   el("mkBarraChips").innerHTML = (mkState.barrasSel || []).map((n, i) =>
     `<span class="tag" style="background:var(--green-deep);color:var(--green);display:inline-flex;align-items:center;gap:6px;padding:4px 6px 4px 10px">
        ${cpEsc(n)}<button onclick="mkBarraTirar(${i})" title="Tirar" style="background:none;border:0;color:inherit;cursor:pointer;font-size:14px;line-height:1;padding:0 2px">×</button></span>`).join("");
+}
+
+// ---------- público vindo de planilha de leads ----------
+// O conteúdo do arquivo não é confiável: tudo passa por cpEsc na tela
+// e o banco (mkt_criar_campanha_lista) revalida telefone, tamanho e limite.
+function mkFonteTrocar(){
+  const plan = el("mkFonte").value === "planilha";
+  document.querySelectorAll(".mkSoFiltro").forEach(e => { e.style.display = plan ? "none" : ""; });
+  document.querySelectorAll(".mkSoPlan").forEach(e => { e.style.display = plan ? "" : "none"; });
+  if(plan) el("mkObj").value = "leads";
+  mkState.previa = null; mkState.planilha = null;
+  el("mkPrev").innerHTML = "";
+}
+async function mkLerPlanilha(f){
+  const box = el("mkPrev");
+  if(!f) return;
+  if(f.size > 5 * 1024 * 1024){ toast("Arquivo grande demais", "Use uma planilha de até 5 MB.", true); return; }
+  let aoa;
+  try{
+    const wb = XLSX.read(new Uint8Array(await f.arrayBuffer()), { type:"array" });
+    aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header:1, raw:true, defval:"" });
+  }catch(e){ box.innerHTML = `<div class="empty">Não consegui ler a planilha: ${cpEsc(e.message)}</div>`; return; }
+  const norm = v => mkSemAcento(v).trim();
+  const ehFone = c => /telefone|whats|celular|fone|numero/.test(norm(c));
+  let hi = aoa.slice(0, 10).findIndex(r => (r || []).some(ehFone));
+  let cTel, cNome, corpo;
+  if(hi >= 0){
+    const cab = aoa[hi].map(norm);
+    cTel  = cab.findIndex(ehFone);
+    cNome = cab.findIndex(c => /^nome|nome completo|^cliente|^lead/.test(c));
+    corpo = aoa.slice(hi + 1);
+  } else {
+    // sem cabeçalho: a coluna de telefone é a que tem mais números de 10 a 13 dígitos
+    const n = (aoa[0] || []).length;
+    const pts = Array.from({ length:n }, (_, j) => aoa.filter(r => /^\d{10,13}$/.test(String(r[j]||"").replace(/\D/g,""))).length);
+    cTel = pts.indexOf(Math.max(...pts, 0));
+    cNome = cTel === 0 ? 1 : 0;
+    corpo = aoa;
+  }
+  if(cTel < 0){ box.innerHTML = '<div class="empty">Não achei a coluna de telefone na planilha.</div>'; return; }
+  if(corpo.length > 5000){ box.innerHTML = '<div class="empty">A planilha passou de 5.000 linhas. Divida em arquivos menores.</div>'; return; }
+
+  const vistos = new Set(), ok = [], invalidos = [];
+  let repetidos = 0;
+  for(const r of corpo){
+    if(!r || r.every(c => String(c).trim() === "")) continue;
+    const nome = cNome >= 0 ? String(r[cNome] || "").trim().slice(0, 120) : "";
+    const fone = mkFoneRD(r[cTel]);
+    if(!/^55\d{10,11}$/.test(fone)){ invalidos.push(nome || String(r[cTel] || "")); continue; }
+    const k = fone.slice(2, 4) + fone.slice(-8);
+    if(vistos.has(k)){ repetidos++; continue; }
+    vistos.add(k); ok.push({ nome, telefone: fone });
+  }
+  mkState.planilha = { arquivo: f.name, lista: ok };
+  box.innerHTML = `
+    <div class="kpi-grid" style="margin-top:18px">
+      ${mkKpi("Público", nf(ok.length), "telefones válidos", "var(--green)")}
+      ${mkKpi("Inválidos", nf(invalidos.length), "ficam fora", invalidos.length ? "var(--amber)" : null)}
+      ${mkKpi("Repetidos", nf(repetidos), "mesmo telefone, entra uma vez", repetidos ? "var(--amber)" : null)}
+      ${mkKpi("Sem nome", nf(ok.filter(x => !x.nome).length), "o {{1}} sai vazio")}
+    </div>
+    ${invalidos.length ? `<div class="panel" style="padding:10px 18px;margin-bottom:16px;font-size:13px;border-left:3px solid var(--amber)">
+      Fora por telefone inválido: ${invalidos.slice(0, 10).map(cpEsc).join(", ")}${invalidos.length > 10 ? " e mais " + nf(invalidos.length - 10) : ""}</div>` : ""}
+    <div class="panel" style="margin-bottom:16px">
+      <table><thead><tr><th>Nome</th><th>Telefone</th></tr></thead><tbody>
+      ${ok.slice(0, 50).map(x => `<tr><td style="font-weight:600">${cpEsc(x.nome || "—")}</td><td style="color:var(--text-dim)">${cpEsc(x.telefone)}</td></tr>`).join("")}
+      </tbody></table>
+      ${ok.length > 50 ? `<div class="pc-hint" style="padding:10px 16px">Mostrando 50 de ${nf(ok.length)}.</div>` : ""}
+    </div>
+    <div class="panel" style="padding:16px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <div style="flex:1;font-size:13.5px">Criar a campanha grava esta lista como rascunho. Nada é enviado ainda.</div>
+      <button class="cfg-save" id="mkCriarBtn" onclick="mkCriarPlanilha()" ${ok.length ? "" : "disabled"}>Criar campanha com ${nf(ok.length)} pessoas</button>
+    </div>`;
+}
+async function mkCriarPlanilha(){
+  const nome = el("mkNome").value.trim();
+  if(!nome){ toast("Falta o nome", "Dê um nome para a campanha.", true); return; }
+  const P = mkState.planilha;
+  if(!P || !P.lista.length){ toast("Falta a planilha", "Escolha o arquivo de leads.", true); return; }
+  const jan = parseInt(el("mkJan").value, 10);
+  el("mkCriarBtn").disabled = true;
+  const { data, error } = await sb.rpc("mkt_criar_campanha_lista", {
+    p_nome: nome, p_objetivo: el("mkObj").value, p_canal: el("mkCanal").value,
+    p_lista: P.lista, p_arquivo: P.arquivo, p_template: el("mkTpl").value.trim() || null,
+    p_janela: isFinite(jan) && jan > 0 ? jan : 15
+  });
+  if(error){ el("mkCriarBtn").disabled = false; toast("Não consegui criar", mkErroMsg(error), true); return; }
+  sb.rpc("registrar_evento", { p_acao:"criou_campanha", p_resumo:"Criou a campanha " + nome + " por planilha",
+    p_detalhe:{ campanha:data, arquivo:P.arquivo, pessoas:P.lista.length } });
+  toast("Campanha criada", nome);
+  await vMarketing();
+  mkDetalhe(data);
 }
 
 function mkModoDias(){
@@ -10473,6 +10573,7 @@ function mkTabelaPublico(L){
 // Antes de baixar, confere de novo: quem voltou a operar (ou saiu das regras)
 // desde a criação sai da lista gravada. Foi exatamente o erro de 04/10.
 async function mkRevalidar(c){
+  if(c.regras && c.regras.fonte === "planilha") return 0;
   const atual = await mkRpcTudo("mkt_previa_publico", { p_regras: c.regras || {} });
   const ok = new Set(atual.map(x => String(x.sinacor)));
   const sair = mkState.publico.filter(p => !ok.has(String(p.sinacor))).map(p => p.sinacor);
