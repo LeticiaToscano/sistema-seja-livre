@@ -9944,7 +9944,11 @@ async function pcCriar(){
 const MK_OBJ = { reativacao:"Reativação", ativacao:"Ativação", aniversario:"Aniversário",
                  parceiro:"Parceiro", leads:"Leads", outro:"Outro" };
 const MK_ST  = { rascunho:["Rascunho","var(--surface-2)","var(--text-dim)"],
+                 agendada:["Agendada","var(--surface-2)","var(--amber)"],
                  disparando:["Disparando","var(--surface-2)","var(--amber)"],
+                 pausada:["Pausada","var(--surface-2)","var(--text-dim)"],
+                 cancelada:["Cancelada","var(--surface-2)","var(--red)"],
+                 falhou:["Falhou","var(--surface-2)","var(--red)"],
                  enviada:["Enviada","var(--green-deep)","var(--green)"],
                  encerrada:["Encerrada","var(--surface-2)","var(--text-faint)"] };
 let mkState = { lista:[], atual:null, publico:[], res:[], filtro:"todos", previa:null, regras:null };
@@ -9982,7 +9986,7 @@ function mkErroMsg(e){
 async function vMarketing(){
   el("content").innerHTML = '<div class="loading"><div class="spinner"></div>Carregando campanhas…</div>';
   const { data, error } = await sb.from("mkt_campanhas")
-    .select("id,nome,objetivo,canal_envio,status,data_envio,janela_dias,criado_em")
+    .select("id,nome,objetivo,canal_envio,status,data_envio,agendada_para,janela_dias,criado_em")
     .order("criado_em", { ascending:false });
   if(error){ el("content").innerHTML = `<div class="empty">${cpEsc(mkErroMsg(error))}</div>`; return; }
   mkState.lista = data || [];
@@ -10008,7 +10012,7 @@ async function vMarketing(){
         <td style="font-weight:700">${cpEsc(c.nome)}</td>
         <td style="color:var(--text-dim)">${MK_OBJ[c.objetivo]||cpEsc(c.objetivo)}</td>
         <td>${mkTag(c.status)}</td>
-        <td style="color:var(--text-dim)">${c.data_envio ? fmtData(c.data_envio) : "—"}</td>
+        <td style="color:var(--text-dim)">${c.status==="agendada" && c.agendada_para ? "agendada p/ " + fmtDataHora(c.agendada_para) : (c.data_envio ? fmtData(c.data_envio) : "—")}</td>
         <td>${nf(c.publico)}</td>
         <td style="color:var(--text-dim)">${c.canal_envio==="sistema" ? "Pelo sistema" : "Planilha no RD"}</td>
       </tr>`).join("")}</tbody></table>`}
@@ -10462,6 +10466,7 @@ async function mkDetalhe(id){
   if(error || !c){ el("content").innerHTML = `<div class="empty">${cpEsc(mkErroMsg(error))}</div>`; return; }
   mkState.atual = c; mkState.filtro = "todos";
   if(c.status === "rascunho") return mkRascunho(c);
+  if(c.status === "agendada" || !c.data_envio) return mkSemEnvio(c);
   let R;
   try { R = await mkRpcTudo("mkt_resultado", { p_campanha: c.id }); }
   catch(e){ el("content").innerHTML = `<div class="empty">${cpEsc(mkErroMsg(e))}</div>`; return; }
@@ -10491,8 +10496,43 @@ function mkCabecalho(c){
         </div>
         ${c.observacoes ? `<div class="pc-hint" style="margin-top:6px">${cpEsc(c.observacoes)}</div>` : ""}
       </div>
-      <div id="mkAcoes" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+      <div id="mkAcoes" style="display:flex;gap:8px;flex-wrap:wrap">${mkControles(c)}</div>
     </div>`;
+}
+
+// ---------- pausar / retomar / cancelar (mkt_controlar só responde à gestão) ----------
+function mkControles(c){
+  const b = (acao, rot, cor) => `<button class="pc-cp" style="margin:0${cor?";color:"+cor:""}" onclick="mkControlar('${acao}')">${rot}</button>`;
+  if(c.status === "disparando") return b("pausar", "Pausar disparo") + b("cancelar", "Cancelar campanha", "var(--red)");
+  if(c.status === "pausada")    return b("retomar", "Retomar disparo") + b("cancelar", "Cancelar campanha", "var(--red)");
+  if(c.status === "agendada")   return b("cancelar", "Cancelar agendamento", "var(--red)");
+  if(c.status === "rascunho")   return b("cancelar", "Cancelar campanha", "var(--red)");
+  return "";
+}
+
+async function mkControlar(acao){
+  const c = mkState.atual;
+  const avisos = {
+    pausar:   `Pausar "${c.nome}"? Quem ainda não recebeu fica na fila até você retomar. A rodada que já está saindo agora ainda termina.`,
+    retomar:  `Retomar "${c.nome}"? O envio volta em até 5 minutos, no mesmo ritmo.`,
+    cancelar: `Cancelar "${c.nome}"? Quem ainda não recebeu não recebe mais. Quem já recebeu continua nos resultados. Não dá para desfazer.`
+  };
+  if(!confirm(avisos[acao])) return;
+  const { data, error } = await sb.rpc("mkt_controlar", { p_campanha: c.id, p_acao: acao });
+  if(error){ toast("Não consegui " + acao, mkErroMsg(error), true); return; }
+  const rot = { pausar:"pausou", retomar:"retomou", cancelar:"cancelou" }[acao];
+  sb.rpc("registrar_evento", { p_acao: rot + "_campanha", p_resumo: "Gestão " + rot + " a campanha " + c.nome, p_detalhe:{ campanha:c.id } });
+  toast("Campanha " + ((MK_ST[data] || [data])[0]).toLowerCase(), c.nome);
+  mkDetalhe(c.id);
+}
+
+// ---------- agendada, ou cancelada antes de sair ----------
+function mkSemEnvio(c){
+  const msg = c.status === "agendada"
+    ? `Disparo agendado para <b>${fmtDataHora(c.agendada_para)}</b>, no ritmo de ${nf(c.lote_rodada || 150)} pessoas a cada 5 minutos, com o template <b>${cpEsc(c.template_rd || "—")}</b>.
+       Na hora marcada o sistema confere o público de novo: quem não se encaixa mais nos filtros sai da lista antes do envio.`
+    : "Esta campanha não chegou a ser enviada.";
+  el("content").innerHTML = mkCabecalho(c) + `<div class="panel" style="padding:16px 20px;font-size:13.5px">${msg}</div>`;
 }
 
 // ---------- rascunho: conferir, baixar, marcar como enviada ----------
@@ -10537,8 +10577,16 @@ async function mkRascunho(c){
                <input id="mkRitmo" value="${c.lote_rodada || 150}" inputmode="numeric">
              </div>
              <div class="pc-hint">De 1 a 300. Menos pessoas por vez dá tempo da equipe responder quem chamar.</div>
-             <button class="cfg-save" id="mkDispBtn" style="margin-top:12px" onclick="mkDisparar()">Disparar pelo RD</button>
+             <button class="cfg-save" id="mkDispBtn" style="margin-top:12px" onclick="mkDisparar(false)">Disparar pelo RD agora</button>
              <div class="pc-hint" style="margin-top:8px">Começa em até 5 minutos, no ritmo escolhido acima. O acompanhamento conta a partir do clique.</div>
+             <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-top:14px">
+               <div class="pc-form" style="max-width:260px;margin:0">
+                 <label>Ou agendar para</label>
+                 <input id="mkAgenda" type="datetime-local">
+               </div>
+               <button class="pc-add" id="mkAgendaBtn" onclick="mkDisparar(true)">Agendar disparo</button>
+             </div>
+             <div class="pc-hint" style="margin-top:8px">Até 30 dias à frente. Na hora marcada o público é conferido de novo e o envio começa em até 5 minutos.</div>
            </div>
            <div class="pc-hint" style="margin-bottom:10px">Ou, se preferir, baixe a planilha e importe no RD:</div>` : ""}
       <div class="pc-form" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:4px 18px;max-width:640px">
@@ -10697,31 +10745,45 @@ async function mkMarcarEnviada(){
   mkDetalhe(c.id);
 }
 
-async function mkDisparar(){
+async function mkDisparar(agendar){
   const c = mkState.atual;
   const tpl = (el("mkTpl").value || "").trim();
   if(!/^[A-Za-z0-9_-]{1,100}$/.test(tpl)){
     toast("Template inválido", "Use o nome do template no RD, como aviso_compromisso_1791564439", true); return;
   }
-  const qtd = mkState.publico.length - mkState.desmarcados.size;
-  if(!qtd){ toast("Ninguém marcado", "Marque pelo menos uma pessoa para receber.", true); return; }
-  const minutos = Math.ceil(qtd / Math.max(1, parseInt(el("mkRitmo").value, 10) || 150)) * 5;
-  if(!confirm(`Disparar "${c.nome}" pelo RD para ${nf(qtd)} pessoas?\n\nLeva cerca de ${nf(minutos)} minutos para sair inteira. Não dá para desfazer.`)) return;
-  const btn = el("mkDispBtn");
-  btn.disabled = true; btn.textContent = "Colocando na fila…";
-  try { await mkAplicarSelecao(c); }
-  catch(e){ btn.disabled = false; btn.textContent = "Disparar pelo RD"; toast("Não consegui ajustar a lista", mkErroMsg(e), true); return; }
-  const var2 = (el("mkVar2").value || "").trim();
   const ritmo = parseInt(el("mkRitmo").value, 10);
   if(!(ritmo >= 1 && ritmo <= 300)){ toast("Ritmo inválido", "Escolha de 1 a 300 pessoas a cada 5 minutos.", true); return; }
-  const { data, error } = await sb.rpc("mkt_disparar", { p_campanha: c.id, p_template: tpl, p_variavel_2: var2 || null, p_lote: ritmo });
-  if(error){
-    btn.disabled = false; btn.textContent = "Disparar pelo RD";
-    toast("Não consegui disparar", mkErroMsg(error), true); return;
+  let quando = null;
+  if(agendar){
+    const v = el("mkAgenda").value;
+    const d = v ? new Date(v) : null;   // hora local de quem agenda
+    if(!d || isNaN(d)){ toast("Escolha dia e hora", "Preencha o campo \"Ou agendar para\".", true); return; }
+    if(d.getTime() <= Date.now()){ toast("Horário no passado", "Escolha um horário no futuro.", true); return; }
+    if(d.getTime() > Date.now() + 30*864e5){ toast("Muito à frente", "O agendamento vai até 30 dias.", true); return; }
+    quando = d;
   }
-  sb.rpc("registrar_evento", { p_acao:"disparou_campanha", p_resumo:"Disparou pelo RD a campanha " + c.nome,
-    p_detalhe:{ campanha:c.id, template:tpl, variavel_2:var2 || null, ritmo, pessoas:data } });
-  toast("Disparo na fila", nf(data) + " pessoas · começa em até 5 minutos");
+  const qtd = mkState.publico.length - mkState.desmarcados.size;
+  if(!qtd){ toast("Ninguém marcado", "Marque pelo menos uma pessoa para receber.", true); return; }
+  const minutos = Math.ceil(qtd / ritmo) * 5;
+  const pergunta = agendar
+    ? `Agendar "${c.nome}" para ${quando.toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"})}, para até ${nf(qtd)} pessoas?\n\nLeva cerca de ${nf(minutos)} minutos para sair inteira. Dá para cancelar até a hora do disparo.`
+    : `Disparar "${c.nome}" pelo RD para ${nf(qtd)} pessoas?\n\nLeva cerca de ${nf(minutos)} minutos para sair inteira. Dá para pausar ou cancelar no meio.`;
+  if(!confirm(pergunta)) return;
+  const btn = el(agendar ? "mkAgendaBtn" : "mkDispBtn"), rotulo = btn.textContent;
+  const volta = () => { btn.disabled = false; btn.textContent = rotulo; };
+  btn.disabled = true; btn.textContent = agendar ? "Agendando…" : "Colocando na fila…";
+  try { await mkAplicarSelecao(c); }
+  catch(e){ volta(); toast("Não consegui ajustar a lista", mkErroMsg(e), true); return; }
+  const var2 = (el("mkVar2").value || "").trim();
+  const { data, error } = await sb.rpc("mkt_disparar", { p_campanha: c.id, p_template: tpl, p_variavel_2: var2 || null,
+    p_lote: ritmo, p_agendar_para: quando ? quando.toISOString() : null });
+  if(error){ volta(); toast(agendar ? "Não consegui agendar" : "Não consegui disparar", mkErroMsg(error), true); return; }
+  sb.rpc("registrar_evento", { p_acao: agendar ? "agendou_campanha" : "disparou_campanha",
+    p_resumo: (agendar ? "Agendou" : "Disparou") + " pelo RD a campanha " + c.nome,
+    p_detalhe:{ campanha:c.id, template:tpl, variavel_2:var2 || null, ritmo, pessoas:data, agendada_para: quando ? quando.toISOString() : null } });
+  toast(agendar ? "Disparo agendado" : "Disparo na fila",
+        agendar ? nf(data) + " pessoas · " + quando.toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"})
+                : nf(data) + " pessoas · começa em até 5 minutos");
   mkDetalhe(c.id);
 }
 
@@ -10819,8 +10881,8 @@ function mkPintarResultado(){
       ${lista.length > 300 ? `<div class="pc-hint" style="padding:10px 16px">Mostrando 300 de ${nf(lista.length)}. A planilha traz todos.</div>` : ""}`}
     </div>`;
 
-  el("mkAcoes").innerHTML = c.status === "enviada"
-    ? `<button class="pc-cp" style="margin:0" onclick="mkEncerrar()">Encerrar campanha</button>` : "";
+  el("mkAcoes").innerHTML = mkControles(c) + (c.status === "enviada"
+    ? `<button class="pc-cp" style="margin:0" onclick="mkEncerrar()">Encerrar campanha</button>` : "");
 }
 
 // =====================================================================
