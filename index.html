@@ -10063,13 +10063,14 @@ async function mkNova(){
         <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:13px;margin-top:12px">
           <input type="checkbox" id="mkNunca" style="width:auto">Incluir quem nunca operou</label>
       </div>
-      <div class="mkSoFiltro" style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
-        <button class="pc-add" onclick="mkPrevia()">Ver público e avisos</button>
-      </div>
       <div class="pc-form mkSoPlan" style="margin-top:6px;display:none">
         <label>Planilha de leads (.xlsx ou .csv)</label>
         <input type="file" id="mkArq" accept=".xlsx,.xls,.csv" style="width:auto" onchange="mkLerPlanilha(this.files[0])">
-        <div class="pc-hint">Precisa de uma coluna de telefone (Telefone, WhatsApp ou Celular). A coluna Nome é opcional. Até 5.000 linhas.</div>
+        <div class="pc-hint">Precisa de uma coluna de telefone (Telefone, WhatsApp ou Celular). A coluna Nome é opcional. Até 20.000 linhas.<br>
+          Os filtros acima valem para a planilha. Quem já é cliente é filtrado pela barra, faixa e última operação; quem não é cliente conta como "nunca operou".</div>
+      </div>
+      <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
+        <button class="pc-add" onclick="mkPrevia()">Ver público e avisos</button>
       </div>
     </div>
     <div id="mkPrev"></div>`;
@@ -10112,24 +10113,27 @@ function mkBarraChips(){
 // e o banco (mkt_criar_campanha_lista) revalida telefone, tamanho e limite.
 function mkFonteTrocar(){
   const plan = el("mkFonte").value === "planilha";
-  document.querySelectorAll(".mkSoFiltro").forEach(e => { e.style.display = plan ? "none" : ""; });
   document.querySelectorAll(".mkSoPlan").forEach(e => { e.style.display = plan ? "" : "none"; });
-  if(plan) el("mkObj").value = "leads";
+  if(plan){ el("mkObj").value = "leads"; el("mkModo").value = "todos"; mkModoDias(); }
   mkState.previa = null; mkState.planilha = null;
+  if(el("mkArq")) el("mkArq").value = "";
   el("mkPrev").innerHTML = "";
 }
+// Lê o arquivo e guarda só nome + telefone. A validação de verdade é no banco.
 async function mkLerPlanilha(f){
   const box = el("mkPrev");
+  mkState.planilha = null;
   if(!f) return;
   if(f.size > 5 * 1024 * 1024){ toast("Arquivo grande demais", "Use uma planilha de até 5 MB.", true); return; }
   let aoa;
   try{
     const wb = XLSX.read(new Uint8Array(await f.arrayBuffer()), { type:"array" });
-    aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header:1, raw:true, defval:"" });
+    aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header:1, raw:true, defval:"" })
+      .filter(r => r && r.some(c => String(c).trim() !== ""));   // Excel guarda linhas vazias formatadas
   }catch(e){ box.innerHTML = `<div class="empty">Não consegui ler a planilha: ${cpEsc(e.message)}</div>`; return; }
   const norm = v => mkSemAcento(v).trim();
   const ehFone = c => /telefone|whats|celular|fone|numero/.test(norm(c));
-  let hi = aoa.slice(0, 10).findIndex(r => (r || []).some(ehFone));
+  const hi = aoa.slice(0, 10).findIndex(r => r.some(ehFone));
   let cTel, cNome, corpo;
   if(hi >= 0){
     const cab = aoa[hi].map(norm);
@@ -10145,38 +10149,67 @@ async function mkLerPlanilha(f){
     corpo = aoa;
   }
   if(cTel < 0){ box.innerHTML = '<div class="empty">Não achei a coluna de telefone na planilha.</div>'; return; }
-  if(corpo.length > 5000){ box.innerHTML = '<div class="empty">A planilha passou de 5.000 linhas. Divida em arquivos menores.</div>'; return; }
+  if(corpo.length > 20000){ box.innerHTML = `<div class="empty">A planilha tem ${nf(corpo.length)} linhas preenchidas. O limite é 20.000: divida em arquivos menores.</div>`; return; }
 
-  const vistos = new Set(), ok = [], invalidos = [];
-  let repetidos = 0;
+  const lista = [], invalidos = [];
   for(const r of corpo){
-    if(!r || r.every(c => String(c).trim() === "")) continue;
     const nome = cNome >= 0 ? String(r[cNome] || "").trim().slice(0, 120) : "";
     const fone = mkFoneRD(r[cTel]);
     if(!/^55\d{10,11}$/.test(fone)){ invalidos.push(nome || String(r[cTel] || "")); continue; }
-    const k = fone.slice(2, 4) + fone.slice(-8);
-    if(vistos.has(k)){ repetidos++; continue; }
-    vistos.add(k); ok.push({ nome, telefone: fone });
+    lista.push({ nome, telefone: fone });
   }
-  mkState.planilha = { arquivo: f.name, lista: ok };
+  mkState.planilha = { arquivo: f.name, lista, invalidos };
+  mkPreviaPlanilha();
+}
+async function mkPreviaPlanilha(){
+  const box = el("mkPrev"), P = mkState.planilha;
+  if(!P){ toast("Falta a planilha", "Escolha o arquivo de leads.", true); return; }
+  const regras = mkLerRegras(); delete regras.excluir;
+  if(regras.dias_min > regras.dias_max){ toast("Faixa de dias inválida", "O mínimo é maior que o máximo.", true); return; }
+  box.innerHTML = '<div class="loading"><div class="spinner"></div>Cruzando a planilha com a base…</div>';
+  let R = [];
+  try{
+    for(let de = 0; ; de += 1000){
+      const { data, error } = await sb.rpc("mkt_previa_lista", { p_lista: P.lista, p_regras: regras })
+        .order("telefone").range(de, de + 999);
+      if(error) throw error;
+      R = R.concat(data || []);
+      if(!data || data.length < 1000) break;
+    }
+  }catch(e){ box.innerHTML = `<div class="empty">${cpEsc(mkErroMsg(e))}</div>`; return; }
+  mkState.regras = regras;
+  const entra = R.filter(x => !x.motivo), fora = R.filter(x => x.motivo);
+  const clientes = entra.filter(x => x.sinacor).length;
+  const repetidos = P.lista.length - R.length;
+  const motivos = {};
+  fora.forEach(x => { motivos[x.motivo] = (motivos[x.motivo] || 0) + 1; });
+  if(P.invalidos.length) motivos["telefone inválido"] = P.invalidos.length;
+  if(repetidos > 0) motivos["telefone repetido na planilha"] = repetidos;
+  const nm = Object.keys(motivos).sort((a, b) => motivos[b] - motivos[a]);
   box.innerHTML = `
     <div class="kpi-grid" style="margin-top:18px">
-      ${mkKpi("Público", nf(ok.length), "telefones válidos", "var(--green)")}
-      ${mkKpi("Inválidos", nf(invalidos.length), "ficam fora", invalidos.length ? "var(--amber)" : null)}
-      ${mkKpi("Repetidos", nf(repetidos), "mesmo telefone, entra uma vez", repetidos ? "var(--amber)" : null)}
-      ${mkKpi("Sem nome", nf(ok.filter(x => !x.nome).length), "o {{1}} sai vazio")}
+      ${mkKpi("Público", nf(entra.length), "pessoas que entram na campanha", "var(--green)")}
+      ${mkKpi("Já são clientes", nf(clientes), "dentro do público")}
+      ${mkKpi("Não clientes", nf(entra.length - clientes), "dentro do público")}
+      ${mkKpi("Ficaram fora", nf(fora.length + P.invalidos.length + Math.max(0, repetidos)), "pelos filtros ou telefone", nm.length ? "var(--amber)" : null)}
     </div>
-    ${invalidos.length ? `<div class="panel" style="padding:10px 18px;margin-bottom:16px;font-size:13px;border-left:3px solid var(--amber)">
-      Fora por telefone inválido: ${invalidos.slice(0, 10).map(cpEsc).join(", ")}${invalidos.length > 10 ? " e mais " + nf(invalidos.length - 10) : ""}</div>` : ""}
+    ${nm.length ? `<div class="sec-title">Por que ficaram fora<span class="rule"></span></div>
+    <div class="panel" style="padding:14px 18px;margin-bottom:22px">
+      ${nm.map(m => `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px"><span>${cpEsc(m)}</span><b>${nf(motivos[m])}</b></div>`).join("")}
+    </div>` : ""}
     <div class="panel" style="margin-bottom:16px">
-      <table><thead><tr><th>Nome</th><th>Telefone</th></tr></thead><tbody>
-      ${ok.slice(0, 50).map(x => `<tr><td style="font-weight:600">${cpEsc(x.nome || "—")}</td><td style="color:var(--text-dim)">${cpEsc(x.telefone)}</td></tr>`).join("")}
+      <table><thead><tr><th>Nome</th><th>Telefone</th><th>Cliente</th><th>Barra</th><th>Faixa</th><th>Última operação</th></tr></thead><tbody>
+      ${entra.slice(0, 50).map(x => `<tr${mkAbre(x.cliente_id)}><td style="font-weight:600">${cpEsc(x.nome || "—")}</td>
+        <td style="color:var(--text-dim)">${cpEsc(x.telefone)}</td>
+        <td style="color:var(--text-dim)">${x.sinacor ? cpEsc(x.sinacor) : "não é cliente"}</td>
+        <td style="color:var(--text-dim)">${cpEsc(x.barra || "—")}</td><td>${faixaBadge(x.faixa, 0)}</td>
+        <td style="color:var(--text-dim)">${x.ultima_op ? fmtData(x.ultima_op) : "nunca"}</td></tr>`).join("")}
       </tbody></table>
-      ${ok.length > 50 ? `<div class="pc-hint" style="padding:10px 16px">Mostrando 50 de ${nf(ok.length)}.</div>` : ""}
+      ${entra.length > 50 ? `<div class="pc-hint" style="padding:10px 16px">Mostrando 50 de ${nf(entra.length)}.</div>` : ""}
     </div>
     <div class="panel" style="padding:16px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
-      <div style="flex:1;font-size:13.5px">Criar a campanha grava esta lista como rascunho. Nada é enviado ainda.</div>
-      <button class="cfg-save" id="mkCriarBtn" onclick="mkCriarPlanilha()" ${ok.length ? "" : "disabled"}>Criar campanha com ${nf(ok.length)} pessoas</button>
+      <div style="flex:1;font-size:13.5px">Criar a campanha grava esta lista como rascunho. Nada é enviado ainda. Mudou um filtro? Clique em "Ver público e avisos" de novo.</div>
+      <button class="cfg-save" id="mkCriarBtn" onclick="mkCriarPlanilha()" ${entra.length ? "" : "disabled"}>Criar campanha com ${nf(entra.length)} pessoas</button>
     </div>`;
 }
 async function mkCriarPlanilha(){
@@ -10185,15 +10218,16 @@ async function mkCriarPlanilha(){
   const P = mkState.planilha;
   if(!P || !P.lista.length){ toast("Falta a planilha", "Escolha o arquivo de leads.", true); return; }
   const jan = parseInt(el("mkJan").value, 10);
+  const regras = mkLerRegras(); delete regras.excluir;
   el("mkCriarBtn").disabled = true;
   const { data, error } = await sb.rpc("mkt_criar_campanha_lista", {
     p_nome: nome, p_objetivo: el("mkObj").value, p_canal: el("mkCanal").value,
     p_lista: P.lista, p_arquivo: P.arquivo, p_template: el("mkTpl").value.trim() || null,
-    p_janela: isFinite(jan) && jan > 0 ? jan : 15
+    p_janela: isFinite(jan) && jan > 0 ? jan : 15, p_regras: regras
   });
   if(error){ el("mkCriarBtn").disabled = false; toast("Não consegui criar", mkErroMsg(error), true); return; }
   sb.rpc("registrar_evento", { p_acao:"criou_campanha", p_resumo:"Criou a campanha " + nome + " por planilha",
-    p_detalhe:{ campanha:data, arquivo:P.arquivo, pessoas:P.lista.length } });
+    p_detalhe:{ campanha:data, arquivo:P.arquivo, linhas:P.lista.length } });
   toast("Campanha criada", nome);
   await vMarketing();
   mkDetalhe(data);
@@ -10230,6 +10264,7 @@ function mkUltimoUtil(){
 }
 
 async function mkPrevia(){
+  if(el("mkFonte") && el("mkFonte").value === "planilha") return mkPreviaPlanilha();
   const regras = mkLerRegras();
   if(regras.dias_min > regras.dias_max){ toast("Faixa de dias inválida", "O mínimo é maior que o máximo.", true); return; }
   const box = el("mkPrev");
@@ -10454,8 +10489,17 @@ function mkCabecalho(c){
 
 // ---------- rascunho: conferir, baixar, marcar como enviada ----------
 async function mkRascunho(c){
-  const { data, error } = await sb.from("mkt_publico")
-    .select("id,cliente_id,sinacor,nome,telefone,barra,faixa,ultima_op,dias_parado").eq("campanha_id", c.id).order("nome").limit(10000);
+  // o Supabase entrega no máximo mil linhas por vez: busca de mil em mil
+  let data = [], error = null;
+  for(let de = 0; ; de += 1000){
+    const r = await sb.from("mkt_publico")
+      .select("id,cliente_id,sinacor,nome,telefone,barra,faixa,ultima_op,dias_parado").eq("campanha_id", c.id)
+      .order("id").range(de, de + 999);
+    if(r.error){ error = r.error; break; }
+    data = data.concat(r.data || []);
+    if(!r.data || r.data.length < 1000) break;
+  }
+  data.sort((a, b) => String(a.nome||"").localeCompare(String(b.nome||""), "pt-BR"));
   if(error){ el("content").innerHTML = `<div class="empty">${cpEsc(mkErroMsg(error))}</div>`; return; }
   mkState.desmarcados = new Set(); mkState.busca = "";
   mkState.publico = data || [];
@@ -10573,7 +10617,21 @@ function mkTabelaPublico(L){
 // Antes de baixar, confere de novo: quem voltou a operar (ou saiu das regras)
 // desde a criação sai da lista gravada. Foi exatamente o erro de 04/10.
 async function mkRevalidar(c){
-  if(c.regras && c.regras.fonte === "planilha") return 0;
+  if(c.regras && c.regras.fonte === "planilha"){
+    const { data: n, error } = await sb.rpc("mkt_reconferir_lista", { p_campanha: c.id });
+    if(error) throw error;
+    if(n){
+      const ficam = new Set();
+      for(let de = 0; ; de += 1000){
+        const r = await sb.from("mkt_publico").select("id").eq("campanha_id", c.id).order("id").range(de, de + 999);
+        if(r.error) throw r.error;
+        (r.data || []).forEach(x => ficam.add(x.id));
+        if(!r.data || r.data.length < 1000) break;
+      }
+      mkState.publico = mkState.publico.filter(p => ficam.has(p.id));
+    }
+    return n || 0;
+  }
   const atual = await mkRpcTudo("mkt_previa_publico", { p_regras: c.regras || {} });
   const ok = new Set(atual.map(x => String(x.sinacor)));
   const sair = mkState.publico.filter(p => !ok.has(String(p.sinacor))).map(p => p.sinacor);
