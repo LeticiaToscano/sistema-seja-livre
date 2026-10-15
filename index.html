@@ -1230,7 +1230,7 @@
       <button class="nav-item" data-view="integracoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 7V4M15 7V4M8 7h8v4a4 4 0 0 1-8 0z" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15v5" stroke-linecap="round"/></svg>Integrações</button>
     </nav>
     <div class="foot">
-      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v13/10 busca com botão em Clientes</div></div></div>
+      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v15/10 cadastro incompleto em Solicitações</div></div></div>
       <button class="btn-vercomo hidden" id="verComoBtn" type="button">Ver como assessor</button>
       <button class="btn-logout" id="logoutBtn">Sair</button>
     </div>
@@ -2405,6 +2405,7 @@ function vSolicitacoes(){
       <button class="sol-tab" onclick="solFiltro('saida',this)">Saídas</button>
       <button class="sol-tab" onclick="solFiltro('entrada',this)">Entradas</button>
       <button class="sol-tab" onclick="solFiltro('habilitacao',this)">Aberturas</button>
+      <button class="sol-tab" id="solTabInc" onclick="solFiltro('incompleto',this)" style="border-color:var(--amber);color:var(--amber)">Cadastro incompleto</button>
     </div>
     <div class="panel" id="solList"><div class="loading"><div class="spinner"></div>Carregando…</div></div>`;
   solState.tipo="todas";
@@ -2493,19 +2494,47 @@ async function carregarSolic(){
     <div class="sol-chip"><span class="sc-n" style="color:#5B9BE0">${nf(habilitacao)}</span><span class="sc-l">Aberturas</span></div>`;
   carregarRankSolic();
   let q=sb.from("notificacoes").select("*").order("criado_em",{ascending:false});
-  if(solState.tipo!=="todas") q=q.eq("tipo",solState.tipo);
+  if(solState.tipo!=="todas" && solState.tipo!=="incompleto") q=q.eq("tipo",solState.tipo);
   q=aplicarBarra(aplicarData(q));
-  const {data,error}=await q.limit(400);
+  const {data:bruto,error}=await q.limit(400);
   if(error){ return erro(error,"solList"); }
-  if(!data||!data.length){ el("solList").innerHTML=`<div class="empty">Nenhuma solicitação neste filtro.</div>`; return; }
-  el("solList").innerHTML=`<table><thead><tr><th>Tipo</th><th>Cliente</th><th>Barra</th><th>Data</th><th>Origem</th><th></th></tr></thead>
+  const cad = await solCadastros(bruto||[]);
+  const nInc = (bruto||[]).filter(n=>cad.faltam(n).length).length;
+  const tabInc = el("solTabInc"); if(tabInc) tabInc.textContent = "Cadastro incompleto · " + nf(nInc);
+  const data = solState.tipo==="incompleto" ? (bruto||[]).filter(n=>cad.faltam(n).length) : (bruto||[]);
+  if(!data.length){ el("solList").innerHTML=`<div class="empty">${solState.tipo==="incompleto"?"Todos os clientes deste filtro estão com o cadastro completo.":"Nenhuma solicitação neste filtro."}</div>`; return; }
+  el("solList").innerHTML=`<table><thead><tr><th>Tipo</th><th>Cliente</th><th>Barra</th><th>Data</th><th>Origem</th><th>Cadastro</th><th></th></tr></thead>
     <tbody>${data.map(n=>{const t=TIPO_INFO[n.tipo]||TIPO_INFO.entrada; const nome=n.cliente_nome||("Sinacor "+(n.sinacor||"—"));
       return `<tr class="${n.tipo==='saida'?'linha-preta':''}" ${n.cliente_id?`onclick="abrirFicha('${n.cliente_id}')"`:''}>
         <td><span class="notif-ico ${t.cls}" style="width:26px;height:26px;font-size:12px;display:inline-grid;vertical-align:middle">${t.ico}</span> ${t.label}</td>
         <td>${nome}</td><td class="num">${n.barra||"—"}</td>
         <td class="num">${n.data_movimento?fmtData(n.data_movimento):fmtDataHora(n.criado_em)}</td>
         <td class="num">${n.origem}${n.alerta?' <span style="color:var(--amber)">⚠</span>':""}</td>
+        <td>${solTagCadastro(cad.faltam(n))}</td>
         <td>${n.tipo==='saida'?btnRD(nome):""}</td></tr>`;}).join("")}</tbody></table>`;
+}
+
+// Cadastro completo = a ficha tem telefone, e-mail e CPF (os três que a ficha marca como "faltando").
+// Busca na tabela de clientes em lotes: lista grande de ids não cabe numa URL só.
+async function solCadastros(lista){
+  const ids=[...new Set(lista.map(n=>n.cliente_id).filter(Boolean))];
+  const mapa={};
+  for(let i=0;i<ids.length;i+=150){
+    const {data}=await sb.from("clientes").select("id,telefone,email,cpf").in("id",ids.slice(i,i+150));
+    (data||[]).forEach(c=>{ mapa[c.id]=c; });
+  }
+  const vazio=v=>!String(v==null?"":v).trim();
+  return { faltam: n=>{
+    const c=n.cliente_id && mapa[n.cliente_id];
+    if(!c) return ["ficha"];
+    const f=[]; if(vazio(c.telefone)) f.push("telefone"); if(vazio(c.email)) f.push("e-mail"); if(vazio(c.cpf)) f.push("CPF");
+    return f;
+  }};
+}
+function solTagCadastro(f){
+  if(!f.length) return '<span class="tag t-green" style="font-size:10.5px">completo</span>';
+  const txt = f[0]==="ficha" ? "sem ficha" : "falta "+f.join(", ");
+  return `<span class="tag t-amber" style="font-size:10.5px" title="Cadastro incompleto">${txt}</span>`;
 }
 
 // ---------- INTEGRAÇÕES ----------
