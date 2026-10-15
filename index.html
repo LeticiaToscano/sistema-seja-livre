@@ -1230,7 +1230,7 @@
       <button class="nav-item" data-view="integracoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 7V4M15 7V4M8 7h8v4a4 4 0 0 1-8 0z" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15v5" stroke-linecap="round"/></svg>Integrações</button>
     </nav>
     <div class="foot">
-      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v15/10 cadastro incompleto em Solicitações</div></div></div>
+      <div class="user-chip"><div class="avatar" id="avatar">–</div><div><div class="u-name" id="userName">–</div><div class="u-role" id="userRole">–</div><div style="font-size:9px;color:var(--text-faint);letter-spacing:.3px;margin-top:1px" title="Versão do painel. Serve para conferir se a última alteração já está no ar.">v15/10 busca por e-mail, CPF e telefone</div></div></div>
       <button class="btn-vercomo hidden" id="verComoBtn" type="button">Ver como assessor</button>
       <button class="btn-logout" id="logoutBtn">Sair</button>
     </div>
@@ -1915,7 +1915,7 @@ async function vClientes(){
   el("content").innerHTML=`
     <div class="panel">
       <div class="toolbar">
-        <input class="search" id="busca" placeholder="Nome, Sinacor, CPF ou parceiro — Enter para buscar">
+        <input class="search" id="busca" placeholder="Nome, Sinacor, CPF, e-mail ou telefone — Enter para buscar">
         <select class="search select" id="filtro">
           <option value="todos">Todas as situações</option>
           <option value="operando">Operando</option>
@@ -2084,12 +2084,16 @@ async function carregarClientes(){
   // barra excluida. A lista normal le da vw_saude_carteira, que so tem
   // ativos — por isso a busca por CPF nem funcionava ali.
   if(termo && termo.trim().length >= 2){
-    const {data,error} = await sb.rpc("fn_buscar_cliente",
-      {p_termo: termo.trim(), p_limite: 200});
+    const [r1, extras] = await Promise.all([
+      sb.rpc("fn_buscar_cliente", {p_termo: termo.trim(), p_limite: 200}),
+      cliBuscaExtra(termo.trim())
+    ]);
     if(meu!==cliSeq) return;
     fim();
-    if(error) return erro(error,"tabelaClientes");
-    const achados = data || [];
+    if(r1.error) return erro(r1.error,"tabelaClientes");
+    const achados = r1.data || [];
+    const ja = new Set(achados.map(c=>String(c.id)));
+    extras.forEach(c=>{ if(!ja.has(String(c.id))){ achados.push(c); ja.add(String(c.id)); } });
     cliState.total = achados.length;
     cliPagina = achados;
     if(!achados.length){
@@ -2123,7 +2127,7 @@ async function carregarClientes(){
           : c.saude
             ? `<span class="status s-${c.saude}">${SAUDE_LABEL[c.saude]||c.saude}</span>`
             : '<span style="color:var(--text-faint)">—</span>'}
-          ${!c.na_base_corretora
+          ${c.na_base_corretora===false
             ? '<span class="tag t-amber" style="font-size:10px" title="Não consta na base da corretora">fora da base</span>' : ""}</td>
         <td class="num">${c.contratos_bmf?nf(c.contratos_bmf):"—"}</td>
         <td class="num">${c.data_ultima_operacao?fmtData(c.data_ultima_operacao):"—"}</td>
@@ -2297,6 +2301,37 @@ function cliPerguntar(titulo, texto, opcoes){
     cx.onclick = e => { if(e.target===cx){ cx.remove(); resolve(null); } };
     document.body.appendChild(cx);
   });
+}
+
+// Busca por e-mail, CPF e telefone direto na tabela de clientes, em qualquer
+// formato: o telefone está gravado com parênteses e traço, então os dígitos
+// viram um padrão com % entre eles. Junta com o resultado da fn_buscar_cliente.
+async function cliBuscaExtra(termo){
+  const t = String(termo||"").replace(/[",()]/g,"").trim();
+  if(t.length < 3) return [];
+  const d = t.replace(/\D/g,"");
+  const espaca = x => "%" + x.split("").join("%") + "%";
+  const ors = [`email.ilike."%${t}%"`];
+  if(d.length >= 3){
+    ors.push(`cpf.ilike."%${d}%"`, `cpf.ilike."${espaca(d)}"`);
+  }
+  if(d.length >= 4){
+    let f = d;
+    if(f.length >= 12 && f.startsWith("55")) f = f.slice(2);
+    ors.push(`telefone.ilike."${espaca(f.slice(-11))}"`);
+  }
+  const {data,error} = await sb.from("clientes")
+    .select("id,sinacor,nome,cpf,barra,parceiros,status,segmento")
+    .or(ors.join(",")).limit(200);
+  if(error || !data || !data.length) return [];
+  // saúde, faixa e operação vêm da carteira, para a linha sair igual às outras
+  const ids = data.map(c=>c.id), info = {};
+  for(let i=0;i<ids.length;i+=150){
+    const {data:v} = await sb.from("vw_saude_carteira")
+      .select("id,saude,faixa,grau,contratos_bmf,data_ultima_operacao").in("id", ids.slice(i,i+150));
+    (v||[]).forEach(x=>{ info[x.id]=x; });
+  }
+  return data.map(c=>Object.assign({}, c, info[c.id]||{}));
 }
 
 function mudarPagina(d){ cliState.page=Math.max(0,cliState.page+d); carregarClientes();
